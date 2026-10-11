@@ -34,11 +34,17 @@ struct FetchProgress {
     std::atomic<long long> done{0}, total{0}; // bytes downloaded / expected
 };
 
+// RisenModsInstaller.exe of the release (self_update.h).
+struct ReleaseInstaller {
+    std::wstring source; // URL or local path (--zips), empty = not in the release
+    std::string sha256;  // lowercase hex, empty when GitHub didn't list it
+};
+
 // Lists the mods of the latest release (or the *.zip files in localZips when not empty); one small request,
 // the archives themselves are fetched by LoadModFiles. The mod id comes from the asset name
 // ("RisenFastStart-1.2.zip" -> fast_start). False + error text on failure.
-bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::string* releaseTag, std::string* error,
-               FetchProgress* progress);
+bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::string* releaseTag,
+               ReleaseInstaller* installer, std::string* error);
 
 // Downloads / reads the mod's zip and unpacks it into Mod::files (checks that it holds bin\mods\<id>.dll).
 bool LoadModFiles(Mod* mod, std::string* error, FetchProgress* progress);

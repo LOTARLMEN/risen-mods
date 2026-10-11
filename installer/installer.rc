@@ -1,11 +1,12 @@
 // Icon (tools\make_installer_icon.ps1) and file properties of RisenModsInstaller.exe.
 #include <windows.h>
+#include "version.h"
 
 1 ICON "installer.ico"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,0,0,0
-PRODUCTVERSION 1,0,0,0
+FILEVERSION INSTALLER_VERSION_NUMBERS
+PRODUCTVERSION INSTALLER_VERSION_NUMBERS
 FILEOS VOS_NT_WINDOWS32
 FILETYPE VFT_APP
 BEGIN
@@ -15,12 +16,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "LOTARLMEN"
             VALUE "FileDescription", "Risen Mods installer"
-            VALUE "FileVersion", "1.0"
+            VALUE "FileVersion", INSTALLER_VERSION
             VALUE "InternalName", "RisenModsInstaller"
             VALUE "LegalCopyright", "MIT License"
             VALUE "OriginalFilename", "RisenModsInstaller.exe"
             VALUE "ProductName", "Risen Mods"
-            VALUE "ProductVersion", "1.0"
+            VALUE "ProductVersion", INSTALLER_VERSION
         END
     END
     BLOCK "VarFileInfo"

@@ -227,8 +227,8 @@ bool ModNeedsUpdate(const Mod& mod)
            (mod.installed == "?" || CompareVersions(mod.installed, mod.version) < 0);
 }
 
-bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::string* releaseTag, std::string* error,
-               FetchProgress* progress)
+bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::string* releaseTag,
+               ReleaseInstaller* installer, std::string* error)
 {
     struct Asset {
         std::string name, version;
@@ -253,6 +253,9 @@ bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::strin
         } while (FindNextFileW(find, &fd));
         FindClose(find);
         *releaseTag = "local";
+        std::wstring exe = localZips + L"\\RisenModsInstaller.exe";
+        if (FileExists(exe))
+            installer->source = exe; // no checksum: always compared by version
     } else {
         std::vector<unsigned char> body;
         if (!HttpGet(kReleaseApi, &body, error))
@@ -267,7 +270,23 @@ bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::strin
                 assets.push_back(a);
             }
         }
-        Log("release %s: %zu mod zips", releaseTag->c_str(), assets.size());
+        // The installer exe: its URL and the "digest": "sha256:..." GitHub lists in the same asset object.
+        size_t name = json.find("\"RisenModsInstaller.exe\"");
+        if (name != std::string::npos) {
+            size_t url = json.find("\"browser_download_url\"", name), digest = json.find("\"digest\"", name);
+            for (const std::string& u : JsonStrings(json.substr(url == std::string::npos ? name : url), "browser_download_url"))
+                if (u.size() > 23 && u.compare(u.size() - 23, 23, "/RisenModsInstaller.exe") == 0) {
+                    installer->source = Widen(u);
+                    break;
+                }
+            if (digest != std::string::npos && digest < url) {
+                std::vector<std::string> d = JsonStrings(json.substr(digest, url - digest), "digest");
+                if (!d.empty() && d[0].compare(0, 7, "sha256:") == 0)
+                    installer->sha256 = d[0].substr(7);
+            }
+        }
+        Log("release %s: %zu mod zips, installer %s", releaseTag->c_str(), assets.size(),
+            installer->source.empty() ? "-" : installer->sha256.empty() ? "(no checksum)" : installer->sha256.c_str());
     }
     if (assets.empty()) {
         *error = "the release has no mod archives";

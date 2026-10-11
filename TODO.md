@@ -188,8 +188,15 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
 - [ ] Discord shows its game overlay over the installer (user, 2026-10-11): check whether it's the exe living in the
       Risen folder (Discord "Registered games") - run a copy from Downloads
 - [ ] User test of the window: clicks, drag, folder picker, apply on the real game folder (overwrites dev dlls with release ones)
-- [ ] Release asset RisenModsInstaller.exe + README section (ask before uploading); unsigned exe -> SmartScreen note
-- [ ] Optional later: self-update check, progress per file while applying
+- [x] Published 2026-10-11: commit efafa2d, RisenModsInstaller.exe added to release v2026.10.11 (RU/EN notes, SmartScreen note); downloaded asset verified
+- [x] Self-update (installer 1.1): release asset sha256 ("digest" in the API) vs own exe; differs -> download,
+      VERSIONINFO compared (installer/version.h is the single version source) -> banner "new installer version" +
+      button; swap self -> .old, new -> self, restart, .old deleted at start; failure -> "open the releases page".
+      Tested with a 1.0.9 build updating itself from a local --zips folder with a 1.1 exe (click sent via PostMessage).
+      Installer 1.0 has no updater: its users update by hand once. EVERY new release must carry RisenModsInstaller.exe
+      (the installer reads releases/latest), raise INSTALLER_VERSION for every published installer change.
+- [x] Hardening: /DEPENDENTLOADFLAG:0x800 (system DLLs only from System32 - no d3d9.dll/version.dll planted next to it)
+- [ ] Optional later: progress per file while applying
 
 ## Maybe later
 - [ ] Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)

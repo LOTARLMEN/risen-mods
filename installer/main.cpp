@@ -31,12 +31,15 @@
 #include "imgui_impl_win32.h"
 #include "mods.h"
 #include "risen_style.h"
+#include "self_update.h"
+#include "version.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace {
 
-const char kVersion[] = "1.0";
+const char kVersion[] = INSTALLER_VERSION;
+const wchar_t kReleasesPage[] = L"https://github.com/LOTARLMEN/risen-mods/releases/latest";
 const float kWidth = 760.0f, kHeight = 800.0f; // window size at 100% scaling
 
 // ---------------------------------------------------------------------------------------------
@@ -55,6 +58,12 @@ bool g_fetched;
 std::atomic<bool> g_busy;       // worker running
 std::atomic<bool> g_gameRunning;
 FetchProgress g_progress;
+
+// Self-update (under g_lock): the newer exe of the release, waiting for the "Update installer" button.
+std::vector<unsigned char> g_newExe;
+std::string g_newVersion;
+bool g_selfUpdateFailed; // offer the releases page instead
+bool g_commandMode;      // --list / --install / --remove: no self-update
 
 std::wstring g_localZips; // --zips
 std::wstring g_screenshot; // --screenshot
@@ -176,7 +185,23 @@ void FetchJob()
     g_progress.total = 0;
     std::vector<Mod> mods;
     std::string tag, error;
-    bool ok = FetchMods(g_localZips, &mods, &tag, &error, &g_progress);
+    ReleaseInstaller installer;
+    bool ok = FetchMods(g_localZips, &mods, &tag, &installer, &error);
+    if (ok && !g_commandMode && !installer.source.empty())
+        std::thread([installer] { // in the background: the mod list is usable meanwhile
+            std::vector<unsigned char> exe;
+            std::string version, err;
+            FetchProgress progress;
+            if (FindInstallerUpdate(installer, &exe, &version, &err, &progress)) {
+                std::lock_guard<std::mutex> lock(g_lock);
+                g_newExe = std::move(exe);
+                g_newVersion = version;
+            } else if (!err.empty()) {
+                Log("self-update check: %s", err.c_str());
+            }
+            if (g_hwnd)
+                InvalidateRect(g_hwnd, nullptr, FALSE);
+        }).detach();
     std::lock_guard<std::mutex> lock(g_lock);
     if (!ok) {
         g_fetchError = error;
@@ -254,6 +279,21 @@ void ApplyJob()
     }
     g_message = text;
     Log("apply: %s", text);
+}
+
+void SelfUpdateJob()
+{
+    std::lock_guard<std::mutex> lock(g_lock);
+    std::string error;
+    if (ApplyInstallerUpdate(g_newExe, &error)) {
+        PostMessageW(g_hwnd, WM_CLOSE, 0, 0); // the new exe is starting
+        return;
+    }
+    Log("self-update FAILED: %s", error.c_str());
+    g_message = std::string(T("Couldn't update the installer: ", "Не удалось обновить установщик: ")) + error;
+    g_messageError = true;
+    g_selfUpdateFailed = true;
+    g_newVersion.clear();
 }
 
 void InstallJob()
@@ -405,6 +445,26 @@ void DrawUi()
     if (CloseButton(frame))
         PostMessageW(g_hwnd, WM_CLOSE, 0, 0);
     g_headerHeight = ImGui::GetItemRectMax().y + 4.0f * s;
+
+    // A newer installer in the release.
+    if (lock.owns_lock() && (!g_newVersion.empty() || g_selfUpdateFailed)) {
+        ImGui::Spacing();
+        ImGui::AlignTextToFramePadding();
+        if (g_selfUpdateFailed) {
+            ImGui::TextColored(kBad, "%s", T("Download the new installer by hand:", "Скачайте новый установщик вручную:"));
+            ImGui::SameLine();
+            if (ImGui::Button(T("Open the releases page", "Открыть страницу релиза")))
+                ShellExecuteW(nullptr, L"open", kReleasesPage, nullptr, nullptr, SW_SHOWNORMAL);
+        } else {
+            ImGui::TextColored(kGood, T("A new installer version is out: %s", "Вышла новая версия установщика: %s"),
+                               g_newVersion.c_str());
+            ImGui::SameLine();
+            ImGui::BeginDisabled(busy);
+            if (ImGui::Button(T("Update installer", "Обновить установщик")))
+                StartJob(SelfUpdateJob);
+            ImGui::EndDisabled();
+        }
+    }
 
     // Game folder.
     ImGui::SeparatorText(T("Game folder", "Папка игры"));
@@ -747,7 +807,9 @@ int RunWindow()
     io.IniFilename = nullptr;
     io.LogFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange; // WM_SETCURSOR sets the game's arrow
-    g_font = LoadGameUiFont(20.0f); // Segoe UI until the game folder is known
+    g_font = LoadSystemFont("segoeui.ttf", 20.0f); // the game's font comes with LoadGameStyle
+    if (!g_font)
+        g_font = io.Fonts->AddFontDefault();
     ImGui_ImplWin32_Init(g_hwnd);
     ImGui_ImplDX9_Init(g_device);
 
@@ -863,6 +925,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     strcat_s(temp, "RisenModsInstaller");
     ModInitAt(temp);
     Log("Risen Mods installer %s", kVersion);
+    DeleteOldInstaller(); // left by a self-update
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     g_russian = PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_RUSSIAN;
 
@@ -892,6 +955,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     LocalFree(argv);
     SetGameFolder(game.empty() ? FindGameFolder() : game);
 
+    g_commandMode = command;
     if (!command)
         return RunWindow();
     int code = RunCommand(install, remove);
