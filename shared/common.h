@@ -18,6 +18,8 @@ int IniInt(const char* section, const char* key, int def);
 float IniFloat(const char* section, const char* key, float def);
 // Key name like "F4", "MOUSE3", "NUMPAD+" or "0x73" -> virtual key code; def when missing or unknown.
 int IniKey(const char* section, const char* key, int def);
+// Key name -> virtual key code, 0 when empty or unknown.
+int ParseKey(const char* name);
 // Virtual key code -> name accepted by IniKey ("F4", "MOUSE3", "0x73" for keys without a name).
 const char* KeyName(int vk, char* buf, size_t size);
 void IniWriteString(const char* section, const char* key, const char* value);

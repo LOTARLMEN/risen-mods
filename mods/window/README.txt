@@ -1,4 +1,4 @@
-Risen Window 1.0
+Risen Window 1.1
 ================
 
 Безрамочное окно на весь экран для Risen (64-битный Risen 2023 года, Steam).
@@ -11,11 +11,12 @@ Risen Window 1.0
   1. Распаковать архив в папку игры Risen:
          Risen\bin\version.dll         - загрузчик модов (общий для всех моих модов)
          Risen\bin\mods\window.dll     - сам мод
+         Risen\bin\mods\menu.dll       - меню настроек F10 (общее для всех моих модов)
   2. Включить в игре оконный режим. Или вручную: в файле Risen\data\ini\ConfigLocal.xml
      поставить FullScreen="false".
 
 НАСТРОЙКИ
-  Risen\bin\mods\window.ini (создаётся при первом запуске, меняется прямо во время игры):
+  F10 в игре, вкладка "Окно". Или Risen\bin\mods\window.ini (создаётся при первом запуске, меняется прямо во время игры):
       Borderless=1         безрамочное окно на весь монитор
       HideSystemCursor=1   прятать курсор Windows
       ClipCursor=1         держать мышь внутри окна
@@ -31,3 +32,5 @@ Risen Window 1.0
 English: borderless fullscreen window for Risen (64-bit 2023, Steam), hides the Windows cursor and keeps
 the mouse inside the window. Set FullScreen="false" in data\ini\ConfigLocal.xml. Extract into the Risen folder.
 Settings: bin\mods\window.ini (hot-reloaded).
+
+Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.

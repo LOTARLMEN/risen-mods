@@ -4,10 +4,12 @@
 
 #include <windows.h>
 #include <algorithm>
+#include <unordered_set>
 #include <vector>
 
 #include "common.h"
 #include "game.h"
+#include "hub_client.h"
 
 static const char kDefaultIni[] =
     "; AutoLoot mod settings. Changes are picked up while the game is running.\r\n"
@@ -32,6 +34,9 @@ static const char kDefaultIni[] =
     "Active=0\r\n"
     "ToggleKey=F\r\n"
     "Radius=300\r\n"
+    "; Also loot dead bodies / open chests that belong to nobody within the radius\r\n"
+    "Bodies=0\r\n"
+    "Chests=0\r\n"
     "\r\n"
     "[Debug]\r\n"
     "; Writes everything around the player to autoloot.log\r\n"
@@ -47,6 +52,8 @@ struct Config {
     bool autoActive = false;
     int autoKey = 'F';
     float autoRadius = 300.0f;
+    bool autoBodies = false;
+    bool autoChests = false;
     int dumpKey = 0;
     float dumpRadius = 1500.0f;
 };
@@ -77,14 +84,17 @@ static void ConfigLoad(bool first)
     c.autoActive = IniInt("AutoLoot", "Active", 0) != 0;
     c.autoKey = IniKey("AutoLoot", "ToggleKey", 'F');
     c.autoRadius = Clamp(IniFloat("AutoLoot", "Radius", 300.0f), 100.0f, 3000.0f);
+    c.autoBodies = IniInt("AutoLoot", "Bodies", 0) != 0;
+    c.autoChests = IniInt("AutoLoot", "Chests", 0) != 0;
     c.dumpKey = IniKey("Debug", "DumpKey", 0);
     c.dumpRadius = Clamp(IniFloat("Debug", "DumpRadius", 1500.0f), 100.0f, 100000.0f);
     g_config = c;
     if (first)
         g_autoActive = c.autoActive;
-    Log("config: quick=%d key=0x%02X ground=%d chests=%d | auto=%d active=%d key=0x%02X r=%.0f | dump=0x%02X r=%.0f",
+    Log("config: quick=%d key=0x%02X ground=%d chests=%d | auto=%d active=%d key=0x%02X r=%.0f bodies=%d chests=%d | "
+        "dump=0x%02X r=%.0f",
         c.quickLoot, c.quickKey, c.quickGround, c.quickChests, c.autoLoot, g_autoActive, c.autoKey, c.autoRadius,
-        c.dumpKey, c.dumpRadius);
+        c.autoBodies, c.autoChests, c.dumpKey, c.dumpRadius);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -215,15 +225,78 @@ static void QuickLoot()
     Log("quickloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
 }
 
+// Bodies / chests the AutoLoot script already ran on: whatever it leaves behind (stacks it won't take) must not
+// make us call it again four times a second.
+static std::unordered_set<void*> g_looted;
+
 static void AutoLootTick()
 {
     Entity player;
     if (!g_config.autoLoot || !g_autoActive || !GameReady(&player))
         return;
-    for (const Nearby& n : CollectNearby(player, g_config.autoRadius))
-        if (IsFreeGroundItem(n.e))
+    for (const Nearby& n : CollectNearby(player, g_config.autoRadius)) {
+        if (IsFreeGroundItem(n.e)) {
             PickUp(player, n.e, "autoloot");
+            continue;
+        }
+        bool body = g_config.autoBodies && IsDeadBody(n.e);
+        bool chest = !body && g_config.autoChests && IsOpenChest(n.e);
+        if ((!body && !chest) || g_looted.count(n.e.e))
+            continue;
+        if (g_looted.size() > 1000)
+            g_looted.clear();
+        g_looted.insert(n.e.e);
+        char name[96];
+        EntityName(n.e, name, sizeof(name));
+        int64_t moved = ScriptAutoLoot(player, n.e);
+        Log("autoloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
+    }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Risen Mods menu
+
+static const HubItem kItems[] = {
+    /* 0 */ {HubHeader, nullptr, nullptr, "QuickLoot", "Быстрый лут"},
+    /* 1 */ {HubCheckbox, "QuickLoot", "Enabled", "Loot what you look at with a key",
+             "Лутать то, на что смотришь, по клавише", 1, 0, 0, 0, 0, nullptr, -1,
+             "Dead bodies, open chests, items: everything at once, no loot window",
+             "Трупы, открытые сундуки, предметы: всё сразу, без окна лута"},
+    /* 2 */ {HubKey, "QuickLoot", "Key", "Key", "Клавиша", VK_RBUTTON, 0, 0, 0, 0, nullptr, 1,
+             "Not while the weapon is drawn: then the key works as usual in the game",
+             "С обнажённым оружием не лутает: клавиша работает как обычно в игре"},
+    /* 3 */ {HubCheckbox, "QuickLoot", "GroundItems", "Items on the ground", "Предметы на земле", 1, 0, 0, 0, 0,
+             nullptr, 1},
+    /* 4 */ {HubCheckbox, "QuickLoot", "Chests", "Open chests", "Открытые сундуки", 1, 0, 0, 0, 0, nullptr, 1},
+    /* 5 */ {HubHeader, nullptr, nullptr, "AutoLoot", "Автолут"},
+    /* 6 */ {HubCheckbox, "AutoLoot", "Enabled", "Pick up loose items around you", "Подбирать предметы вокруг", 1,
+             0, 0, 0, 0, nullptr, -1, "Switched on and off with the key below. Items that belong to someone are never taken.",
+             "Включается и выключается клавишей ниже. Чужие предметы не берутся никогда."},
+    /* 7 */ {HubKey, "AutoLoot", "ToggleKey", "On / off key", "Клавиша вкл/выкл", 'F', 0, 0, 0, 0, nullptr, 6},
+    /* 8 */ {HubSlider, "AutoLoot", "Radius", "Radius", "Радиус", 300, 1.0f, 30.0f, 0.5f, 0.01f, "%.1f m", 6},
+    /* 9 */ {HubCheckbox, "AutoLoot", "Bodies", "Also search dead bodies", "Обыскивать трупы", 0, 0, 0, 0, 0,
+             nullptr, 6},
+    /*10 */ {HubCheckbox, "AutoLoot", "Chests", "Also empty open chests", "Опустошать открытые сундуки", 0, 0, 0, 0,
+             0, nullptr, 6, "Only chests that belong to nobody and are not locked",
+             "Только ничьи и не запертые сундуки"},
+    /*11 */ {HubCheckbox, "AutoLoot", "Active", "On at game start", "Включён при запуске игры", 0, 0, 0, 0, 0,
+             nullptr, 6},
+};
+
+static void OnMenuChanged()
+{
+    ConfigLoad(false);
+}
+
+static HubPage g_page = {"autoloot", 20, "AutoLoot", "Автолут", nullptr, kItems, sizeof(kItems) / sizeof(kItems[0]),
+                         OnMenuChanged};
+
+static bool StatusQuery(char*, int)
+{
+    return g_config.autoLoot && g_autoActive;
+}
+
+static const HubStatus kStatus = {"autoloot", 20, HubIconHand, StatusQuery};
 
 static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
@@ -267,18 +340,23 @@ static DWORD WINAPI Worker(LPVOID)
 {
     HWND hwnd = WaitForGameWindow();
     g_origProc = SubclassWindow(hwnd, HookedWndProc);
-    Log("autoloot: ready");
+    if (const HubApi* hub = HubGet()) {
+        hub->registerPage(&g_page);
+        hub->registerStatus(&kStatus);
+    }
+    Log("autoloot: ready (%s)", HubGet() ? "menu found" : "no menu.dll: ini only");
 
     KeyEdge quick, toggle, dump;
     for (unsigned tick = 0; IsWindow(hwnd); ++tick) {
         bool focused = GetForegroundWindow() == hwnd;
-        if (quick.Pressed(g_config.quickKey, focused))
+        bool busy = HubBusy(); // the menu is open: its clicks and key rebinds are not ours
+        if (quick.Pressed(g_config.quickKey, focused) && !busy)
             PostMessageW(hwnd, WM_LOOT_QUICK, 0, 0);
-        if (toggle.Pressed(g_config.autoKey, focused))
+        if (toggle.Pressed(g_config.autoKey, focused) && !busy)
             PostMessageW(hwnd, WM_LOOT_AUTO_TOGGLE, 0, 0);
-        if (dump.Pressed(g_config.dumpKey, focused))
+        if (dump.Pressed(g_config.dumpKey, focused) && !busy)
             PostMessageW(hwnd, WM_LOOT_DUMP, 0, 0);
-        if (tick % 8 == 0 && g_autoActive)
+        if (tick % 8 == 0 && g_autoActive && !busy)
             PostMessageW(hwnd, WM_LOOT_AUTO_TICK, 0, 0); // ~4 times a second
         if (tick % 30 == 0 && IniChanged())
             PostMessageW(hwnd, WM_LOOT_RELOAD, 0, 0);
@@ -292,8 +370,8 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.2");
-        IniPath(kDefaultIni);
+        Log("AutoLoot 0.3");
+        g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))
             CloseHandle(t);

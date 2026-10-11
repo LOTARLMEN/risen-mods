@@ -108,17 +108,31 @@ Debug: `[Debug] DumpKey` logs everything around the player.
 - [ ] Hand icon right of the hourglass while AutoLoot is on (comes with the hub below)
 - [ ] README + package
 
-## Stage 5.5 — Mod hub: one F10 window for all mods (user's idea, next session)
-Each mod DLL has its own ImGui copy -> mods can't draw into another mod's window. Plan:
-- [ ] `mods/menu` (hub) owns the D3D9 overlay, ImGui, input capture, F10 window and the status icon row
-- [ ] C API exported by the hub (GetProcAddress from mods): register a mod page with declarative settings
-      (toggle mod on/off, checkbox, slider, key bind, language) + get/set callbacks; status icon (hourglass, hand)
-- [ ] Speed: move its panel + indicator onto the hub API; keep working without the hub (ini only)
-- [ ] AutoLoot: page + hand icon + item feed
-- [ ] Window, Fast Start: pages (toggles need restart -> show a note)
-- [ ] Language RU/EN shared by all pages
-- [ ] Later: item category filters for AutoLoot; style the window like Risen (dark/parchment, font)
+## Stage 5.5 — Mod hub: one F10 window for all mods (session 5, 2026-10-11)
+Each mod DLL has its own ImGui copy -> mods can't draw into another mod's window. Design: `mods/menu` -> `menu.dll`
+owns D3D9 overlay, ImGui, input capture, pause, F10 window and the status icon row. Mods register pages with
+declarative items bound to keys of their own ini (`shared/hub_api.h`, C ABI, `RisenHubApi` export); the hub writes the
+ini and calls the mod's onChanged on the game thread. Without menu.dll mods keep working via ini.
+- [x] `shared/hub_api.h` + `shared/hub_client` (lazy GetProcAddress, HubBusy() for hotkeys)
+- [x] `mods/menu`: overlay + window with a tab per mod, checkbox/slider/key/header/note items, RU/EN globe, pause
+- [x] Status icons row: hourglass (Speed, moved from the speed mod), hand (AutoLoot active)
+- [x] Speed 1.3: drop own ImGui panel/indicator, register page + status
+- [x] AutoLoot 0.3: page (keys, radius, ground/chests) + hand icon; NEW auto-loot of bodies / open chests in radius
+- [x] Window, Fast Start: pages (Fast Start needs a restart -> note)
+- [x] User test 2026-10-11: all tabs, icons (hand liked), radius bodies/chests - "works great"
+- [ ] Fixed window size + mouse wheel scroll (built, deployed, waiting for test)
+- [ ] package.ps1: menu.dll in every zip (user agreed: shared like version.dll, newest wins); READMEs Speed 1.3/AutoLoot 0.3
+- [ ] Risen style: game cursor instead of ImGui arrow (find cursor texture in gui .pak), dark/gold colors, game font
+- [ ] Later: item category filters for AutoLoot
 - [ ] Idea: with ReShade Addon present, also offer the pages in ReShade's menu (`reshade::register_overlay`)
+
+## Stage 5.7 — No training limits (user's request 2026-10-11, small mod `mods/no-limits`)
+Risen caps how far attributes (strength, dexterity, ...) and skills can be trained (max value / per-teacher limit).
+Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an on/off toggle.
+- [ ] Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
+      (per-teacher max level), or a hard max in the attribute code (PSSkills / gCSkillValue?)
+- [ ] Pick the smallest hook (patch the max-value check or the teacher limit table), learning point costs unchanged
+- [ ] Test: train past the old cap at a teacher; saves stay compatible with the mod removed
 
 ## Maybe later
 - [ ] Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)

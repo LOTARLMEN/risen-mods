@@ -96,7 +96,7 @@ static const struct { const char* name; int vk; } kKeyNames[] = {
     {"NUMPAD+", VK_ADD}, {"NUMPAD-", VK_SUBTRACT}, {"NUMPAD*", VK_MULTIPLY}, {"NUMPAD/", VK_DIVIDE},
 };
 
-static int ParseKeyName(const char* raw)
+int ParseKey(const char* raw)
 {
     char name[32];
     size_t n = 0;
@@ -135,7 +135,7 @@ int IniKey(const char* section, const char* key, int def)
     GetPrivateProfileStringA(section, key, "", buf, sizeof(buf), g_iniPath);
     if (!buf[0])
         return def;
-    if (int vk = ParseKeyName(buf))
+    if (int vk = ParseKey(buf))
         return vk;
     Log("config: unknown key name '%s' for %s, using 0x%02X", buf, key, def);
     return def;

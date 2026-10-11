@@ -1,13 +1,14 @@
 // Speed: toggle game speed with a hotkey (like Gothic's Z-mod speedup). Settings: mods\speed.ini (hot-reloaded)
-// or the in-game panel (F10). Uses eCTimer::GetInstance().SetTimeScaling(float), exported by Engine.dll;
-// called on the game thread only.
+// or the Risen Mods menu (F10, menu.dll), which also draws the hourglass while the speed-up is on.
+// Uses eCTimer::GetInstance().SetTimeScaling(float), exported by Engine.dll; called on the game thread only.
 
 #include <windows.h>
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 
 #include "common.h"
-#include "input_capture.h"
-#include "speed.h"
+#include "hub_client.h"
 
 static const char kDefaultIni[] =
     "; Speed mod settings. Changes are picked up while the game is running.\r\n"
@@ -22,24 +23,22 @@ static const char kDefaultIni[] =
     "ToggleKey=Z\r\n"
     "\r\n"
     "[Indicator]\r\n"
-    "; Hourglass + x3 in the top-left corner while the speed-up is on\r\n"
-    "Show=1\r\n"
-    "; Size (1.0 = normal)\r\n"
-    "Scale=1.0\r\n"
-    "\r\n"
-    "[Panel]\r\n"
-    "; Opens the settings window in game (the game is paused while it is open)\r\n"
-    "Key=F10\r\n"
-    "; Window language: EN or RU (the globe button in the window switches it)\r\n"
-    "Language=\r\n";
+    "; Hourglass + x3 in the top-left corner while the speed-up is on (needs the Risen Mods menu, menu.dll)\r\n"
+    "Show=1\r\n";
 
-static SpeedConfig g_config;
+struct Config {
+    bool enabled = true;
+    float multiplier = 3.0f;
+    int toggleKey = 'Z';
+    bool indicator = true;
+};
+
+static Config g_config;
 static WNDPROC g_origProc;
 
 constexpr UINT WM_SPEEDMOD_TOGGLE = WM_APP + 0x5201;
 constexpr UINT WM_SPEEDMOD_TICK = WM_APP + 0x5202;
 constexpr UINT WM_SPEEDMOD_RELOAD = WM_APP + 0x5203;
-constexpr UINT WM_SPEEDMOD_PANEL = WM_APP + 0x5204; // wParam: 1 open, 0 close
 
 static float Clamp(float v, float lo, float hi)
 {
@@ -48,36 +47,13 @@ static float Clamp(float v, float lo, float hi)
 
 static void ConfigLoad()
 {
-    SpeedConfig c;
+    Config c;
     c.enabled = IniInt("Speed", "Enabled", 1) != 0;
     c.multiplier = Clamp(IniFloat("Speed", "Multiplier", 3.0f), 0.1f, 10.0f);
     c.toggleKey = IniKey("Speed", "ToggleKey", 'Z');
     c.indicator = IniInt("Indicator", "Show", 1) != 0;
-    c.indicatorScale = Clamp(IniFloat("Indicator", "Scale", 1.0f), 0.3f, 4.0f);
-    c.panelKey = IniKey("Panel", "Key", VK_F10);
-    char lang[8];
-    GetPrivateProfileStringA("Panel", "Language", "", lang, sizeof(lang), IniPath());
-    c.russian = lang[0] ? _stricmp(lang, "RU") == 0 : PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_RUSSIAN;
     g_config = c;
-    Log("config: enabled=%d x%.2f key=0x%02X indicator=%d scale=%.2f panel=0x%02X lang=%s", c.enabled,
-        c.multiplier, c.toggleKey, c.indicator, c.indicatorScale, c.panelKey, c.russian ? "RU" : "EN");
-}
-
-const SpeedConfig& SpeedGetConfig() { return g_config; }
-
-void SpeedApplyLive(const SpeedConfig& c) { g_config = c; }
-
-void SpeedSetConfig(const SpeedConfig& c)
-{
-    g_config = c;
-    IniWriteString("Speed", "Enabled", c.enabled ? "1" : "0");
-    IniWriteFloat("Speed", "Multiplier", c.multiplier);
-    IniWriteKey("Speed", "ToggleKey", c.toggleKey);
-    IniWriteString("Indicator", "Show", c.indicator ? "1" : "0");
-    IniWriteFloat("Indicator", "Scale", c.indicatorScale);
-    IniWriteKey("Panel", "Key", c.panelKey);
-    IniWriteString("Panel", "Language", c.russian ? "RU" : "EN");
-    Log("config: saved from panel");
+    Log("config: enabled=%d x%.2f key=0x%02X indicator=%d", c.enabled, c.multiplier, c.toggleKey, c.indicator);
 }
 
 using GetInstanceFn = void* (*)();
@@ -88,8 +64,6 @@ static GetInstanceFn g_timerInstance;
 static SetTimeScalingFn g_setTimeScale;
 static GetTimeScalingFn g_getTimeScale;
 static bool g_active;
-static bool g_frozen;
-static float g_scaleBeforeFreeze = 1.0f;
 
 static bool SpeedInit()
 {
@@ -117,28 +91,10 @@ static void SpeedToggle()
     Log("speed: %s (x%.2f)", g_active ? "ON" : "OFF", scale);
 }
 
-void SpeedFreeze(bool freeze)
-{
-    if (!g_timerInstance || freeze == g_frozen)
-        return;
-    void* timer = g_timerInstance();
-    g_frozen = freeze;
-    if (freeze) {
-        // gCSession::Pause blacks out the screen; a near-zero time scale keeps the picture.
-        g_scaleBeforeFreeze = g_getTimeScale(timer);
-        g_setTimeScale(timer, 0.001f);
-    } else {
-        g_active = g_active && g_config.enabled;
-        float scale = g_scaleBeforeFreeze < 0.999f ? g_scaleBeforeFreeze // the game's own slow motion
-                      : g_active ? g_config.multiplier : 1.0f;
-        g_setTimeScale(timer, scale);
-    }
-    Log("speed: %s", freeze ? "frozen" : "unfrozen");
-}
-
 static void SpeedTick()
 {
-    if (!g_timerInstance || !g_active || g_frozen)
+    // While the menu is open it holds the time scale near zero (pause) and restores it on close.
+    if (!g_timerInstance || !g_active || HubBusy())
         return;
     void* timer = g_timerInstance();
     if (!g_config.enabled) {
@@ -154,13 +110,41 @@ static void SpeedTick()
         g_setTimeScale(timer, g_config.multiplier);
 }
 
-bool SpeedIsActive() { return g_active; }
+// ---------------------------------------------------------------------------------------------
+// Risen Mods menu
+
+static const HubItem kItems[] = {
+    {HubCheckbox, "Speed", "Enabled", "Speed-up enabled", "Ускорение включено", 1},
+    {HubSlider, "Speed", "Multiplier", "Speed", "Скорость", 3.0f, 1.5f, 10.0f, 0.1f, 1.0f, "x%.1f", 0},
+    {HubKey, "Speed", "ToggleKey", "Toggle key", "Клавиша", 'Z', 0, 0, 0, 0, nullptr, 0,
+     "Avoid F3, F5-F9, F12: the game uses them", "Не берите F3, F5-F9, F12: их использует игра"},
+    {HubCheckbox, "Indicator", "Show", "Hourglass while sped up", "Песочные часы при ускорении", 1, 0, 0, 0, 0,
+     nullptr, 0},
+};
+
+static HubPage g_page = {"speed", 10, "Speed", "Ускорение", nullptr, kItems, sizeof(kItems) / sizeof(kItems[0]),
+                         ConfigLoad};
+
+static bool StatusQuery(char* text, int size)
+{
+    if (!g_active || !g_config.indicator)
+        return false;
+    snprintf(text, size, "x%.2f", g_config.multiplier);
+    for (char* end = text + strlen(text) - 1; *end == '0' || *end == '.'; --end) { // "x2.00" -> "x2"
+        bool dot = *end == '.';
+        *end = 0;
+        if (dot)
+            break;
+    }
+    return true;
+}
+
+static const HubStatus kStatus = {"speed", 10, HubIconHourglass, StatusQuery};
+
+// ---------------------------------------------------------------------------------------------
 
 static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
-    LRESULT result;
-    if (InputCaptureFilter(hwnd, msg, wp, lp, &result))
-        return result;
     switch (msg) {
     case WM_SPEEDMOD_TOGGLE:
         SpeedToggle();
@@ -171,13 +155,6 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_SPEEDMOD_RELOAD:
         ConfigLoad();
         return 0;
-    case WM_SPEEDMOD_PANEL:
-        PanelSetOpen(hwnd, wp != 0);
-        return 0;
-    case WM_ACTIVATE:
-        if (LOWORD(wp) == WA_INACTIVE && PanelIsOpen())
-            PanelSetOpen(hwnd, false); // Alt+Tab: give the game its input back
-        break;
     }
     return CallOriginalWndProc(g_origProc, hwnd, msg, wp, lp);
 }
@@ -188,7 +165,7 @@ struct KeyEdge {
     bool wasDown = false;
     bool Pressed(int vk, bool focused)
     {
-        bool down = focused && (GetAsyncKeyState(vk) & 0x8000);
+        bool down = vk && focused && (GetAsyncKeyState(vk) & 0x8000);
         bool pressed = down && !wasDown && vk == key; // a key just rebound while held doesn't fire
         key = vk;
         wasDown = down;
@@ -202,19 +179,17 @@ static DWORD WINAPI Worker(LPVOID)
     if (!SpeedInit())
         return 0;
     g_origProc = SubclassWindow(hwnd, HookedWndProc);
-    Log("speed: ready");
+    if (const HubApi* hub = HubGet()) {
+        hub->registerPage(&g_page);
+        hub->registerStatus(&kStatus);
+    }
+    Log("speed: ready (%s)", HubGet() ? "menu found" : "no menu.dll: ini only, no hourglass");
 
-    KeyEdge toggle, panel, escape;
+    KeyEdge toggle;
     for (unsigned tick = 0; IsWindow(hwnd); ++tick) {
         bool focused = GetForegroundWindow() == hwnd;
-        bool waiting = PanelIsWaitingKey(); // the panel itself reads the next key
-        bool open = PanelIsOpen();
-        if (toggle.Pressed(g_config.toggleKey, focused) && !open && !waiting)
+        if (toggle.Pressed(g_config.toggleKey, focused) && !HubBusy())
             PostMessageW(hwnd, WM_SPEEDMOD_TOGGLE, 0, 0); // the timer is touched on the game thread only
-        if (panel.Pressed(g_config.panelKey, focused) && !waiting)
-            PostMessageW(hwnd, WM_SPEEDMOD_PANEL, !open, 0);
-        if (escape.Pressed(VK_ESCAPE, focused) && open && !waiting)
-            PostMessageW(hwnd, WM_SPEEDMOD_PANEL, 0, 0);
         if (tick % 5 == 0)
             PostMessageW(hwnd, WM_SPEEDMOD_TICK, 0, 0);
         if (tick % 20 == 0 && IniChanged())
@@ -229,12 +204,9 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "speed");
-        Log("Speed 1.2");
-        IniPath(kDefaultIni);
+        Log("Speed 1.3");
+        g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
-        // Before the game creates its D3D9 device, which happens after the mod loader has run.
-        Log("overlay: d3d9 hook %s", OverlayInstall() ? "installed" : "FAILED (no indicator, no panel)");
-        Log("input capture: %s", InputCaptureInstall() ? "installed" : "FAILED");
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))
             CloseHandle(t);
     }

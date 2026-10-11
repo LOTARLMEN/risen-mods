@@ -1,4 +1,4 @@
-Risen Fast Start 1.1
+Risen Fast Start 1.2
 ====================
 
 Ускоряет запуск Risen: окно игры появляется примерно через 10 секунд вместо ~30.
@@ -37,7 +37,7 @@ Risen Fast Start 1.1
 
 -------------------------------------------------------------------------------
 
-Risen Fast Start 1.1 (English)
+Risen Fast Start 1.2 (English)
 
 Makes Risen (64-bit 2023 re-release, Steam) start in ~10 s instead of ~30 s. No game files are changed.
 
@@ -48,3 +48,6 @@ What it does: buffers the game's ~8 million tiny reads of its .pak archives at s
 and answers the engine's video memory query directly from DXGI instead of running DxDiag (~7 s).
 Optional Risen\bin\mods\fast_start.ini: [Performance] FastPakReads=0 / SkipDxDiag=0 to turn parts off.
 Requires Windows on drive C:.
+
+F10 in game: settings window of all my mods (bin\mods\menu.dll), tab "Fast Start".
+Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.
