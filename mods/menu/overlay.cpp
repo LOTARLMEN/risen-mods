@@ -8,6 +8,7 @@
 
 #include "common.h"
 #include "d3d9_hook.h"
+#include "game_assets.h"
 #include "imgui.h"
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
@@ -18,6 +19,7 @@ namespace {
 bool g_ready;
 ImFont* g_font;   // icon text
 ImFont* g_uiFont; // window
+IDirect3DTexture9* g_atlas; // the game's GUI atlas (cursor, parchment), null = plain ImGui look
 
 ImFont* LoadFont(const char* file, float size)
 {
@@ -28,6 +30,19 @@ ImFont* LoadFont(const char* file, float size)
     if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES)
         return nullptr;
     return ImGui::GetIO().Fonts->AddFontFromFileTTF(path, size);
+}
+
+// Font from the game's gui2.pak; merge = add the glyphs missing in the previous font.
+ImFont* LoadGameFont(const char* name, float size, bool merge)
+{
+    std::vector<unsigned char> data;
+    if (!GamePakRead("data\\common\\gui2.pak", name, &data) || data.empty())
+        return nullptr;
+    void* copy = IM_ALLOC(data.size()); // owned and freed by the ImGui font atlas
+    memcpy(copy, data.data(), data.size());
+    ImFontConfig config;
+    config.MergeMode = merge;
+    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, static_cast<int>(data.size()), size, &config);
 }
 
 void OnInit(IDirect3DDevice9* device, HWND hwnd)
@@ -42,12 +57,17 @@ void OnInit(IDirect3DDevice9* device, HWND hwnd)
     g_font = LoadFont("segoeuib.ttf", 32.0f);
     if (!g_font)
         g_font = io.Fonts->AddFontDefault();
-    g_uiFont = LoadFont("segoeui.ttf", 20.0f);
+    g_uiFont = LoadGameFont("QUORUMM.TTF", 20.0f, false); // the game's interface font (Latin)
+    if (g_uiFont)
+        LoadGameFont("FreeSans.ttf", 20.0f, true); // Cyrillic and whatever else Quorum lacks, as in the game
+    else
+        g_uiFont = LoadFont("segoeui.ttf", 20.0f);
     if (!g_uiFont)
         g_uiFont = g_font;
 
+    g_atlas = GameLoadTexture(device, "data\\compiled\\images.pak", "GUI_TexturePage01_REDESIGN._ximg");
     g_ready = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
-    Log("overlay: %s", g_ready ? "ready" : "init FAILED");
+    Log("overlay: %s, game style %s", g_ready ? "ready" : "init FAILED", g_atlas ? "on" : "off (plain look)");
 }
 
 void OnBeforeReset()
@@ -183,7 +203,7 @@ void OnDraw(IDirect3DDevice9*)
     ImGuiIO& io = ImGui::GetIO();
     if (open) {
         io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
-        io.MouseDrawCursor = true; // the game hides the system cursor
+        io.MouseDrawCursor = !g_atlas; // the game hides the system cursor; with the atlas we draw the game's arrow
         // The game's raw input takes the buttons away from window messages: read them directly.
         bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
         io.AddMouseButtonEvent(0, (GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) & 0x8000) != 0);
@@ -205,6 +225,15 @@ void OnDraw(IDirect3DDevice9*)
     if (open) {
         ImGui::PushFont(g_uiFont, 20.0f * screenScale);
         WindowDraw(screenScale);
+        if (g_atlas) {
+            const AtlasRect& r = kAtlasCursor;
+            float s = screenScale * 0.9f;
+            ImVec2 p = io.MousePos;
+            ImGui::GetForegroundDrawList()->AddImage(
+                reinterpret_cast<ImTextureID>(g_atlas), p,
+                ImVec2(p.x + (r.x1 - r.x0) * s, p.y + (r.y1 - r.y0) * s),
+                ImVec2(r.x0 / kAtlasSize, r.y0 / kAtlasSize), ImVec2(r.x1 / kAtlasSize, r.y1 / kAtlasSize));
+        }
         ImGui::PopFont();
     }
 
@@ -214,6 +243,11 @@ void OnDraw(IDirect3DDevice9*)
 }
 
 } // namespace
+
+void* OverlayAtlas()
+{
+    return g_atlas;
+}
 
 bool OverlayReady()
 {

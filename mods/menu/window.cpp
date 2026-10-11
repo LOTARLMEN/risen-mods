@@ -10,6 +10,7 @@
 
 #include "common.h"
 #include "imgui.h"
+#include "game_assets.h"
 #include "menu.h"
 
 namespace {
@@ -255,6 +256,57 @@ bool LanguageButton(bool russian)
     return clicked;
 }
 
+// Stretches the game's parchment frame over the rectangle: corners keep their size (k = pixels per atlas pixel),
+// edges stretch along one axis, the middle in both.
+void DrawFrame(ImDrawList* dl, ImTextureID atlas, ImVec2 a, ImVec2 b, float k)
+{
+    const AtlasRect& r = kAtlasFrame;
+    const float m = kFrameBorder, mk = kFrameBorder * k;
+    const float sx[4] = {r.x0, r.x0 + m, r.x1 - m, r.x1}, sy[4] = {r.y0, r.y0 + m, r.y1 - m, r.y1};
+    const float dx[4] = {a.x, a.x + mk, b.x - mk, b.x}, dy[4] = {a.y, a.y + mk, b.y - mk, b.y};
+    for (int y = 0; y < 3; ++y)
+        for (int x = 0; x < 3; ++x)
+            dl->AddImage(atlas, ImVec2(dx[x], dy[y]), ImVec2(dx[x + 1], dy[y + 1]),
+                         ImVec2(sx[x] / kAtlasSize, sy[y] / kAtlasSize),
+                         ImVec2(sx[x + 1] / kAtlasSize, sy[y + 1] / kAtlasSize));
+}
+
+// Dark ink on parchment, leather-brown controls, dark red accents.
+int PushParchmentColors()
+{
+    const struct {
+        ImGuiCol id;
+        ImVec4 color;
+    } colors[] = {
+        {ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0)},
+        {ImGuiCol_Text, ImVec4(0.20f, 0.13f, 0.07f, 1.0f)},
+        {ImGuiCol_TextDisabled, ImVec4(0.42f, 0.34f, 0.24f, 1.0f)},
+        {ImGuiCol_Border, ImVec4(0.35f, 0.24f, 0.12f, 0.35f)},
+        {ImGuiCol_FrameBg, ImVec4(0.35f, 0.24f, 0.12f, 0.16f)},
+        {ImGuiCol_FrameBgHovered, ImVec4(0.35f, 0.24f, 0.12f, 0.28f)},
+        {ImGuiCol_FrameBgActive, ImVec4(0.35f, 0.24f, 0.12f, 0.40f)},
+        {ImGuiCol_CheckMark, ImVec4(0.50f, 0.12f, 0.06f, 1.0f)},
+        {ImGuiCol_SliderGrab, ImVec4(0.42f, 0.27f, 0.12f, 0.90f)},
+        {ImGuiCol_SliderGrabActive, ImVec4(0.55f, 0.15f, 0.07f, 1.0f)},
+        {ImGuiCol_Button, ImVec4(0.35f, 0.24f, 0.12f, 0.20f)},
+        {ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.24f, 0.12f, 0.35f)},
+        {ImGuiCol_ButtonActive, ImVec4(0.35f, 0.24f, 0.12f, 0.50f)},
+        {ImGuiCol_Tab, ImVec4(0.35f, 0.24f, 0.12f, 0.15f)},
+        {ImGuiCol_TabHovered, ImVec4(0.35f, 0.24f, 0.12f, 0.35f)},
+        {ImGuiCol_TabSelected, ImVec4(0.35f, 0.24f, 0.12f, 0.30f)},
+        {ImGuiCol_TabSelectedOverline, ImVec4(0.55f, 0.15f, 0.07f, 1.0f)},
+        {ImGuiCol_Separator, ImVec4(0.35f, 0.24f, 0.12f, 0.45f)},
+        {ImGuiCol_ScrollbarBg, ImVec4(0, 0, 0, 0)},
+        {ImGuiCol_ScrollbarGrab, ImVec4(0.35f, 0.24f, 0.12f, 0.40f)},
+        {ImGuiCol_ScrollbarGrabHovered, ImVec4(0.35f, 0.24f, 0.12f, 0.60f)},
+        {ImGuiCol_ScrollbarGrabActive, ImVec4(0.35f, 0.24f, 0.12f, 0.80f)},
+        {ImGuiCol_PopupBg, ImVec4(0.93f, 0.87f, 0.74f, 0.97f)},
+    };
+    for (const auto& c : colors)
+        ImGui::PushStyleColor(c.id, c.color);
+    return static_cast<int>(sizeof(colors) / sizeof(colors[0]));
+}
+
 } // namespace
 
 void WindowOpened()
@@ -271,15 +323,21 @@ void WindowDraw(float scale)
     ImGuiIO& io = ImGui::GetIO();
     ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always,
                             ImVec2(0.5f, 0.5f));
-    ImGui::SetNextWindowBgAlpha(0.92f);
+    ImTextureID atlas = reinterpret_cast<ImTextureID>(OverlayAtlas());
+    if (!atlas)
+        ImGui::SetNextWindowBgAlpha(0.92f);
+    // With the parchment: keep clear of the burnt edges and the metal bar on top.
+    ImVec2 padding = atlas ? ImVec2(34.0f * scale, 36.0f * scale) : ImVec2(18.0f * scale, 14.0f * scale);
     // Same size on every tab; a tab with more items scrolls (mouse wheel).
     float fontSize = ImGui::GetFontSize();
-    float width = LabelColumn() + FieldWidth() + fontSize * 3.0f + 36.0f * scale;
+    float width = LabelColumn() + FieldWidth() + fontSize * 3.0f + padding.x * 2.0f;
     float height = fontSize * 34.0f;
     if (height > io.DisplaySize.y * 0.9f)
         height = io.DisplaySize.y * 0.9f;
     ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f * scale, 14.0f * scale));
+    int colors = atlas ? PushParchmentColors() : 0;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, padding);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, atlas ? 0.0f : 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f * scale, 10.0f * scale));
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * scale, 5.0f * scale));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 8.0f * scale);
@@ -290,9 +348,17 @@ void WindowDraw(float scale)
     ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar |
                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
     if (ImGui::Begin("##risen_mods_menu", nullptr, flags)) {
+        if (atlas) {
+            ImVec2 pos = ImGui::GetWindowPos(), size = ImGui::GetWindowSize();
+            DrawFrame(ImGui::GetWindowDrawList(), atlas, pos, ImVec2(pos.x + size.x, pos.y + size.y), scale * 1.2f);
+        }
         // Own header: title on the left, language switch on the right.
         ImGui::AlignTextToFramePadding();
+        if (atlas)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.45f, 0.10f, 0.05f, 1.0f));
         ImGui::TextUnformatted("Risen Mods");
+        if (atlas)
+            ImGui::PopStyleColor();
         if (LanguageButton(russian))
             MenuSetLanguage(!russian);
 
@@ -321,7 +387,8 @@ void WindowDraw(float scale)
             keepOpen = false;
     }
     ImGui::End();
-    ImGui::PopStyleVar(7);
+    ImGui::PopStyleVar(8);
+    ImGui::PopStyleColor(colors);
     if (!keepOpen)
         MenuSetOpen(FindGameWindow(), false);
 }

@@ -122,7 +122,12 @@ ini and calls the mod's onChanged on the game thread. Without menu.dll mods keep
 - [x] User test 2026-10-11: all tabs, icons (hand liked), radius bodies/chests - "works great"
 - [x] Fixed window size + mouse wheel scroll (user-tested)
 - [x] package.ps1: menu.dll in every zip (user agreed: shared like version.dll, newest wins); READMEs Speed 1.3/AutoLoot 0.3
-- [ ] Risen style: game cursor instead of ImGui arrow (find cursor texture in gui .pak), dark/gold colors, game font
+- [x] Risen style (user: "просто офигенно"): game cursor + parchment frame (9-slice) from images.pak atlas
+      GUI_TexturePage01_REDESIGN, Quorum + FreeSans fonts from gui2.pak, read at runtime (mods/menu/game_assets)
+- [ ] AutoLoot: short game effect (spark) where an item / body / chest was looted, menu toggle (user's idea).
+      Script.dll: static `EffectSystem::StartEffect(bCString const&, bCVector const&)` (?StartEffect@EffectSystem@@SA?AVEffect@@AEBVbCString@@AEBVbCVector@@@Z),
+      `Entity::GetPosition` (?GetPosition@Entity@@QEBA?AVbCVector@@XZ) - take it BEFORE InsertStack. Pick a short effect name from
+      data\compiled\effects.pak (sparkle / glint). Fallback: Engine eCCameraBase::WorldToScreen + ImGui sparkle.
 - [ ] Later: item category filters for AutoLoot
 - [ ] Idea: with ReShade Addon present, also offer the pages in ReShade's menu (`reshade::register_overlay`)
 

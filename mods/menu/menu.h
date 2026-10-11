@@ -31,6 +31,7 @@ float MenuTakeWheel(); // wheel notches since the last call (positive = away fro
 // overlay.cpp: Dear ImGui on the game's frame. Call OverlayInstall from DllMain.
 bool OverlayInstall();
 bool OverlayReady();
+void* OverlayAtlas(); // IDirect3DTexture9* of the game's GUI atlas (game_assets.h), null = plain look
 
 // window.cpp: the settings window, inside an ImGui frame.
 void WindowOpened(); // re-reads every page's ini
