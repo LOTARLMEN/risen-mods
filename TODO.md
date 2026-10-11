@@ -12,6 +12,21 @@ Goals:
 
 Both mods share one loader + one `.ini` (`risen_mods.ini` next to `Risen.exe`), hot-reloaded.
 
+## Faster game startup — DONE 2026-10-11: window at 9.7 s instead of 32.3 s
+Measured with `src/startup_trace.cpp` (`[Debug] StartupTrace=1` -> `bin/risen_startup.log`: DLL loads with call stacks,
+main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
+- ~17 s: FileSystem2.dll reads .pak archives with ~8M ReadFile calls of 1-64 bytes, each after a seek
+  (library/strings/templates/speech_english.pak). Fix `src/fast_io.cpp`: IAT hooks of FFCore g_FF* in FileSystem2,
+  64 KB read window per read-only .pak handle, position kept in memory -> 4244 real reads. `[Performance] FastPakReads`
+- ~7 s: Engine.dll runs DxDiag (CLSID_DxDiagProvider) only to read `DxDiag_DisplayDevices.N.szDisplayMemoryLocalized`;
+  DxDiag Initialize creates D3D11/D3D12 devices (the "18x D3D11CreateDevice" in ReShade log). Fix `src/dxdiag_stub.cpp`:
+  CoCreateInstance hook returns a stub provider filled from DXGI (dedicated+shared MB, same value). `[Performance] SkipDxDiag`
+- ReShade itself costs only ~0.3 s (+ ~1 s update check over WinINet: ReShade.ini CheckForUpdates=0)
+- [x] User test 2026-10-11: saves load, quicksave (F8)/quickload, new game, running around the start beach — all OK
+- [ ] Check loading screens (save load / level change) also got faster
+- [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) — could cache compiled shaders, low priority
+- [ ] Disable ReShade update check (ask user)
+
 ## Stage 0 — Setup
 - [x] Create project folder `Risen\risen-mods` (inside the game folder)
 - [x] `git init`
@@ -33,24 +48,28 @@ Both mods share one loader + one `.ini` (`risen_mods.ini` next to `Risen.exe`), 
       `eCTimer::GetTimeScaling`; console command `timer.fTimeScale`
 
 ## Stage 2 — Proof of concept
-- [x] Proxy DLL (`version.dll`) that loads with the game and writes a log file — built, awaiting in-game test
+- [x] Proxy DLL (`version.dll`) that loads with the game and writes a log file — verified in game 2026-10-11
 - [ ] Call `eCTimer::GetInstance()` and log `GetTimeScaling()` — proves calling game exports works
-- [ ] `.ini` reader with hot reload
+- [x] `.ini` reader with hot reload
 
 ## Stage 2.5 — Borderless window (quick win)
 Exclusive fullscreen + ReShade (D3D9) hangs / black screen on Alt+Tab (seen 2026-10-11, hang in `IDirect3DDevice9::Reset`).
 Engine has no borderless option (`<Window FullScreen=... Left/Top/Right/Bottom>` only).
-- [ ] On startup: strip window border (`WS_POPUP`), size to monitor, keep `FullScreen="false"`
-- [ ] `.ini`: `Borderless=1`
-- [ ] Hide Windows cursor over the game window (windowed mode shows OS cursor + game cursor), clip cursor to window while focused
-- [ ] Investigate slow startup: ~8 s of D3D11/D3D12 device probing (18x `D3D11CreateDevice`) in a D3D9 game, not caused by Steam overlay — find caller, maybe skip
+- [x] On startup: strip window border (`WS_POPUP`), size to monitor, keep `FullScreen="false"`
+- [x] `.ini`: `Borderless=1`
+- [x] Hide Windows cursor over the game window (windowed mode shows OS cursor + game cursor), clip cursor to window while focused
+- [x] Investigate slow startup: D3D11/D3D12 probing comes from DxDiag run by Engine.dll — stubbed (see top)
 
 ## Stage 3 — Speed Hack mod
-- [ ] Hotkey toggles `SetTimeScaling(multiplier)` ↔ `1.0`
-- [ ] `.ini`: `SpeedMultiplier` (default 2.0), `SpeedToggleKey`
+Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified in game 2026-10-11.
+- [x] Hotkey toggles `SetTimeScaling(multiplier)` <-> `1.0`, `.ini` hot reload
+- [ ] **On-screen indicator** top-left while speed-up is on: hourglass icon + `x2` / `xN`
+      (needs drawing in D3D9: hook `IDirect3DDevice9::EndScene`/`Present`, or a ReShade add-on overlay when ReShade is present)
+- [ ] **Speed settings from inside the game** (multiplier, toggle key, on/off) — ini is hot-reloaded, so the in-game UI
+      just edits values and writes `risen_mods.ini`; part of Stage 5.5 settings window, can ship earlier as a small speed panel
+- [x] `.ini`: `[Speed] Multiplier` (default 2.0), `ToggleKey` (default F4)
 - [ ] Optional: second hotkey / step up-down keys
 - [ ] Check side effects: physics at high speed, dialogs, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)
-- [ ] Optional: on-screen indicator when speedup is active
 
 ## Stage 4 — QuickLoot mod
 - [ ] Enumerate entities in radius around player

@@ -8,6 +8,10 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "dxdiag_stub.h"
+#include "fast_io.h"
+#include "startup_trace.h"
+
 // ---------------------------------------------------------------------------------------------
 // Log
 
@@ -23,7 +27,7 @@ static void PathNextToExe(char* out, const char* fileName)
     strcpy_s(dst, MAX_PATH - (dst - out), fileName);
 }
 
-static void Log(const char* fmt, ...)
+void Log(const char* fmt, ...)
 {
     char msg[1024];
     va_list args;
@@ -75,7 +79,13 @@ static const char kDefaultIni[] =
     "Enabled=1\r\n"
     "; Game speed while speed-up is on (1.0 = normal, max 10)\r\n"
     "Multiplier=2.0\r\n"
-    "ToggleKey=F4\r\n";
+    "ToggleKey=F4\r\n"
+    "\r\n"
+    "[Performance]\r\n"
+    "; Read the game's .pak archives through a memory buffer: much faster startup and loading\r\n"
+    "FastPakReads=1\r\n"
+    "; Answer the engine's video memory query without running DxDiag (saves several seconds at startup)\r\n"
+    "SkipDxDiag=1\r\n";
 
 static int ParseKeyName(const char* raw)
 {
@@ -239,17 +249,27 @@ constexpr UINT WM_RISENMODS_TICK = WM_APP + 0x5202;
 static WNDPROC g_origProc;
 static bool g_unicodeWindow;
 
+static BOOL CALLBACK FindGameWindowProc(HWND hwnd, LPARAM result)
+{
+    // Title is "RISEN, V1.0.0 (Rev. 2045) 1920x1080" (prefix from <Window Name="RISEN"> in ConfigDefault.xml).
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    if (pid != GetCurrentProcessId() || !IsWindowVisible(hwnd))
+        return TRUE;
+    // InternalGetWindowText does not send WM_GETTEXT, so it can't block on the busy game thread.
+    wchar_t title[64];
+    InternalGetWindowText(hwnd, title, 64);
+    if (_wcsnicmp(title, L"RISEN", 5) != 0)
+        return TRUE;
+    *reinterpret_cast<HWND*>(result) = hwnd;
+    return FALSE;
+}
+
 static HWND FindGameWindow()
 {
-    // Title comes from <Window Name="RISEN"> in data\ini\ConfigDefault.xml.
     HWND hwnd = nullptr;
-    while ((hwnd = FindWindowExA(nullptr, hwnd, nullptr, "RISEN")) != nullptr) {
-        DWORD pid = 0;
-        GetWindowThreadProcessId(hwnd, &pid);
-        if (pid == GetCurrentProcessId() && IsWindowVisible(hwnd))
-            return hwnd;
-    }
-    return nullptr;
+    EnumWindows(FindGameWindowProc, reinterpret_cast<LPARAM>(&hwnd));
+    return hwnd;
 }
 
 static void ClipToWindow(HWND hwnd, bool clip)
@@ -321,14 +341,23 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 // ---------------------------------------------------------------------------------------------
 // Worker thread
 
+static bool g_fastIo;
+static bool g_dxDiagStub;
+
 static DWORD WINAPI Worker(LPVOID)
 {
-    Log("risen_mods loaded");
+    Log("risen_mods loaded, fast pak reads %s, dxdiag stub %s", g_fastIo ? "on" : "off", g_dxDiagStub ? "on" : "off");
     ConfigInit();
 
     HWND hwnd = nullptr;
-    while (!(hwnd = FindGameWindow()))
+    for (int attempt = 1; !(hwnd = FindGameWindow()); ++attempt) {
+        if (attempt % 50 == 0)
+            Log("window: still searching (%d s)", attempt / 5);
         Sleep(200);
+    }
+    Log("window: found %p", hwnd);
+    StartupTraceMark("game window found");
+    StartupTraceStopSoon();
 
     SpeedInit();
     g_unicodeWindow = IsWindowUnicode(hwnd) != FALSE;
@@ -364,6 +393,12 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
         FILE* f = nullptr;
         if (fopen_s(&f, g_logPath, "w") == 0 && f) // fresh log every launch
             fclose(f);
+        char tracePath[MAX_PATH];
+        PathNextToExe(tracePath, "risen_startup.log");
+        // Must run before the game starts loading, i.e. here in DllMain (we load as a dependency of SharedBase.dll).
+        g_fastIo = GetPrivateProfileIntA("Performance", "FastPakReads", 1, g_iniPath) && FastIoInstall();
+        g_dxDiagStub = GetPrivateProfileIntA("Performance", "SkipDxDiag", 1, g_iniPath) && DxDiagStubInstall();
+        StartupTraceInit(g_iniPath, tracePath);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))
             CloseHandle(t);
     }
