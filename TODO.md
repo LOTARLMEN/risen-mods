@@ -76,16 +76,21 @@ Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified i
         `Present` + `Reset`; works with and without ReShade (bin\d3d9.dll)
   - [x] Draw the indicator with ImGui (no input), handle device Reset
   - [x] Test: F4 on/off, Alt+Tab while sped up, minimize/restore, ReShade overlay still fine (user-tested OK 2026-10-11)
-- [ ] **Speed settings from inside the game** — next session:
-  - [ ] Recon: how the game reads input (DirectInput8 / raw input / window messages) -> how to block it while the panel is open
-  - [ ] Panel hotkey (default F10, check the game doesn't use it), pause game while open
-  - [ ] Enabled checkbox, multiplier slider, rebind toggle key ("press a key..."), write `speed.ini` (hot reload picks it up)
+- [x] **Speed settings from inside the game** — session 4 (2026-10-11), user-tested OK (incl. dialogs):
+  - [x] Recon: Engine.dll reads input via Raw Input (RegisterRawInputDevices + WM_INPUT), mouse look via
+        SetCursorPos/ClipCursor -> `shared/input_capture` swallows WM_INPUT/key/mouse messages and no-ops those calls
+  - [x] F10 panel (`mods/speed/panel.cpp`), Esc/F10/Close; game time frozen via eCTimer scale 0.001
+        (`gCSession::Pause` blacked out the screen)
+  - [x] Enabled, multiplier slider, rebind toggle/panel keys, indicator on/off + size, RU/EN switch (globe button)
+  - [x] Defaults changed to Z / x3 (user's request); `dist/RisenSpeed-1.2.zip` for a friend
+  - [ ] Friend's feedback; panel not yet tested in exclusive fullscreen / without the Window mod
   - [ ] Later grows into the Stage 5.5 settings window for all mods
-- [x] `.ini`: `[Speed] Multiplier` (default 2.0), `ToggleKey` (default F4)
+- [x] `.ini`: `[Speed] Multiplier` (default 3.0), `ToggleKey` (default Z), `[Panel] Key/Language`
 - [ ] Optional: second hotkey / step up-down keys
 - [ ] Check side effects: physics at high speed, dialogs, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)
 
 ## Stage 4 — QuickLoot mod
+Recon done 2026-10-11 (static only): see `notes/loot-recon.md` (plan: Script.dll `Entity` API + vanilla `AutoLoot` script).
 - [ ] Enumerate entities in radius around player
 - [ ] Filter lootable: dead NPCs/monsters, unlocked chests (respect locks — no free lockpicking)
 - [ ] Transfer all items to player inventory using the game's own loot logic (keep quest triggers firing)

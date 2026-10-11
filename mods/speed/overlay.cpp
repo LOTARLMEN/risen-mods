@@ -1,5 +1,6 @@
-// Speed indicator: hourglass + "x2" in the top-left corner while the speed-up is on. Drawn with Dear ImGui
-// on top of the game's frame (shared/d3d9_hook). No input: the indicator never takes mouse or keyboard.
+// Dear ImGui on top of the game's frame (shared/d3d9_hook): the speed indicator (hourglass + "x3" in the
+// top-left corner while the speed-up is on) and the settings panel (panel.cpp). ImGui gets the mouse only
+// while the panel is open; keyboard never (the panel reads keys itself).
 
 #include <windows.h>
 #include <cmath>
@@ -11,12 +12,13 @@
 #include "imgui.h"
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
-#include "overlay.h"
+#include "speed.h"
 
 namespace {
 
 bool g_ready;
-ImFont* g_font;
+ImFont* g_font;   // indicator text
+ImFont* g_uiFont; // panel
 
 void OnInit(IDirect3DDevice9* device, HWND hwnd)
 {
@@ -34,6 +36,12 @@ void OnInit(IDirect3DDevice9* device, HWND hwnd)
         g_font = io.Fonts->AddFontFromFileTTF(font, 32.0f);
     if (!g_font)
         g_font = io.Fonts->AddFontDefault();
+    GetWindowsDirectoryA(font, MAX_PATH);
+    strcat_s(font, "\\Fonts\\segoeui.ttf");
+    if (GetFileAttributesA(font) != INVALID_FILE_ATTRIBUTES)
+        g_uiFont = io.Fonts->AddFontFromFileTTF(font, 20.0f);
+    if (!g_uiFont)
+        g_uiFont = g_font;
 
     g_ready = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
     Log("overlay: %s", g_ready ? "ready" : "init FAILED");
@@ -79,22 +87,15 @@ void DrawHourglass(ImDrawList* dl, float x, float y, float w, float h, float pha
     dl->AddLine(ImVec2(x, y + h), ImVec2(x + w, y + h), glass, line * 1.8f);
 }
 
-void OnDraw(IDirect3DDevice9*)
+void DrawIndicator(float screenScale)
 {
-    if (!g_ready || !SpeedIsActive() || !OverlayEnabled())
-        return; // nothing on screen: skip ImGui entirely
-
-    ImGui_ImplDX9_NewFrame();
-    ImGui_ImplWin32_NewFrame();
-    ImGui::NewFrame();
-
-    ImGuiIO& io = ImGui::GetIO();
-    float scale = io.DisplaySize.y / 1080.0f * OverlayScale();
+    const SpeedConfig& config = SpeedGetConfig();
+    float scale = screenScale * config.indicatorScale;
     float pad = 10.0f * scale, iconH = 34.0f * scale, iconW = 22.0f * scale;
     float fontSize = 32.0f * scale;
 
     char text[16];
-    snprintf(text, sizeof(text), "x%.2f", SpeedMultiplier());
+    snprintf(text, sizeof(text), "x%.2f", config.multiplier);
     for (char* end = text + strlen(text) - 1; *end == '0' || *end == '.'; --end) { // "x2.00" -> "x2"
         bool dot = *end == '.';
         *end = 0;
@@ -113,6 +114,40 @@ void OnDraw(IDirect3DDevice9*)
     DrawHourglass(dl, x + pad, y + (boxH - iconH) * 0.5f, iconW, iconH, phase, 2.0f * scale);
     dl->AddText(g_font, fontSize, ImVec2(x + pad * 2 + iconW, y + (boxH - textSize.y) * 0.5f),
                 IM_COL32(245, 235, 210, 255), text);
+}
+
+void OnDraw(IDirect3DDevice9*)
+{
+    bool indicator = SpeedIsActive() && SpeedGetConfig().indicator;
+    bool panel = PanelIsOpen();
+    if (!g_ready || (!indicator && !panel))
+        return; // nothing on screen: skip ImGui entirely
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (panel) {
+        io.ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+        io.MouseDrawCursor = true; // the game hides the system cursor
+        // The game's raw input takes the buttons away from window messages: read them directly.
+        bool swapped = GetSystemMetrics(SM_SWAPBUTTON) != 0;
+        io.AddMouseButtonEvent(0, (GetAsyncKeyState(swapped ? VK_RBUTTON : VK_LBUTTON) & 0x8000) != 0);
+        io.AddMouseButtonEvent(1, (GetAsyncKeyState(swapped ? VK_LBUTTON : VK_RBUTTON) & 0x8000) != 0);
+    } else {
+        io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+        io.MouseDrawCursor = false;
+    }
+
+    ImGui_ImplDX9_NewFrame();
+    ImGui_ImplWin32_NewFrame(); // also reads the cursor position (GetCursorPos)
+    ImGui::NewFrame();
+
+    float screenScale = io.DisplaySize.y / 1080.0f;
+    if (indicator)
+        DrawIndicator(screenScale);
+    if (panel) {
+        ImGui::PushFont(g_uiFont, 20.0f * screenScale);
+        PanelDraw(screenScale);
+        ImGui::PopFont();
+    }
 
     ImGui::EndFrame();
     ImGui::Render();
@@ -120,6 +155,11 @@ void OnDraw(IDirect3DDevice9*)
 }
 
 } // namespace
+
+bool OverlayReady()
+{
+    return g_ready;
+}
 
 bool OverlayInstall()
 {

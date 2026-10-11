@@ -8,7 +8,7 @@ setlocal
 call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat" >nul || exit /b 1
 cd /d "%~dp0"
 set IMGUI=third_party\imgui
-set CFLAGS=/nologo /O2 /MT /EHsc /std:c++17 /W3 /DWIN32_LEAN_AND_MEAN /Gy /Ishared /I%IMGUI% /I%IMGUI%\backends
+set CFLAGS=/nologo /O2 /MT /EHsc /std:c++17 /utf-8 /W3 /DWIN32_LEAN_AND_MEAN /Gy /Ishared /I%IMGUI% /I%IMGUI%\backends
 set LIBS=build\lib\shared.lib build\lib\imgui.lib user32.lib oleaut32.lib gdi32.lib imm32.lib /OPT:REF
 for %%D in (bin\mods lib obj\shared obj\imgui obj\loader) do if not exist build\%%D mkdir build\%%D
 

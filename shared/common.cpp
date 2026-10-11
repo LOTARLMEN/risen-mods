@@ -87,6 +87,14 @@ float IniFloat(const char* section, const char* key, float def)
     return buf[0] ? static_cast<float>(atof(buf)) : def;
 }
 
+static const struct { const char* name; int vk; } kKeyNames[] = {
+    {"SPACE", VK_SPACE}, {"TAB", VK_TAB}, {"INSERT", VK_INSERT}, {"DELETE", VK_DELETE},
+    {"HOME", VK_HOME}, {"END", VK_END}, {"PAGEUP", VK_PRIOR}, {"PAGEDOWN", VK_NEXT},
+    {"BACKSPACE", VK_BACK}, {"CAPSLOCK", VK_CAPITAL}, {"ENTER", VK_RETURN},
+    {"MOUSE3", VK_MBUTTON}, {"MMB", VK_MBUTTON}, {"MOUSE4", VK_XBUTTON1}, {"MOUSE5", VK_XBUTTON2},
+    {"NUMPAD+", VK_ADD}, {"NUMPAD-", VK_SUBTRACT}, {"NUMPAD*", VK_MULTIPLY}, {"NUMPAD/", VK_DIVIDE},
+};
+
 static int ParseKeyName(const char* raw)
 {
     char name[32];
@@ -114,13 +122,7 @@ static int ParseKeyName(const char* raw)
         if (c == '*') return VK_MULTIPLY;
         if (c == '/') return VK_DIVIDE;
     }
-    static const struct { const char* name; int vk; } table[] = {
-        {"SPACE", VK_SPACE}, {"TAB", VK_TAB}, {"INSERT", VK_INSERT}, {"DELETE", VK_DELETE},
-        {"HOME", VK_HOME}, {"END", VK_END}, {"PAGEUP", VK_PRIOR}, {"PAGEDOWN", VK_NEXT},
-        {"BACKSPACE", VK_BACK}, {"CAPSLOCK", VK_CAPITAL}, {"ENTER", VK_RETURN},
-        {"MOUSE3", VK_MBUTTON}, {"MMB", VK_MBUTTON}, {"MOUSE4", VK_XBUTTON1}, {"MOUSE5", VK_XBUTTON2},
-    };
-    for (auto& k : table)
+    for (auto& k : kKeyNames)
         if (strcmp(name, k.name) == 0)
             return k.vk;
     return 0;
@@ -136,6 +138,43 @@ int IniKey(const char* section, const char* key, int def)
         return vk;
     Log("config: unknown key name '%s' for %s, using 0x%02X", buf, key, def);
     return def;
+}
+
+const char* KeyName(int vk, char* buf, size_t size)
+{
+    if ((vk >= 'A' && vk <= 'Z') || (vk >= '0' && vk <= '9'))
+        snprintf(buf, size, "%c", vk);
+    else if (vk >= VK_F1 && vk <= VK_F24)
+        snprintf(buf, size, "F%d", vk - VK_F1 + 1);
+    else if (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9)
+        snprintf(buf, size, "NUMPAD%d", vk - VK_NUMPAD0);
+    else {
+        snprintf(buf, size, "0x%02X", vk);
+        for (auto& k : kKeyNames)
+            if (k.vk == vk) {
+                strcpy_s(buf, size, k.name);
+                break;
+            }
+    }
+    return buf;
+}
+
+void IniWriteString(const char* section, const char* key, const char* value)
+{
+    WritePrivateProfileStringA(section, key, value, g_iniPath);
+}
+
+void IniWriteFloat(const char* section, const char* key, float value)
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%.2f", value);
+    IniWriteString(section, key, buf);
+}
+
+void IniWriteKey(const char* section, const char* key, int vk)
+{
+    char buf[32];
+    IniWriteString(section, key, KeyName(vk, buf, sizeof(buf)));
 }
 
 bool IniChanged()
