@@ -10,24 +10,28 @@ Goals:
    auto-pick up items from the ground, no pickup animation.
 2. **Speed Hack** — like Gothic's Z-mod speedup: toggle game speed by hotkey, multiplier configurable in `.ini`.
 
-Both mods share one loader + one `.ini` (`risen_mods.ini` next to `Risen.exe`), hot-reloaded.
+Layout (since 2026-10-11): `loader/` builds `bin\version.dll` (proxy of the system version.dll) which loads every
+`bin\mods\*.dll` in alphabetical order from its DllMain. One folder per mod in `mods/` -> `bin\mods\<mod>.dll`,
+settings `bin\mods\<mod>.ini`, log `bin\mods\<mod>.log`. Shared code in `shared/` (log, ini, keys, game window, IAT).
+`build.bat [deploy]` builds everything; `tools\package.ps1` makes `dist\Risen<Mod>-<ver>.zip` for every mod with a README.
+Mods: fast-start, window (borderless + cursor), speed (F4), startup-trace (developer only, not deployed/packed).
 
 ## Faster game startup — DONE 2026-10-11: window at 9.7 s instead of 32.3 s
-Measured with `src/startup_trace.cpp` (`[Debug] StartupTrace=1` -> `bin/risen_startup.log`: DLL loads with call stacks,
+Measured with `mods/startup-trace` (copy `startup_trace.dll` into `bin\mods` -> `bin\mods\startup_trace.log`: DLL loads with call stacks,
 main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - ~17 s: FileSystem2.dll reads .pak archives with ~8M ReadFile calls of 1-64 bytes, each after a seek
   (library/strings/templates/speech_english.pak). Fix `src/fast_io.cpp`: IAT hooks of FFCore g_FF* in FileSystem2,
-  64 KB read window per read-only .pak handle, position kept in memory -> 4244 real reads. `[Performance] FastPakReads`
+  64 KB read window per read-only .pak handle, position kept in memory -> 4244 real reads. `fast_start.ini [Performance] FastPakReads`
 - ~7 s: Engine.dll runs DxDiag (CLSID_DxDiagProvider) only to read `DxDiag_DisplayDevices.N.szDisplayMemoryLocalized`;
   DxDiag Initialize creates D3D11/D3D12 devices (the "18x D3D11CreateDevice" in ReShade log). Fix `src/dxdiag_stub.cpp`:
-  CoCreateInstance hook returns a stub provider filled from DXGI (dedicated+shared MB, same value). `[Performance] SkipDxDiag`
+  CoCreateInstance hook returns a stub provider filled from DXGI (dedicated+shared MB, same value). `SkipDxDiag`
 - ReShade itself costs only ~0.3 s (+ ~1 s update check over WinINet: ReShade.ini CheckForUpdates=0)
 - [x] User test 2026-10-11: saves load, quicksave (F8)/quickload, new game, running around the start beach — all OK
 - [ ] Check loading screens (save load / level change) also got faster
 - [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) — could cache compiled shaders, low priority
 - [ ] Disable ReShade update check (ask user)
-- [x] Standalone "Risen Fast Start" build for friends: `buildast_startersion.dll`, `release/fast_start/README.txt`,
-      zip in `dist/RisenFastStart-1.0.zip` (tested: window at 8.2 s)
+- [x] Separate mods for friends: `dist/RisenFastStart-1.1.zip`, `RisenWindow-1.0.zip`, `RisenSpeed-1.0.zip` (loader + one mod each)
+- [ ] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
 - [ ] Fast Start: get feedback from friends (other PCs, GOG version?)
 
 ## Stage 0 — Setup

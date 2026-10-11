@@ -14,7 +14,7 @@
 #include "dxdiag_stub.h"
 #include "iat_patch.h"
 
-void Log(const char* fmt, ...);
+#include "common.h"
 
 namespace {
 

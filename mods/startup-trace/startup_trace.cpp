@@ -1,4 +1,4 @@
-// Startup diagnostics, enabled by [Debug] StartupTrace=1 in risen_mods.ini. Writes bin\risen_startup.log:
+// Startup diagnostics (developer mod, active while mods\startup_trace.dll exists). Writes mods\startup_trace.log:
 //  - every DLL load with time since process start and the call stack that loaded it;
 //  - samples of the main thread's stack every 50 ms until the game window shows up (or 120 s).
 // The main thread is only suspended long enough to copy its registers and stack; everything that may take
@@ -12,7 +12,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "fast_io.h"
 #include "iat_patch.h"
 #include "startup_trace.h"
 
@@ -341,19 +340,14 @@ DWORD WINAPI Sampler(LPVOID)
     }
     Append("%8.3f  sampler stopped", Now());
     DumpIoStats();
-    long long reads, fills, direct;
-    FastIoStats(&reads, &fills, &direct);
-    Append("fast io: %lld pak reads served with %lld window fills + %lld direct reads", reads, fills, direct);
     Flush();
     return 0;
 }
 
 } // namespace
 
-void StartupTraceInit(const char* iniPath, const char* tracePath)
+void StartupTraceInit(const char* tracePath)
 {
-    if (!GetPrivateProfileIntA("Debug", "StartupTrace", 0, iniPath))
-        return;
     strcpy_s(g_tracePath, tracePath);
     InitializeCriticalSection(&g_bufLock);
     g_buf = static_cast<char*>(VirtualAlloc(nullptr, kBufSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE));
