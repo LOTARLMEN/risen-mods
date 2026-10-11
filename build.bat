@@ -25,6 +25,12 @@ cl %CFLAGS% /LD loader\*.cpp /Fobuild\obj\loader\ /Fe:build\bin\version.dll /lin
 rem Mod folder "fast-start" -> fast_start.dll
 for /d %%M in (mods\*) do call :mod %%~nxM || exit /b 1
 
+rem build\RisenModsInstaller.exe: installs the mods of the latest GitHub release.
+if not exist build\obj\installer mkdir build\obj\installer
+rc /nologo /fobuild\obj\installer\installer.res installer\installer.rc || exit /b 1
+cl %CFLAGS% installer\*.cpp /Fobuild\obj\installer\ build\obj\installer\installer.res /Fe:build\RisenModsInstaller.exe ^
+   /link %LIBS% d3d9.lib winhttp.lib ole32.lib shell32.lib advapi32.lib /SUBSYSTEM:WINDOWS || exit /b 1
+
 if /i "%~1"=="deploy" (
     copy /y build\bin\version.dll ..\bin\version.dll >nul || exit /b 1
     if not exist ..\bin\mods mkdir ..\bin\mods

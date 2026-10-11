@@ -4,34 +4,43 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "common.h"
 
 namespace {
 
-bool GamePath(const char* relative, char* out, size_t size)
+std::wstring g_root; // empty = derive from the exe
+
+std::wstring GamePath(const char* relative)
 {
-    char exe[MAX_PATH];
-    GetModuleFileNameA(nullptr, exe, MAX_PATH); // Risen\bin\Risen.exe
-    char* slash = strrchr(exe, '\\');
-    if (!slash)
-        return false;
-    *slash = 0;
-    if ((slash = strrchr(exe, '\\')) != nullptr)
-        *slash = 0;
-    return snprintf(out, size, "%s\\%s", exe, relative) < static_cast<int>(size);
+    if (g_root.empty()) {
+        wchar_t exe[MAX_PATH];
+        GetModuleFileNameW(nullptr, exe, MAX_PATH); // Risen\bin\Risen.exe
+        std::wstring dir = exe;
+        for (int i = 0; i < 2; ++i)
+            dir.resize(dir.find_last_of(L'\\') == std::wstring::npos ? 0 : dir.find_last_of(L'\\'));
+        g_root = dir;
+    }
+    std::wstring path = g_root + L'\\';
+    for (const char* p = relative; *p; ++p)
+        path += static_cast<wchar_t>(*p); // relative paths are ASCII
+    return path;
 }
 
 } // namespace
 
+void GameAssetsSetRoot(const wchar_t* gameFolder)
+{
+    g_root = gameFolder ? gameFolder : L"";
+}
+
 bool GamePakRead(const char* pak, const char* name, std::vector<unsigned char>* out)
 {
-    char path[MAX_PATH];
-    if (!GamePath(pak, path, sizeof(path)))
-        return false;
+    std::wstring path = GamePath(pak);
     FILE* f = nullptr;
-    if (fopen_s(&f, path, "rb") != 0 || !f) {
-        Log("assets: can't open %s", path);
+    if (_wfopen_s(&f, path.c_str(), L"rb") != 0 || !f) {
+        Log("assets: can't open %ls", path.c_str());
         return false;
     }
     bool ok = false;
@@ -75,31 +84,42 @@ bool GamePakRead(const char* pak, const char* name, std::vector<unsigned char>* 
     return ok;
 }
 
-IDirect3DTexture9* GameLoadTexture(IDirect3DDevice9* device, const char* pak, const char* name)
+bool GameLoadImage(const char* pak, const char* name, std::vector<unsigned char>* bgra, int* width, int* height)
 {
     std::vector<unsigned char> data;
     if (!GamePakRead(pak, name, &data))
-        return nullptr;
+        return false;
     // ._ximg: own header, then a complete DDS file.
     size_t dds = 0;
     while (dds + 128 <= data.size() && memcmp(&data[dds], "DDS ", 4) != 0)
         ++dds;
     if (dds + 128 > data.size())
-        return nullptr;
+        return false;
     const unsigned char* h = &data[dds];
-    uint32_t height, width, flags, bits, rMask, aMask;
-    memcpy(&height, h + 12, 4);
-    memcpy(&width, h + 16, 4);
-    memcpy(&flags, h + 80, 4);
+    uint32_t w, ht, bits, rMask, aMask;
+    memcpy(&ht, h + 12, 4);
+    memcpy(&w, h + 16, 4);
     memcpy(&bits, h + 88, 4);
     memcpy(&rMask, h + 92, 4);
     memcpy(&aMask, h + 104, 4);
     size_t pixels = dds + 128;
-    if (bits != 32 || rMask != 0x00FF0000 || aMask != 0xFF000000 || !width || !height ||
-        pixels + static_cast<size_t>(width) * height * 4 > data.size()) {
+    if (bits != 32 || rMask != 0x00FF0000 || aMask != 0xFF000000 || !w || !ht ||
+        pixels + static_cast<size_t>(w) * ht * 4 > data.size()) {
         Log("assets: %s is not a 32-bit ARGB DDS (bits %u)", name, bits);
-        return nullptr;
+        return false;
     }
+    bgra->assign(data.begin() + pixels, data.begin() + pixels + static_cast<size_t>(w) * ht * 4);
+    *width = static_cast<int>(w);
+    *height = static_cast<int>(ht);
+    return true;
+}
+
+IDirect3DTexture9* GameLoadTexture(IDirect3DDevice9* device, const char* pak, const char* name)
+{
+    std::vector<unsigned char> pixels;
+    int width, height;
+    if (!GameLoadImage(pak, name, &pixels, &width, &height))
+        return nullptr;
     IDirect3DTexture9* tex = nullptr;
     if (FAILED(device->CreateTexture(width, height, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, &tex, nullptr)))
         return nullptr;
@@ -108,8 +128,9 @@ IDirect3DTexture9* GameLoadTexture(IDirect3DDevice9* device, const char* pak, co
         tex->Release();
         return nullptr;
     }
-    for (uint32_t y = 0; y < height; ++y) // same byte order: B G R A
-        memcpy(static_cast<unsigned char*>(lock.pBits) + y * lock.Pitch, &data[pixels + y * width * 4], width * 4);
+    for (int y = 0; y < height; ++y) // same byte order: B G R A
+        memcpy(static_cast<unsigned char*>(lock.pBits) + y * lock.Pitch, &pixels[static_cast<size_t>(y) * width * 4],
+               static_cast<size_t>(width) * 4);
     tex->UnlockRect(0);
     return tex;
 }

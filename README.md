@@ -14,7 +14,11 @@ small proxy `version.dll`; no game files or saves are changed, uninstalling = de
 
 ## Install
 
-Download the zips from [Releases](../../releases), close the game, extract into the Risen folder
+**Installer:** download `RisenModsInstaller.exe` from [Releases](../../releases) and run it. It finds Risen (Steam), lists
+the mods of the latest release, installs, updates and removes them (close the game first). Your settings are kept.
+The exe is not signed, so Windows SmartScreen may warn: "More info" → "Run anyway".
+
+**By hand:** download the zips from [Releases](../../releases), close the game, extract into the Risen folder
 (Steam → Risen → Manage → Browse local files). You get `bin\version.dll` (loader), `bin\mods\<mod>.dll` and
 `bin\mods\menu.dll`. Extract any number of mods; shared files are identical, the newest wins.
 Every zip has a README (Russian + English) with details, settings and uninstall steps.
@@ -29,9 +33,10 @@ Visual Studio 2022 Build Tools (MSVC x64). `build.bat` builds everything into `b
 `build.bat deploy` also copies it into `..\bin` (the repo is meant to live in `Risen\risen-mods`; close the game first).
 `powershell -File tools\package.ps1` makes `dist\Risen<Mod>-<version>.zip`.
 
-Layout: `loader/` (proxy `version.dll`, loads `bin\mods\*.dll`), `mods/<name>/` (one DLL each),
-`shared/` (log, ini, keys, D3D9 hook, input capture, menu API), `third_party/imgui`, `tools/` (PE export /
-disassembly helpers used for reverse engineering), `notes/` (findings).
+Layout: `loader/` (proxy `version.dll`, loads `bin\mods\*.dll`), `mods/<name>/` (one DLL each), `installer/`
+(`build\RisenModsInstaller.exe`), `shared/` (log, ini, keys, D3D9 hook, input capture, menu API, game art reader,
+Risen style), `third_party/imgui`, `tools/` (PE export / disassembly helpers used for reverse engineering),
+`notes/` (findings).
 
 The mods call functions exported by the game's own DLLs (`Engine.dll`, `Game.dll`, `Script.dll`, ...) by their
 mangled names. No game code or assets are in this repository; the menu reads the game's textures and fonts from

@@ -162,13 +162,34 @@ Suggested order (one or two sessions):
   2. game folder detection (Steam) + "game is running" check
   3. GitHub latest release -> mod list with checkboxes, install / update / remove
   4. polish: progress, errors, RU/EN globe like the menu, README, release asset
-- [ ] Find Risen: Steam registry path -> steamapps/libraryfolders.vdf -> appmanifest_40300.acf; manual folder pick fallback
-- [ ] GitHub API `releases/latest` (WinHTTP), list assets Risen<Mod>-<ver>.zip, show checkboxes + installed / new version
-      (installed version from bin\mods\<mod>.log first line or a small bin\mods\installed.ini written by the installer)
-- [ ] Refuse while Risen.exe is running; download, unzip (Windows Shell / minizip) into the game folder, keep user .ini files
-- [ ] Uninstall per mod and "remove all" (version.dll + bin\mods); Window mod: offer to set FullScreen="false"
-- [ ] Build in build.bat, ship as its own release asset; README section; unsigned exe -> SmartScreen warning note
-- [ ] Optional later: self-update check
+Session 7 (2026-10-11): installer 1.0 built (`installer/` -> `build\RisenModsInstaller.exe`, 0.9 MB). Shared code moved:
+`shared/game_assets` (game folder settable, raw image access) and `shared/risen_style` (parchment frame, colours, game
+fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImGui 1.92.9 ImGuiCol_CheckboxSelectedBg).
+- [x] Find Risen: exe folder / its parent, then Steam (HKCU SteamPath -> libraryfolders.vdf -> appmanifest_40300.acf);
+      "Change..." folder picker (bin\ accepted too); 64-bit check of bin\Risen.exe
+- [x] GitHub `releases/latest` (WinHTTP), all Risen<Mod>-<ver>.zip downloaded at start and unpacked in memory
+      (own inflate + zip reader, CRC checked); checkbox per mod, status not installed / will install / update / remove
+- [x] Installed versions in `bin\mods\installed.ini`; dll present without an entry = "?" (offered as update)
+- [x] Refuses while Risen.exe runs; atomic writes (.new + MoveFileEx), never touches existing .ini, README ->
+      bin\mods\<id>.README.txt, only paths under bin\ are written
+- [x] Remove per mod (dll, readme, log; .ini kept); last mod removed -> menu.dll, installed.ini, our version.dll
+      (marker "Risen mod loader"; a foreign version.dll is kept as version.dll.other and restored)
+- [x] Window mod: FullScreen="false" in data\ini\ConfigLocal.xml (+ .bak) on install
+- [x] RU/EN globe, game cursor as a real HCURSOR, game icon from Risen.exe, drag by the header, per-monitor DPI
+- [x] Command line for tests: --game, --zips <dist>, --list, --install a,b, --remove a,b, --lang, --screenshot;
+      log %TEMP%\RisenModsInstaller.log. CLI-tested: install / update / remove+cleanup on a fake game folder,
+      Steam detection, real GitHub release; screenshots RU/EN with and without game art
+- [x] UX rework after user feedback: start = only the mod list (one API call, ~0.5 s), zips downloaded on install;
+      nothing pre-ticked; "Install (N)" appears only when something is ticked; updates via a separate "Update (N)";
+      each installed mod has a "Remove" button with a confirmation popup (settings kept)
+- [x] Installed version read from the mod dll itself ("<Title> <version>" log string), then installed.ini, else "?"
+      -> hand-installed old zips are offered as updates (tested with a patched "Speed 1.3" dll)
+- [x] Own icon installer\installer.ico (tools\make_installer_icon.ps1, no game art) + VERSIONINFO via installer.rc
+- [ ] Discord shows its game overlay over the installer (user, 2026-10-11): check whether it's the exe living in the
+      Risen folder (Discord "Registered games") - run a copy from Downloads
+- [ ] User test of the window: clicks, drag, folder picker, apply on the real game folder (overwrites dev dlls with release ones)
+- [ ] Release asset RisenModsInstaller.exe + README section (ask before uploading); unsigned exe -> SmartScreen note
+- [ ] Optional later: self-update check, progress per file while applying
 
 ## Maybe later
 - [ ] Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)

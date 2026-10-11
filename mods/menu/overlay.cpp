@@ -13,6 +13,7 @@
 #include "imgui_impl_dx9.h"
 #include "imgui_impl_win32.h"
 #include "menu.h"
+#include "risen_style.h"
 
 namespace {
 
@@ -20,30 +21,6 @@ bool g_ready;
 ImFont* g_font;   // icon text
 ImFont* g_uiFont; // window
 IDirect3DTexture9* g_atlas; // the game's GUI atlas (cursor, parchment), null = plain ImGui look
-
-ImFont* LoadFont(const char* file, float size)
-{
-    char path[MAX_PATH];
-    GetWindowsDirectoryA(path, MAX_PATH);
-    strcat_s(path, "\\Fonts\\");
-    strcat_s(path, file);
-    if (GetFileAttributesA(path) == INVALID_FILE_ATTRIBUTES)
-        return nullptr;
-    return ImGui::GetIO().Fonts->AddFontFromFileTTF(path, size);
-}
-
-// Font from the game's gui2.pak; merge = add the glyphs missing in the previous font.
-ImFont* LoadGameFont(const char* name, float size, bool merge)
-{
-    std::vector<unsigned char> data;
-    if (!GamePakRead("data\\common\\gui2.pak", name, &data) || data.empty())
-        return nullptr;
-    void* copy = IM_ALLOC(data.size()); // owned and freed by the ImGui font atlas
-    memcpy(copy, data.data(), data.size());
-    ImFontConfig config;
-    config.MergeMode = merge;
-    return ImGui::GetIO().Fonts->AddFontFromMemoryTTF(copy, static_cast<int>(data.size()), size, &config);
-}
 
 void OnInit(IDirect3DDevice9* device, HWND hwnd)
 {
@@ -54,18 +31,12 @@ void OnInit(IDirect3DDevice9* device, HWND hwnd)
     io.LogFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NoMouse | ImGuiConfigFlags_NoMouseCursorChange | ImGuiConfigFlags_NoKeyboard;
 
-    g_font = LoadFont("segoeuib.ttf", 32.0f);
+    g_font = LoadSystemFont("segoeuib.ttf", 32.0f);
     if (!g_font)
         g_font = io.Fonts->AddFontDefault();
-    g_uiFont = LoadGameFont("QUORUMM.TTF", 20.0f, false); // the game's interface font (Latin)
-    if (g_uiFont)
-        LoadGameFont("FreeSans.ttf", 20.0f, true); // Cyrillic and whatever else Quorum lacks, as in the game
-    else
-        g_uiFont = LoadFont("segoeui.ttf", 20.0f);
-    if (!g_uiFont)
-        g_uiFont = g_font;
+    g_uiFont = LoadGameUiFont(20.0f); // the game's interface fonts
 
-    g_atlas = GameLoadTexture(device, "data\\compiled\\images.pak", "GUI_TexturePage01_REDESIGN._ximg");
+    g_atlas = GameLoadTexture(device, kAtlasPak, kAtlasName);
     g_ready = ImGui_ImplWin32_Init(hwnd) && ImGui_ImplDX9_Init(device);
     Log("overlay: %s, game style %s", g_ready ? "ready" : "init FAILED", g_atlas ? "on" : "off (plain look)");
 }
