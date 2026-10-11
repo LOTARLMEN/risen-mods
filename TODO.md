@@ -89,33 +89,34 @@ Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified i
 - [ ] Optional: second hotkey / step up-down keys
 - [ ] Check side effects: physics at high speed, dialogs, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)
 
-## Stage 4 — QuickLoot mod
-Recon done 2026-10-11 (static only): see `notes/loot-recon.md` (plan: Script.dll `Entity` API + vanilla `AutoLoot` script).
-- [ ] Enumerate entities in radius around player
-- [ ] Filter lootable: dead NPCs/monsters, unlocked chests (respect locks — no free lockpicking)
-- [ ] Transfer all items to player inventory using the game's own loot logic (keep quest triggers firing)
-- [ ] `.ini`: `QuickLootKey` (default MMB), `QuickLootRadius`
-- [ ] Message on screen: what was looted
+## Stage 4/5 — AutoLoot mod (`mods/autoloot`, QuickLoot is part of it) — 0.1 works in game 2026-10-11
+Recon: `notes/loot-recon.md`. Script.dll `Entity` API + game script `AutoLoot(player, container)` via eCScriptProxyScript.
+Keys (user's choice): MOUSE2 = QuickLoot of the FOCUSED body/open chest/item only (World::GetFocus), no loot window;
+not while the weapon is drawn (PSCombatSystem::GetCombatMode != 0, guess). F = AutoLoot on/off: radius pickup of
+ground items (3 m, never owned/mission), also works in combat stance.
+Debug: `[Debug] DumpKey` logs everything around the player.
+- [x] Dump verified: names, npc/dead/down, items, owner, inventory stacks; Sara (down) is skipped
+- [x] QuickLoot of a dead body, AutoLoot pickup of gold/potions/weapons (no crash)
+- [ ] Test after rebinding: RMB loot (does it interfere with blocking/Action 2? skip in combat / weapon drawn?)
+- [x] gui2.PrintItemLog shows the native "+ item" feed on the left for ground pickups - user likes it, no own feed
+- [ ] Chests: dump near locked/unlocked/owned chests -> confirm PSLock status values (1 = open?) and owner
+- [ ] Skip while GUI2 is browsing (inventory/trade/loot window), in combat, dialogs (IsDialogCameraActive done)
+- [ ] Owned items: check merchant goods / items in houses report an owner
+- [ ] Quest items: pick up a quest item -> quest advances?
+- [ ] Hand icon right of the hourglass while AutoLoot is on (comes with the hub below)
+- [ ] README + package
 
-## Stage 5 — AutoLoot (ground items)
-- [ ] Auto-pick up loose items in radius, periodically or on key
-- [ ] Skip items in shops / owned items (no auto-stealing) — respect ownership
-- [ ] Quest items: pick up via the normal interaction path so scripts trigger
-- [ ] `.ini`: `AutoLootEnabled`, `AutoLootToggleKey` (default O), `AutoLootRadius`, item category filters
-- [ ] Remove / skip pickup animation
-
-## Stage 5.5 — In-game settings window (Dear ImGui overlay, D3D9)
-Game renders via `d3d9.dll` (imported by `Engine.dll`) → hook `IDirect3DDevice9::EndScene`/`Reset`, draw ImGui.
-Two hosts for the same settings UI (user's idea):
-- ReShade (Addon build) present → register an overlay via ReShade add-on API (`reshade::register_overlay`), settings live in ReShade's menu (Home → Add-ons)
-- no ReShade → our own ImGui overlay opened by hotkey
-- [ ] Hook D3D9 device, init ImGui (dx9 + win32 backends), block game input while the window is open
-- [ ] Hotkey to open "Mods" window (default F10, configurable), pause game while open
-- [ ] Speed: on/off, multiplier slider, rebind toggle key ("press a key…")
-- [ ] AutoLoot: on/off, toggle key, radius slider, item category filters
-- [ ] QuickLoot: key, radius
-- [ ] Save to / load from `risen_mods.ini`
-- [ ] Style the window to match Risen (dark/parchment palette, font)
+## Stage 5.5 — Mod hub: one F10 window for all mods (user's idea, next session)
+Each mod DLL has its own ImGui copy -> mods can't draw into another mod's window. Plan:
+- [ ] `mods/menu` (hub) owns the D3D9 overlay, ImGui, input capture, F10 window and the status icon row
+- [ ] C API exported by the hub (GetProcAddress from mods): register a mod page with declarative settings
+      (toggle mod on/off, checkbox, slider, key bind, language) + get/set callbacks; status icon (hourglass, hand)
+- [ ] Speed: move its panel + indicator onto the hub API; keep working without the hub (ini only)
+- [ ] AutoLoot: page + hand icon + item feed
+- [ ] Window, Fast Start: pages (toggles need restart -> show a note)
+- [ ] Language RU/EN shared by all pages
+- [ ] Later: item category filters for AutoLoot; style the window like Risen (dark/parchment, font)
+- [ ] Idea: with ReShade Addon present, also offer the pages in ReShade's menu (`reshade::register_overlay`)
 
 ## Maybe later
 - [ ] Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
