@@ -26,6 +26,9 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - [ ] Check loading screens (save load / level change) also got faster
 - [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) — could cache compiled shaders, low priority
 - [ ] Disable ReShade update check (ask user)
+- [x] Standalone "Risen Fast Start" build for friends: `buildast_startersion.dll`, `release/fast_start/README.txt`,
+      zip in `dist/RisenFastStart-1.0.zip` (tested: window at 8.2 s)
+- [ ] Fast Start: get feedback from friends (other PCs, GOG version?)
 
 ## Stage 0 — Setup
 - [x] Create project folder `Risen\risen-mods` (inside the game folder)
