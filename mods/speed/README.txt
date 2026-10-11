@@ -1,7 +1,8 @@
-Risen Speed 1.0
+Risen Speed 1.1
 ===============
 
 Ускорение игры по кнопке, как Z-mod в Готике: F4 включает/выключает ускорение (по умолчанию x2).
+Пока ускорение включено, в левом верхнем углу горят песочные часы и множитель (x2).
 Для 64-битного Risen 2023 года (Steam).
 
 УСТАНОВКА
@@ -14,6 +15,9 @@ Risen Speed 1.0
       Enabled=1          мод включён
       Multiplier=2.0     во сколько раз ускорять (1.0 = обычная скорость, максимум 10)
       ToggleKey=F4       кнопка: F1-F24, A-Z, 0-9, NUMPAD0-9, MOUSE3/4/5 и т.д.
+      [Indicator]
+      Show=1             показывать индикатор (0 = не показывать)
+      Scale=1.0          размер индикатора
   Не назначайте F3, F5-F9, F12 - их использует игра (F8 быстрое сохранение, F9 загрузка).
   Лог: Risen\bin\mods\speed.log
 
@@ -24,5 +28,8 @@ Risen Speed 1.0
 Антивирус может ругаться на version.dll - это ложное срабатывание. Windows должна быть на диске C:.
 
 -------------------------------------------------------------------------------
-English: game speed toggle for Risen (64-bit 2023, Steam). F4 toggles x2 speed. Extract into the Risen folder.
-Settings: bin\mods\speed.ini (Multiplier, ToggleKey; hot-reloaded).
+English: game speed toggle for Risen (64-bit 2023, Steam). F4 toggles x2 speed, an hourglass + x2 indicator
+shows while it is on. Extract into the Risen folder.
+Settings: bin\mods\speed.ini (Multiplier, ToggleKey, [Indicator] Show/Scale; hot-reloaded).
+
+Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.

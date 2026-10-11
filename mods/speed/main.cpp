@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "common.h"
+#include "overlay.h"
 
 static const char kDefaultIni[] =
     "; Speed mod settings. Changes are picked up while the game is running.\r\n"
@@ -16,12 +17,20 @@ static const char kDefaultIni[] =
     "Enabled=1\r\n"
     "; Game speed while speed-up is on (1.0 = normal, max 10)\r\n"
     "Multiplier=2.0\r\n"
-    "ToggleKey=F4\r\n";
+    "ToggleKey=F4\r\n"
+    "\r\n"
+    "[Indicator]\r\n"
+    "; Hourglass + x2 in the top-left corner while the speed-up is on\r\n"
+    "Show=1\r\n"
+    "; Size (1.0 = normal)\r\n"
+    "Scale=1.0\r\n";
 
 struct Config {
     bool enabled = true;
     float multiplier = 2.0f;
     int toggleKey = VK_F4;
+    bool indicator = true;
+    float indicatorScale = 1.0f;
 };
 
 static Config g_config;
@@ -38,8 +47,13 @@ static void ConfigLoad()
     if (c.multiplier < 0.1f) c.multiplier = 0.1f;
     if (c.multiplier > 10.0f) c.multiplier = 10.0f;
     c.toggleKey = IniKey("Speed", "ToggleKey", VK_F4);
+    c.indicator = IniInt("Indicator", "Show", 1) != 0;
+    c.indicatorScale = IniFloat("Indicator", "Scale", 1.0f);
+    if (c.indicatorScale < 0.3f) c.indicatorScale = 0.3f;
+    if (c.indicatorScale > 4.0f) c.indicatorScale = 4.0f;
     g_config = c;
-    Log("config: enabled=%d x%.2f key=0x%02X", c.enabled, c.multiplier, c.toggleKey);
+    Log("config: enabled=%d x%.2f key=0x%02X indicator=%d scale=%.2f", c.enabled, c.multiplier, c.toggleKey,
+        c.indicator, c.indicatorScale);
 }
 
 using GetInstanceFn = void* (*)();
@@ -95,6 +109,11 @@ static void SpeedTick()
         g_setTimeScale(timer, g_config.multiplier);
 }
 
+bool SpeedIsActive() { return g_active; }
+float SpeedMultiplier() { return g_config.multiplier; }
+bool OverlayEnabled() { return g_config.indicator; }
+float OverlayScale() { return g_config.indicatorScale; }
+
 static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
@@ -137,9 +156,11 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "speed");
-        Log("Speed 1.0");
+        Log("Speed 1.1");
         IniPath(kDefaultIni);
         ConfigLoad();
+        // Before the game creates its D3D9 device, which happens after the mod loader has run.
+        Log("overlay: d3d9 hook %s", OverlayInstall() ? "installed" : "FAILED (no indicator)");
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))
             CloseHandle(t);
     }

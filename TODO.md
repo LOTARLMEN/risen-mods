@@ -31,7 +31,7 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) — could cache compiled shaders, low priority
 - [ ] Disable ReShade update check (ask user)
 - [x] Separate mods for friends: `dist/RisenFastStart-1.1.zip`, `RisenWindow-1.0.zip`, `RisenSpeed-1.0.zip` (loader + one mod each)
-- [ ] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
+- [x] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
 - [ ] Fast Start: get feedback from friends (other PCs, GOG version?)
 
 ## Stage 0 — Setup
@@ -70,10 +70,17 @@ Engine has no borderless option (`<Window FullScreen=... Left/Top/Right/Bottom>`
 ## Stage 3 — Speed Hack mod
 Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified in game 2026-10-11.
 - [x] Hotkey toggles `SetTimeScaling(multiplier)` <-> `1.0`, `.ini` hot reload
-- [ ] **On-screen indicator** top-left while speed-up is on: hourglass icon + `x2` / `xN`
-      (needs drawing in D3D9: hook `IDirect3DDevice9::EndScene`/`Present`, or a ReShade add-on overlay when ReShade is present)
-- [ ] **Speed settings from inside the game** (multiplier, toggle key, on/off) — ini is hot-reloaded, so the in-game UI
-      just edits values and writes `risen_mods.ini`; part of Stage 5.5 settings window, can ship earlier as a small speed panel
+- [x] **On-screen indicator** top-left while speed-up is on: hourglass icon + `x2` / `xN` — session 3 (2026-10-11):
+  - [x] Dear ImGui in `third_party/imgui` (pinned release), built into the speed mod
+  - [x] `shared/d3d9_hook`: IAT-hook `Direct3DCreate9` in Engine.dll -> `IDirect3D9::CreateDevice` -> device vtable
+        `Present` + `Reset`; works with and without ReShade (bin\d3d9.dll)
+  - [x] Draw the indicator with ImGui (no input), handle device Reset
+  - [x] Test: F4 on/off, Alt+Tab while sped up, minimize/restore, ReShade overlay still fine (user-tested OK 2026-10-11)
+- [ ] **Speed settings from inside the game** — next session:
+  - [ ] Recon: how the game reads input (DirectInput8 / raw input / window messages) -> how to block it while the panel is open
+  - [ ] Panel hotkey (default F10, check the game doesn't use it), pause game while open
+  - [ ] Enabled checkbox, multiplier slider, rebind toggle key ("press a key..."), write `speed.ini` (hot reload picks it up)
+  - [ ] Later grows into the Stage 5.5 settings window for all mods
 - [x] `.ini`: `[Speed] Multiplier` (default 2.0), `ToggleKey` (default F4)
 - [ ] Optional: second hotkey / step up-down keys
 - [ ] Check side effects: physics at high speed, dialogs, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)
