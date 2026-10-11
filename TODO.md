@@ -148,8 +148,20 @@ Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an 
 - [ ] Test: train past the old cap at a teacher; saves stay compatible with the mod removed
 
 ## Stage 5.8 — Installer (user's idea 2026-10-11)
-One small `RisenModsInstaller.exe` (C++ Win32, no runtime, same toolchain) that installs selected mods from the
-public repo's latest GitHub release (github.com/LOTARLMEN/risen-mods).
+One small `RisenModsInstaller.exe` (C++, no runtime, same toolchain - user agreed C++ over Go/Rust) that installs
+selected mods from the public repo's latest GitHub release (github.com/LOTARLMEN/risen-mods).
+Look: the same Risen style as the F10 menu (user's wish). Plan: own folder `installer/` built by build.bat into
+build\RisenModsInstaller.exe; a plain Win32 window (fixed size, no frame or own frame) with a D3D9 device +
+Dear ImGui (imgui_impl_win32 + imgui_impl_dx9, already in third_party). Reuse mods/menu/game_assets (G3V0 .pak
+reader, parchment 9-slice, game cursor, Quorum/FreeSans fonts) - needs a variant of GamePath() that takes the found
+game folder instead of "parent of the module's bin\"; ideally move game_assets + the ImGui style setup into
+shared/ so menu.dll and the installer use one copy. Fallback when the game folder is not found yet: default ImGui
+style with parchment colours, then switch to the game art once the folder is known.
+Suggested order (one or two sessions):
+  1. installer skeleton: window + D3D9 + ImGui + Risen style from a hard-coded game folder
+  2. game folder detection (Steam) + "game is running" check
+  3. GitHub latest release -> mod list with checkboxes, install / update / remove
+  4. polish: progress, errors, RU/EN globe like the menu, README, release asset
 - [ ] Find Risen: Steam registry path -> steamapps/libraryfolders.vdf -> appmanifest_40300.acf; manual folder pick fallback
 - [ ] GitHub API `releases/latest` (WinHTTP), list assets Risen<Mod>-<ver>.zip, show checkboxes + installed / new version
       (installed version from bin\mods\<mod>.log first line or a small bin\mods\installed.ini written by the installer)
