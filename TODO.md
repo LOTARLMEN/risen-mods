@@ -147,6 +147,17 @@ Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an 
 - [ ] Pick the smallest hook (patch the max-value check or the teacher limit table), learning point costs unchanged
 - [ ] Test: train past the old cap at a teacher; saves stay compatible with the mod removed
 
+## Stage 5.8 — Installer (user's idea 2026-10-11)
+One small `RisenModsInstaller.exe` (C++ Win32, no runtime, same toolchain) that installs selected mods from the
+public repo's latest GitHub release (github.com/LOTARLMEN/risen-mods).
+- [ ] Find Risen: Steam registry path -> steamapps/libraryfolders.vdf -> appmanifest_40300.acf; manual folder pick fallback
+- [ ] GitHub API `releases/latest` (WinHTTP), list assets Risen<Mod>-<ver>.zip, show checkboxes + installed / new version
+      (installed version from bin\mods\<mod>.log first line or a small bin\mods\installed.ini written by the installer)
+- [ ] Refuse while Risen.exe is running; download, unzip (Windows Shell / minizip) into the game folder, keep user .ini files
+- [ ] Uninstall per mod and "remove all" (version.dll + bin\mods); Window mod: offer to set FullScreen="false"
+- [ ] Build in build.bat, ship as its own release asset; README section; unsigned exe -> SmartScreen warning note
+- [ ] Optional later: self-update check
+
 ## Maybe later
 - [ ] Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
 
