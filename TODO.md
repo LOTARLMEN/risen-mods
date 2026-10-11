@@ -120,8 +120,8 @@ ini and calls the mod's onChanged on the game thread. Without menu.dll mods keep
 - [x] AutoLoot 0.3: page (keys, radius, ground/chests) + hand icon; NEW auto-loot of bodies / open chests in radius
 - [x] Window, Fast Start: pages (Fast Start needs a restart -> note)
 - [x] User test 2026-10-11: all tabs, icons (hand liked), radius bodies/chests - "works great"
-- [ ] Fixed window size + mouse wheel scroll (built, deployed, waiting for test)
-- [ ] package.ps1: menu.dll in every zip (user agreed: shared like version.dll, newest wins); READMEs Speed 1.3/AutoLoot 0.3
+- [x] Fixed window size + mouse wheel scroll (user-tested)
+- [x] package.ps1: menu.dll in every zip (user agreed: shared like version.dll, newest wins); READMEs Speed 1.3/AutoLoot 0.3
 - [ ] Risen style: game cursor instead of ImGui arrow (find cursor texture in gui .pak), dark/gold colors, game font
 - [ ] Later: item category filters for AutoLoot
 - [ ] Idea: with ReShade Addon present, also offer the pages in ReShade's menu (`reshade::register_overlay`)
