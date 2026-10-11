@@ -97,9 +97,11 @@ ground items (3 m, never owned/mission), also works in combat stance.
 Debug: `[Debug] DumpKey` logs everything around the player.
 - [x] Dump verified: names, npc/dead/down, items, owner, inventory stacks; Sara (down) is skipped
 - [x] QuickLoot of a dead body, AutoLoot pickup of gold/potions/weapons (no crash)
-- [ ] Test after rebinding: RMB loot (does it interfere with blocking/Action 2? skip in combat / weapon drawn?)
+- [x] Test after rebinding (2026-10-11, user: works great): RMB on focused body/item/open chest, no loot with weapon drawn,
+      nothing in dialogs / on empty focus, F toggle. Sara's hut chest correctly refused (owned or locked)
 - [x] gui2.PrintItemLog shows the native "+ item" feed on the left for ground pickups - user likes it, no own feed
-- [ ] Chests: dump near locked/unlocked/owned chests -> confirm PSLock status values (1 = open?) and owner
+- [ ] Chests: dump (K) near locked/unlocked/owned chests -> confirm PSLock status values (1 = open?) and owner
+      (low priority: sailor chest looted, Sara's chest refused - behaviour already correct in practice)
 - [ ] Skip while GUI2 is browsing (inventory/trade/loot window), in combat, dialogs (IsDialogCameraActive done)
 - [ ] Owned items: check merchant goods / items in houses report an owner
 - [ ] Quest items: pick up a quest item -> quest advances?
