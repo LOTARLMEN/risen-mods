@@ -114,7 +114,7 @@ extern "C" __declspec(dllexport) const HubApi* RisenHubApi()
 
 // The menu's own page: the window key and the status icons.
 static const HubItem kOwnItems[] = {
-    {HubKey, "Menu", "Key", "Open this window", "Открыть это окно", VK_F10},
+    {HubKey, "Menu", "Key", "Open this window", "Открыть это окно", VK_F10, 0, 0, 0, 0, nullptr, -1},
     {HubCheckbox, "Icons", "Show", "Status icons in the top-left corner", "Значки состояния в левом верхнем углу", 1,
      0, 0, 0, 0, nullptr, -1, "Hourglass while sped up, hand while AutoLoot is on",
      "Песочные часы при ускорении, рука при включённом автолуте"},

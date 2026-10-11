@@ -27,7 +27,7 @@ struct HubItem {
     float step;          // slider: shown value is rounded to this (0 = no rounding)
     float displayScale;  // slider: shown = ini * displayScale (0 means 1)
     const char* format;  // slider: printf format of the shown value ("%.1f" when null)
-    int parent;          // index of a checkbox item that has to be on for this item to be editable, -1 = none
+    int parent;          // index of a checkbox item ABOVE this one that has to be on for this one to be editable, -1 = none
     const char* tipEn;   // tooltip, may be null
     const char* tipRu;
 };

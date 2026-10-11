@@ -16,6 +16,8 @@ void Log(const char* fmt, ...);
 const char* IniPath(const char* defaultText = nullptr);
 int IniInt(const char* section, const char* key, int def);
 float IniFloat(const char* section, const char* key, float def);
+// Text value into buf (def when missing).
+void IniString(const char* section, const char* key, const char* def, char* buf, int size);
 // Key name like "F4", "MOUSE3", "NUMPAD+" or "0x73" -> virtual key code; def when missing or unknown.
 int IniKey(const char* section, const char* key, int def);
 // Key name -> virtual key code, 0 when empty or unknown.

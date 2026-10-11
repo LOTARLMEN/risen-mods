@@ -103,11 +103,12 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 // Risen Mods menu
 static const HubItem kItems[] = {
     {HubCheckbox, "Window", "Borderless", "Borderless window over the whole monitor",
-     "Окно без рамки на весь монитор", 1},
+     "Окно без рамки на весь монитор", 1, 0, 0, 0, 0, nullptr, -1},
     {HubCheckbox, "Window", "HideSystemCursor", "Hide the Windows cursor over the game",
      "Прятать курсор Windows над игрой", 1, 0, 0, 0, 0, nullptr, -1, "The game draws its own cursor",
      "Игра рисует свой курсор"},
-    {HubCheckbox, "Window", "ClipCursor", "Keep the mouse inside the game window", "Не выпускать мышь из окна игры", 1},
+    {HubCheckbox, "Window", "ClipCursor", "Keep the mouse inside the game window", "Не выпускать мышь из окна игры", 1, 0, 0, 0, 0,
+     nullptr, -1},
     {HubNote, nullptr, nullptr, "Turning the borderless window off takes effect after restarting the game.",
      "Выключение окна без рамки сработает после перезапуска игры."},
 };
@@ -136,7 +137,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "window");
-        Log("Window 1.1");
+        Log("Window 1.2");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

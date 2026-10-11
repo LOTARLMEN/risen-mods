@@ -133,7 +133,9 @@ void DrawItem(const HubPage* page, int index, std::vector<float>& values)
 {
     const HubItem& item = page->items[index];
     const char* label = Text(item.labelEn, item.labelRu);
-    bool child = item.parent >= 0 && item.parent < page->itemCount;
+    // A parent is an item above this one: items written without the field have parent 0, which must not make
+    // the first item its own parent (it would lock itself once switched off).
+    bool child = item.parent >= 0 && item.parent < index;
     bool disabled = child && values[item.parent] == 0.0f;
     char id[64];
     snprintf(id, sizeof(id), "##%s_%d", page->id, index);

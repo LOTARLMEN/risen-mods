@@ -11,6 +11,15 @@ struct Entity {
     explicit operator bool() const { return e != nullptr; }
 };
 
+struct Vec3 {
+    float x, y, z;
+};
+
+// Script.dll's Effect: handle of a running effect (gCEffect*), no destructor - effects end on their own.
+struct Effect {
+    void* e = nullptr;
+};
+
 // bTObjArray<Entity>
 struct EntityArray {
     Entity* data;
@@ -32,6 +41,10 @@ struct GameApi {
     Entity* (*getOwner)(const Entity*, Entity* ret);
     void* (*getName)(const Entity*, void* retString); // bCString
     bool (*isDialogCamera)();
+    Vec3* (*getPosition)(const Entity*, Vec3* ret);
+    // EffectSystem (static): effects by name from library.pak, e.g. "eff_magic_telekinesis_target_once_01"
+    Effect* (*startEffect)(Effect* ret, const void* name, const Vec3* position);
+    bool (*existsEffect)(const void* name);
     // PSInventory
     bool (*invValid)(const Entity*);
     int (*invStackCount)(const Entity*);
@@ -75,3 +88,8 @@ bool HasOwner(const Entity& e);
 // The game's "AutoLoot" script: moves the container's lootable stacks to the receiver, prints the item log,
 // fires the quest hooks. Returns the number of stacks moved.
 int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container);
+Vec3 EntityPosition(const Entity& e);
+bool EffectExists(const char* name);
+// Starts a one-shot effect at a world position, scaled; quiet = without its sounds (the game's own uses of the
+// effect keep them). False when the effect system is not there or the name is unknown.
+bool PlayEffect(const char* name, const Vec3& position, float scale = 1.0f, bool quiet = false);

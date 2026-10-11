@@ -124,7 +124,9 @@ ini and calls the mod's onChanged on the game thread. Without menu.dll mods keep
 - [x] package.ps1: menu.dll in every zip (user agreed: shared like version.dll, newest wins); READMEs Speed 1.3/AutoLoot 0.3
 - [x] Risen style (user: "просто офигенно"): game cursor + parchment frame (9-slice) from images.pak atlas
       GUI_TexturePage01_REDESIGN, Quorum + FreeSans fonts from gui2.pak, read at runtime (mods/menu/game_assets)
-- [ ] AutoLoot: short game effect (spark) where an item / body / chest was looted, menu toggle (user's idea).
+- [x] AutoLoot 0.4: game effect eff_magic_telekinesis_target_once_01 where something was looted (user: "офигенно"),
+      silent (quiet copy of the sequence without PlaySound, swapped into the effect map only for our start),
+      scaled via the StartEffect matrix (default 0.15, F10 slider). Debug EffectTestKey cycles candidates. Was planned as:
       Script.dll: static `EffectSystem::StartEffect(bCString const&, bCVector const&)` (?StartEffect@EffectSystem@@SA?AVEffect@@AEBVbCString@@AEBVbCVector@@@Z),
       `Entity::GetPosition` (?GetPosition@Entity@@QEBA?AVbCVector@@XZ) - take it BEFORE InsertStack. Pick a short effect name from
       data\compiled\effects.pak (sparkle / glint). Fallback: Engine eCCameraBase::WorldToScreen + ImGui sparkle.
@@ -134,7 +136,13 @@ ini and calls the mod's onChanged on the game thread. Without menu.dll mods keep
 ## Stage 5.7 — No training limits (user's request 2026-10-11, small mod `mods/no-limits`)
 Risen caps how far attributes (strength, dexterity, ...) and skills can be trained (max value / per-teacher limit).
 Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an on/off toggle.
-- [ ] Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
+- [x] No Limits 0.1 (strength + dexterity only, user's/friend's choice): global max 200 (gCSkills_PS::ms_arrSkillInfos,
+      weapons/magic 10); teacher cap = gCSkillRange max checked in gCInfoConditionCanTeachSkill::IsSatisfied (Game.dll
+      +0x8a1630). In-memory patch at +0x8a16fa -> cave (ml64) compares with the global max for skills 7/8; bytes verified
+      first. Patch confirmed applied in game; [ ] user test at a strength/dexterity teacher past his old limit
+- [x] Menu bug: items without the parent field had parent 0 -> first checkbox locked itself (Speed "Enabled",
+      Window "Borderless"); menu now accepts only parents above the item. Speed 1.4, Window 1.2
+- [ ] (old) Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
       (per-teacher max level), or a hard max in the attribute code (PSSkills / gCSkillValue?)
 - [ ] Pick the smallest hook (patch the max-value check or the teacher limit table), learning point costs unchanged
 - [ ] Test: train past the old cap at a teacher; saves stay compatible with the mod removed

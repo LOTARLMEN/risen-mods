@@ -1,4 +1,4 @@
-Risen AutoLoot 0.3
+Risen AutoLoot 0.4
 ==================
 
 Быстрый лут без окна и без анимации, как AutoLoot от Hedin в Готике. Только для 64-битного Risen 2023 года (Steam).
@@ -13,6 +13,8 @@ Risen AutoLoot 0.3
   F10  окно настроек всех моих модов прямо в игре (RU / EN - кнопка с глобусом). Пока оно открыто,
        игра стоит на паузе. Закрыть: Esc, F10 или кнопка.
   Что подобрано - видно слева в обычных игровых строчках "+ предмет".
+  Там, где что-то залутано, вспыхивает маленькая искра (эффект самой игры, без звука) -
+  размер, звук или отключение - в F10, раздел "Эффект".
 
   Никогда не берётся: чужие вещи (у которых есть владелец - иначе это кража), квестовые предметы,
   запертые сундуки, люди без сознания (их обыск - кража). Это остаётся для обычного взаимодействия.
@@ -53,6 +55,12 @@ Risen AutoLoot 0.3
       Radius=300         радиус в сантиметрах (300 = 3 м)
       Bodies=0           обыскивать трупы в радиусе (1 = да)
       Chests=0           опустошать ничьи открытые сундуки в радиусе (1 = да)
+      [Effect]
+      Enabled=1          искра на месте лута
+      Name=eff_magic_telekinesis_target_once_01   какой эффект игры показывать
+      Height=0           подъём над предметом, см
+      Size=0.15          размер (1 = как в игре)
+      Sound=0            звук эффекта (1 = да)
 
 ЕСЛИ ЧТО-ТО НЕ ТАК
   - Игра не запускается или вылетает - удалите version.dll (см. УДАЛЕНИЕ), игра станет как была,
@@ -64,7 +72,7 @@ Risen AutoLoot 0.3
 
 -------------------------------------------------------------------------------
 
-Risen AutoLoot 0.3 (English, beta)
+Risen AutoLoot 0.4 (English, beta)
 
 Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no animation. No game files are changed.
   Right mouse  on the focused dead body / open chest / ground item: everything goes straight into the inventory
@@ -73,13 +81,14 @@ Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no anim
                optionally also nearby dead bodies and open chests nobody owns.
   F10          in-game settings window for all my mods (game paused while open).
 Never taken: owned items (theft), quest items, locked chests, unconscious people. Uses the game's own loot
-script, so quests count the items as usual.
+script, so quests count the items as usual. A small silent sparkle (the game's own effect) marks each looted
+spot; size / sound / off in F10.
 
 Install:   close the game, extract into the Risen folder -> Risen\bin\version.dll (mod loader)
            + Risen\bin\mods\autoloot.dll + Risen\bin\mods\menu.dll (F10 menu).
 Uninstall: close the game, delete Risen\bin\version.dll and the Risen\bin\mods folder. Nothing else is changed.
 Settings:  F10 in game, or Risen\bin\mods\autoloot.ini ([QuickLoot] Key/GroundItems/Chests,
-           [AutoLoot] Active/ToggleKey/Radius/Bodies/Chests).
+           [AutoLoot] Active/ToggleKey/Radius/Bodies/Chests, [Effect] Enabled/Name/Height/Size/Sound).
 Requires Windows on drive C:.
 
 Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.

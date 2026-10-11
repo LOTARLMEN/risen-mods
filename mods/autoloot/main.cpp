@@ -38,10 +38,23 @@ static const char kDefaultIni[] =
     "Bodies=0\r\n"
     "Chests=0\r\n"
     "\r\n"
+    "[Effect]\r\n"
+    "; A short game effect where something was looted\r\n"
+    "Enabled=1\r\n"
+    "; Effect name from the game (eff_* in data\\compiled\\library.pak)\r\n"
+    "Name=eff_magic_telekinesis_target_once_01\r\n"
+    "; Height above the looted object, cm\r\n"
+    "Height=0\r\n"
+    "; Size (1 = as in the game) and the effect's own sound (0 = silent)\r\n"
+    "Size=0.15\r\n"
+    "Sound=0\r\n"
+    "\r\n"
     "[Debug]\r\n"
     "; Writes everything around the player to autoloot.log\r\n"
     "DumpKey=\r\n"
-    "DumpRadius=1500\r\n";
+    "DumpRadius=1500\r\n"
+    "; Plays the next of a list of candidate effects at the focus / the player (name goes to autoloot.log)\r\n"
+    "EffectTestKey=\r\n";
 
 struct Config {
     bool quickLoot = true;
@@ -54,8 +67,14 @@ struct Config {
     float autoRadius = 300.0f;
     bool autoBodies = false;
     bool autoChests = false;
+    bool effect = true;
+    char effectName[96] = {};
+    float effectHeight = 0.0f;
+    float effectSize = 0.15f;
+    bool effectSound = false;
     int dumpKey = 0;
     float dumpRadius = 1500.0f;
+    int effectTestKey = 0;
 };
 
 static Config g_config;
@@ -67,6 +86,7 @@ constexpr UINT WM_LOOT_AUTO_TOGGLE = WM_APP + 0x5402;
 constexpr UINT WM_LOOT_AUTO_TICK = WM_APP + 0x5403;
 constexpr UINT WM_LOOT_DUMP = WM_APP + 0x5404;
 constexpr UINT WM_LOOT_RELOAD = WM_APP + 0x5405;
+constexpr UINT WM_LOOT_EFFECT_TEST = WM_APP + 0x5406;
 
 static float Clamp(float v, float lo, float hi)
 {
@@ -86,15 +106,21 @@ static void ConfigLoad(bool first)
     c.autoRadius = Clamp(IniFloat("AutoLoot", "Radius", 300.0f), 100.0f, 3000.0f);
     c.autoBodies = IniInt("AutoLoot", "Bodies", 0) != 0;
     c.autoChests = IniInt("AutoLoot", "Chests", 0) != 0;
+    c.effect = IniInt("Effect", "Enabled", 1) != 0;
+    IniString("Effect", "Name", "eff_magic_telekinesis_target_once_01", c.effectName, sizeof(c.effectName));
+    c.effectHeight = Clamp(IniFloat("Effect", "Height", 0.0f), -500.0f, 500.0f);
+    c.effectSize = Clamp(IniFloat("Effect", "Size", 0.15f), 0.1f, 3.0f);
+    c.effectSound = IniInt("Effect", "Sound", 0) != 0;
+    c.effectTestKey = IniKey("Debug", "EffectTestKey", 0);
     c.dumpKey = IniKey("Debug", "DumpKey", 0);
     c.dumpRadius = Clamp(IniFloat("Debug", "DumpRadius", 1500.0f), 100.0f, 100000.0f);
     g_config = c;
     if (first)
         g_autoActive = c.autoActive;
     Log("config: quick=%d key=0x%02X ground=%d chests=%d | auto=%d active=%d key=0x%02X r=%.0f bodies=%d chests=%d | "
-        "dump=0x%02X r=%.0f",
+        "effect=%d %s h=%.0f size=%.2f sound=%d | dump=0x%02X r=%.0f fxtest=0x%02X",
         c.quickLoot, c.quickKey, c.quickGround, c.quickChests, c.autoLoot, g_autoActive, c.autoKey, c.autoRadius,
-        c.autoBodies, c.autoChests, c.dumpKey, c.dumpRadius);
+        c.autoBodies, c.autoChests, c.effect, c.effectName, c.effectHeight, c.effectSize, c.effectSound, c.dumpKey, c.dumpRadius, c.effectTestKey);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -162,6 +188,28 @@ static void Dump()
     }
 }
 
+// Debug: plays the candidates one after another at the focus target (or the player) to pick a loot effect.
+static void EffectTest()
+{
+    static const char* const kCandidates[] = {
+        "eff_magic_telekinesis_target_once_01", "eff_magic_magicopen_chest_01", "eff_magic_light_end_01",
+        "eff_magic_illusion_target_end_01", "eff_magic_summoned_end_01", "eff_magic_teleport_end_01",
+        "eff_magic_heal_target_small_01", "eff_magic_protect_end_01", "eff_magic_speed_end_01",
+        "eff_script_itemgiven_01", "eff_script_goldgiven_01", "eff_ui_trade_01",
+    };
+    static int next;
+    Entity player;
+    if (!GameReady(&player))
+        return;
+    Entity target;
+    g_game.worldFocus(g_game.world, &target);
+    const char* name = kCandidates[next++ % (sizeof(kCandidates) / sizeof(kCandidates[0]))];
+    Vec3 at = EntityPosition(target ? target : player);
+    bool exists = EffectExists(name), started = exists && PlayEffect(name, at, g_config.effectSize, !g_config.effectSound);
+    Log("effect test: %s at %s (%.0f %.0f %.0f) exists=%d started=%d", name, target ? "focus" : "player", at.x, at.y,
+        at.z, exists, started);
+}
+
 // Loose item nobody owns, not a quest item, not hanging in a slot (torches in holders etc.).
 static bool IsFreeGroundItem(Entity e)
 {
@@ -184,6 +232,16 @@ static bool IsOpenChest(const Entity& e)
     return !g_game.lockValid(&e) || g_game.lockStatus(&e) == 1;
 }
 
+// The configured effect at a looted spot (for items the position is taken before they leave the world).
+static void Sparkle(Vec3 at)
+{
+    if (!g_config.effect || !g_config.effectName[0])
+        return;
+    at.y += g_config.effectHeight; // the engine is Y-up
+    if (!PlayEffect(g_config.effectName, at, g_config.effectSize, !g_config.effectSound))
+        Log("effect: %s did not start", g_config.effectName);
+}
+
 // No animation: straight into the inventory, with the game's "+ item" line on screen.
 static void PickUp(Entity& player, Entity e, const char* who)
 {
@@ -192,7 +250,9 @@ static void PickUp(Entity& player, Entity e, const char* who)
     unsigned long amount = g_game.itemAmount(&e);
     Entity copy = e;
     g_game.printItemLog(g_game.gui2, &copy, static_cast<int>(amount));
+    Vec3 at = EntityPosition(e);
     int slot = g_game.invInsertStack(&player, &e); // the world item is gone after this
+    Sparkle(at);
     Log("%s: %s x%lu -> stack %d", who, name, amount, slot);
 }
 
@@ -222,6 +282,8 @@ static void QuickLoot()
         return;
     }
     int64_t moved = ScriptAutoLoot(player, target);
+    if (moved > 0)
+        Sparkle(EntityPosition(target));
     Log("quickloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
 }
 
@@ -249,6 +311,8 @@ static void AutoLootTick()
         char name[96];
         EntityName(n.e, name, sizeof(name));
         int64_t moved = ScriptAutoLoot(player, n.e);
+        if (moved > 0)
+            Sparkle(EntityPosition(n.e));
         Log("autoloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
     }
 }
@@ -281,6 +345,12 @@ static const HubItem kItems[] = {
              "Только ничьи и не запертые сундуки"},
     /*11 */ {HubCheckbox, "AutoLoot", "Active", "On at game start", "Включён при запуске игры", 0, 0, 0, 0, 0,
              nullptr, 6},
+    /*12 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
+    /*13 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
+             1, 0, 0, 0, 0, nullptr, -1, "A short game effect at the item, body or chest",
+             "Короткий игровой эффект у предмета, трупа или сундука"},
+    /*14 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 13},
+    /*15 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 13},
 };
 
 static void OnMenuChanged()
@@ -316,6 +386,9 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     case WM_LOOT_DUMP:
         Dump();
         return 0;
+    case WM_LOOT_EFFECT_TEST:
+        EffectTest();
+        return 0;
     case WM_LOOT_RELOAD:
         ConfigLoad(false);
         return 0;
@@ -346,7 +419,7 @@ static DWORD WINAPI Worker(LPVOID)
     }
     Log("autoloot: ready (%s)", HubGet() ? "menu found" : "no menu.dll: ini only");
 
-    KeyEdge quick, toggle, dump;
+    KeyEdge quick, toggle, dump, fxTest;
     for (unsigned tick = 0; IsWindow(hwnd); ++tick) {
         bool focused = GetForegroundWindow() == hwnd;
         bool busy = HubBusy(); // the menu is open: its clicks and key rebinds are not ours
@@ -356,6 +429,8 @@ static DWORD WINAPI Worker(LPVOID)
             PostMessageW(hwnd, WM_LOOT_AUTO_TOGGLE, 0, 0);
         if (dump.Pressed(g_config.dumpKey, focused) && !busy)
             PostMessageW(hwnd, WM_LOOT_DUMP, 0, 0);
+        if (fxTest.Pressed(g_config.effectTestKey, focused) && !busy)
+            PostMessageW(hwnd, WM_LOOT_EFFECT_TEST, 0, 0);
         if (tick % 8 == 0 && g_autoActive && !busy)
             PostMessageW(hwnd, WM_LOOT_AUTO_TICK, 0, 0); // ~4 times a second
         if (tick % 30 == 0 && IniChanged())
@@ -370,7 +445,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.3");
+        Log("AutoLoot 0.4");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

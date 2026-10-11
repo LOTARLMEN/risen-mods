@@ -1,4 +1,4 @@
-Risen Speed 1.3
+Risen Speed 1.4
 ===============
 
 Ускорение игры по кнопке, как Z-mod в Готике. Только для 64-битного Risen 2023 года (Steam).
@@ -52,7 +52,7 @@ Risen Speed 1.3
 
 -------------------------------------------------------------------------------
 
-Risen Speed 1.3 (English)
+Risen Speed 1.4 (English)
 
 Game speed toggle for Risen (64-bit 2023 re-release, Steam), like Gothic's Z-mod. No game files are changed.
   Z    toggles x3 speed; an hourglass + x3 indicator shows while it is on.

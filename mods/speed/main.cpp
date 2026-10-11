@@ -114,7 +114,7 @@ static void SpeedTick()
 // Risen Mods menu
 
 static const HubItem kItems[] = {
-    {HubCheckbox, "Speed", "Enabled", "Speed-up enabled", "Ускорение включено", 1},
+    {HubCheckbox, "Speed", "Enabled", "Speed-up enabled", "Ускорение включено", 1, 0, 0, 0, 0, nullptr, -1},
     {HubSlider, "Speed", "Multiplier", "Speed", "Скорость", 3.0f, 1.5f, 10.0f, 0.1f, 1.0f, "x%.1f", 0},
     {HubKey, "Speed", "ToggleKey", "Toggle key", "Клавиша", 'Z', 0, 0, 0, 0, nullptr, 0,
      "Avoid F3, F5-F9, F12: the game uses them", "Не берите F3, F5-F9, F12: их использует игра"},
@@ -204,7 +204,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "speed");
-        Log("Speed 1.3");
+        Log("Speed 1.4");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

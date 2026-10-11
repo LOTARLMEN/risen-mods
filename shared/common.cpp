@@ -87,6 +87,11 @@ float IniFloat(const char* section, const char* key, float def)
     return buf[0] ? static_cast<float>(atof(buf)) : def;
 }
 
+void IniString(const char* section, const char* key, const char* def, char* buf, int size)
+{
+    GetPrivateProfileStringA(section, key, def, buf, size, g_iniPath);
+}
+
 static const struct { const char* name; int vk; } kKeyNames[] = {
     {"SPACE", VK_SPACE}, {"TAB", VK_TAB}, {"INSERT", VK_INSERT}, {"DELETE", VK_DELETE},
     {"HOME", VK_HOME}, {"END", VK_END}, {"PAGEUP", VK_PRIOR}, {"PAGEDOWN", VK_NEXT},
