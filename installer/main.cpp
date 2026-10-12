@@ -40,6 +40,8 @@ namespace {
 
 const char kVersion[] = INSTALLER_VERSION;
 const wchar_t kReleasesPage[] = L"https://github.com/LOTARLMEN/risen-mods/releases/latest";
+const wchar_t kIssuesPage[] = L"https://github.com/LOTARLMEN/risen-mods/issues";
+const wchar_t kRepoPage[] = L"https://github.com/LOTARLMEN/risen-mods";
 const float kWidth = 760.0f, kHeight = 880.0f; // window size at 100% scaling
 
 // ---------------------------------------------------------------------------------------------
@@ -365,8 +367,8 @@ void SetGameFolder(std::wstring folder)
 // ---------------------------------------------------------------------------------------------
 // UI
 
-ImVec4 kGood = ImVec4(0.18f, 0.38f, 0.10f, 1.0f);
-ImVec4 kBad = ImVec4(0.62f, 0.10f, 0.05f, 1.0f);
+ImVec4 kGood = ImVec4(0.10f, 0.29f, 0.05f, 1.0f);
+ImVec4 kBad = ImVec4(0.55f, 0.07f, 0.03f, 1.0f);
 
 // Right-aligned on the checkbox line, rightInset pixels left free for the "Remove" button.
 void StatusText(const Mod& m, bool want, float rightInset)
@@ -580,8 +582,8 @@ void DrawUi()
     snprintf(header, sizeof(header), "%s%s%s", T("Mods", "Моды"), lock.owns_lock() && !g_tag.empty() ? "  -  " : "",
              lock.owns_lock() ? g_tag.c_str() : "");
     ImGui::SeparatorText(header);
-    float footer = ImGui::GetFrameHeight() * 2.0f + ImGui::GetTextLineHeightWithSpacing() * 2.0f +
-                   ImGui::GetStyle().ItemSpacing.y * 3.0f;
+    float footer = ImGui::GetFrameHeight() * 2.0f + ImGui::GetTextLineHeightWithSpacing() * 3.0f +
+                   ImGui::GetStyle().ItemSpacing.y * 3.0f; // + the links line
     bool canWrite = lock.owns_lock() && !busy && !g_game.empty() && !g_gameRunning && g_gameCheck == GameCheck::Ok;
     ImGui::BeginChild("##mods", ImVec2(0, -footer));
     if (lock.owns_lock()) {
@@ -739,6 +741,19 @@ void DrawUi()
         ImGui::ProgressBar(total > 0 ? static_cast<float>(done) / total : -1.0f * static_cast<float>(ImGui::GetTime()),
                            ImVec2(-FLT_MIN, 0), overlay);
     }
+    // Where to report problems: the issues page, with the log every mod writes to.
+    if (ImGui::TextLink(T("Bug or crash? Report it on GitHub", "Баг или вылет? Сообщите на GitHub")))
+        ShellExecuteW(nullptr, L"open", kIssuesPage, nullptr, nullptr, SW_SHOWNORMAL);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", T("Attach Risen\\bin\\mods\\RisenMods.log (after a crash and a restart: "
+                                  "RisenMods.prev.log). In the game: F10 > \"Log folder\".",
+                                  "Приложите Risen\\bin\\mods\\RisenMods.log (после вылета и перезапуска: "
+                                  "RisenMods.prev.log). В игре: F10 > \"Папка с логом\"."));
+    ImGui::SameLine();
+    ImGui::TextDisabled("|");
+    ImGui::SameLine();
+    if (ImGui::TextLink(T("Mods on GitHub", "Моды на GitHub")))
+        ShellExecuteW(nullptr, L"open", kRepoPage, nullptr, nullptr, SW_SHOWNORMAL);
     ImGui::End();
     ImGui::PopFont();
     ImGui::PopStyleVar(7);

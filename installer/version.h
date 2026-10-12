@@ -2,5 +2,5 @@
 
 // The installer's version: shown in the window, written into the exe's file properties (installer.rc) and
 // compared by the self-update with the exe of the latest release. Raise it for every published change.
-#define INSTALLER_VERSION "1.2"
-#define INSTALLER_VERSION_NUMBERS 1, 2, 0, 0
+#define INSTALLER_VERSION "1.3"
+#define INSTALLER_VERSION_NUMBERS 1, 3, 0, 0

@@ -22,9 +22,16 @@ struct KnownMod {
 const KnownMod kKnown[] = {
     {"autoloot", "AutoLoot",
      {"Right mouse button loots the focused body, open chest or item at once, no loot window. F toggles automatic "
-      "pickup of items around you. Owned and quest items are never touched.",
+      "pickup of items around you (never someone else's things, nothing through walls). Taking what isn't yours "
+      "is theft, as in the game: whoever sees it reacts.",
       "Правая кнопка мыши сразу забирает всё с тела, открытого сундука или предмета под прицелом, без окна лута. "
-      "F включает автоподбор предметов вокруг. Чужое и квестовое не трогает."}},
+      "F включает автоподбор предметов вокруг (чужое и сквозь стены не берёт). Взять чужое - кража, как в "
+      "игре: кто увидит, отреагирует."}},
+    {"quick_lockpick", "Quick Lockpick",
+     {"Right mouse button on a locked chest or door opens it at once, no minigame. The game's own skill check "
+      "decides whether you can; a lockpick may break.",
+      "Правая кнопка мыши на запертом сундуке или двери сразу открывает замок, без мини-игры. Можно ли вскрыть, "
+      "решает сама игра по навыку; отмычка может сломаться."}},
     {"speed", "Speed",
      {"Z toggles a game speed-up (x3 by default) with an hourglass icon, like Gothic's Z-mod.",
       "Z включает ускорение игры (по умолчанию x3), на экране песочные часы. Как Z-mod в Готике."}},
@@ -524,6 +531,8 @@ void CleanupIfEmpty(const std::wstring& game)
     DeleteIfExists(dir + L"\\menu.README.txt", nullptr);
     DeleteIfExists(dir + L"\\menu.log", nullptr);
     DeleteIfExists(dir + L"\\loader.log", nullptr);
+    DeleteIfExists(dir + L"\\RisenMods.log", nullptr);      // the shared log (loader 1.1+)
+    DeleteIfExists(dir + L"\\RisenMods.prev.log", nullptr);
     DeleteIfExists(InstalledIni(game), nullptr);
     std::wstring loader = game + L"\\bin\\version.dll";
     std::vector<unsigned char> data;

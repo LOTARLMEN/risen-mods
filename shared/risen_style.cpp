@@ -59,8 +59,9 @@ int PushParchmentColors()
         ImVec4 color;
     } colors[] = {
         {ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0)},
-        {ImGuiCol_Text, ImVec4(0.20f, 0.13f, 0.07f, 1.0f)},
-        {ImGuiCol_TextDisabled, ImVec4(0.42f, 0.34f, 0.24f, 1.0f)},
+        {ImGuiCol_Text, ImVec4(0.11f, 0.07f, 0.03f, 1.0f)},
+        {ImGuiCol_TextDisabled, ImVec4(0.29f, 0.21f, 0.13f, 1.0f)},
+        {ImGuiCol_TextLink, ImVec4(0.42f, 0.07f, 0.03f, 1.0f)}, // ImGui's default blue is unreadable on parchment
         {ImGuiCol_Border, ImVec4(0.35f, 0.24f, 0.12f, 0.35f)},
         {ImGuiCol_FrameBg, ImVec4(0.35f, 0.24f, 0.12f, 0.16f)},
         {ImGuiCol_FrameBgHovered, ImVec4(0.35f, 0.24f, 0.12f, 0.28f)},

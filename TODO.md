@@ -420,8 +420,21 @@ the game's menus. Needs saving per-save progress too (same question as the theft
 - [x] F10: "Log folder" button (explorer /select the log) next to Close, tooltip which file to send. READMEs RU
       updated (EN sections never mentioned logs)
 - [x] Released v2026.10.12.8: every mod +0.0.1 (each zip carries loader 1.1; installer updates by version)
-- [ ] Installer: also delete RisenMods*.log in CleanupIfEmpty (with the next installer change)
+- [x] Installer: also delete RisenMods*.log in CleanupIfEmpty (installer 1.3, uncommitted)
 - [ ] Friend's crash: ask for RisenMods.prev.log once he runs this version
+- [x] READMEs (all mods + repo README.md): "Bugs and crashes: open an issue, attach RisenMods.log" - pushed 455247c;
+      the mod zips get it with their next release
+
+## Stage 5.16 — Installer 1.3 + readable text (user 2026-10-12)
+Installer 1.3: installer/main.cpp (footer links line: "Bug or crash? Report it on GitHub" -> kIssuesPage with a
+tooltip about RisenMods.log, "Mods on GitHub" -> kRepoPage; footer reserve +1 text line), installer/mods.cpp (kKnown:
+quick_lockpick description, AutoLoot description updated for theft rules; CleanupIfEmpty deletes RisenMods*.log).
+- [x] Text hard to read on parchment: ImGuiCol_TextLink was never set (ImGui's default light blue) - now dark red;
+      Text and TextDisabled darker in shared/risen_style.cpp (installer + F10), installer kGood/kBad darker.
+      User liked it; no background panel needed
+- [x] User checked the installer (links line, links, descriptions)
+- [x] Menu 1.1.2 (palette only), deployed, repackaged
+- [ ] Release v2026.10.12.9: committed + pushed, release-notes written; user runs the gh command
 
 ## Stage 6 — Release
 - [x] README with install/uninstall steps (every mod, RU + EN)
