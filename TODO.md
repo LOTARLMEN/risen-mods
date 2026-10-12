@@ -231,12 +231,25 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
       as its own "Menu update" line when no mod changed; removed with the last mod (already). Bump INSTALLER_VERSION.
       Old installer 1.1 lists "Menu" as a normal mod (user ticks it) - acceptable, it offers the self-update.
       Mod READMEs: manual install = mod zip (+ RisenMenu zip for the F10 window).
+      Every mod README (RU + EN) starts with a short block: "easiest: RisenModsInstaller.exe from the releases page
+      (link); F10 opens the settings menu of all mods" - manual install is the user's own choice after that.
       Test on a fake game folder (--zips): first mod -> menu added, second mod -> menu untouched, newer menu ->
       updated, last mod removed -> menu removed
 - [ ] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
       reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen
 - [ ] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
       v2026.10.11 zips were built before the fix
+
+## Stage 5.10 - German and Polish (user's request 2026-10-12, own session)
+Menu, all mod pages and the installer in EN / RU / DE / PL.
+- [ ] Keep the hub ABI (HubItem has labelEn/labelRu): extra languages from text files next to each mod
+      (bin\mods\<mod>.de.txt / .pl.txt, "English text = translation" lines, shipped in the zips); menu looks a
+      string up by its English text, falls back to English. Installer: its own table
+- [ ] Fonts: check Quorum / FreeSans from gui2.pak have Latin Extended-A (ą ę ł ś ż ź ć ń ó, ä ö ü ß); add the
+      ImGui glyph ranges; fallback font if missing
+- [ ] Language picker: the globe becomes a 4-language dropdown (menu header + installer); menu.ini Language=en|ru|de|pl
+- [ ] Translations written by Claude - ask the user to get a native speaker check if possible
+- [ ] READMEs: keep RU + EN (DE/PL optional)
 
 ## Maybe later
 - [ ] (unlikely) Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
