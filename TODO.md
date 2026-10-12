@@ -31,6 +31,44 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) - cache the compiled shaders on disk
       (user asked 2026-10-12 "can it be even faster?" - measure first with StartupTrace, then decide)
 - [ ] Disable ReShade update check (ask user)
+- [ ] (user 2026-10-12) Look for more: an even faster startup and faster save loading - the user thinks there are
+      more slow spots in the code. Plan: run startup_trace for a fresh profile of the remaining 9.7 s (main-thread
+      samples -> top functions, file I/O per pak, sleeps / waits, single-threaded parsing), then the same for loading a
+      save (extend startup_trace to sample during the loading screen; compare vanilla vs FastPakReads). Candidates:
+      shader cache (above), intro / logo videos, template/strings pak parsing, world sector streaming, save
+      decompression. Fix only what's measured; patches check bytes first
+      Measured 2026-10-12 (warm cache, Ryzen 5 1600): window after 6.1 s avg (6.46 / 6.08 / 5.64) without the trace.
+      Trace of 0..7 s main thread: pak parse 2.7 s (inflated by the trace's own hooks), D3DX shader compile 1.35 s,
+      GPU driver 0.65 s, engine code 0.65 s, ReShade update check 0.45 s (WININET), Steam overlay 0.25 s, signature
+      checks 0.2 s. FFCore file calls total < 1 s - disk is no longer the bottleneck.
+      Pak parse = bCObjectBase::Read / bCAccessorPropertyObject::Read pulling 1-64 bytes per call through
+      CFFPackedDirectFileStream::Read (FileSystem2 0x23540: virtual Seek [vt+0x20] to base+pos, virtual Read [vt+0x28]
+      -> 0x267e0 -> g_FFReadFile). Stream fields: [this-38h] file, [this-30h] base, [this-28h] pos, [this-20h] size.
+      Not parallelizable: single-threaded deserialization into engine globals (bCMemPool, registries) - neither
+      threads nor extra processes can hand the parsed objects to the game.
+  - [x] Shader cache (Fast Start 1.3, shader_cache.cpp, uncommitted): D3DXCompileShader is never called - Engine
+        makes 33 D3DXCreateEffectCompiler and calls ID3DXEffectCompiler::CompileEffect (vtable slot 59) 34 times
+        (1.26-1.56 s), then D3DXCreateEffect from the binary (0.09 s). Hook: IAT D3DXCreateEffectCompiler -> source
+        key (preprocessed if an include handler), vtable patch Release(2)/SetLiteral(57)/CompileEffect(59), value =
+        effect binary (0xFEFF....) in bin\mods\fast_start.shaders (~140 KB, 9 unique effects). Now 33 from cache in
+        0.001 s. ReShade.ini CheckForUpdates=0 (user agreed; backup ReShade.ini.bak).
+        Result: window after 4.49 s avg (4.44 / 4.28 / 4.75) instead of 6.06 s
+  - [x] User 2026-10-12: ran around, all fine, no Press START screen, startup faster
+  - [ ] User plays 1-2 h on 2026-10-13 with the cache + skip; reports problems, then release Fast Start 1.3
+  - [ ] Installer: CleanupIfEmpty must also delete mods\fast_start.shaders (installer bump)
+  - [ ] Release Fast Start 1.3: README RU+EN (shader cache, Press START skip, new ini keys), hub tooltips
+- [x] (user 2026-10-12) Skip the "Press START" screen (press_start.cpp, uncommitted): OnX360Paint_Start
+      (Script_Game 0x158200) polls the pad and eCInputAdmin::GetRawKeyState for keys 1..0x200; on a key it closes
+      pages 0x1A/0x1B, stores keyboard input mode, opens page 0x0D (main menu). We patch Script_Game's IAT entry
+      and answer "pressed" once for the call site 0x158335 (bytes checked). Fast Start ini SkipPressStart=1.
+      Works in the log; user checks the main menu, keyboard/mouse, and a gamepad if he has one
+  - [ ] Fast path in CFFPackedDirectFileStream::Read (vtable patch, serve small reads from our pak window without
+        2 virtual calls + 2 FFCore hooks). Expected a few hundred ms; measure the hook cost first
+  - [ ] (low, user: "if it doesn't make sense - never mind") Background prefetch of the big paks on a worker
+        thread - helps only a cold start / HDD, measure after a reboot
+  - [ ] Crash log false positives: the VEH logs first-chance AVs that a __try handles (startup_trace's AfterCall
+        produced 6 "crash" reports and used up the per-launch cap). Log as "first-chance", keep the cap for
+        unhandled-looking ones, or confirm via a continue handler / sentry
 - [x] Separate mods for friends: `dist/RisenFastStart-1.1.zip`, `RisenWindow-1.0.zip`, `RisenSpeed-1.0.zip` (loader + one mod each)
 - [x] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
 - [ ] Fast Start: get feedback from friends (other PCs, GOG version?)
@@ -434,7 +472,7 @@ quick_lockpick description, AutoLoot description updated for theft rules; Cleanu
       User liked it; no background panel needed
 - [x] User checked the installer (links line, links, descriptions)
 - [x] Menu 1.1.2 (palette only), deployed, repackaged
-- [ ] Release v2026.10.12.9: committed + pushed, release-notes written; user runs the gh command
+- [x] Released v2026.10.12.9 (installer 1.3, menu 1.1.2; other mods unchanged)
 
 ## Stage 6 — Release
 - [x] README with install/uninstall steps (every mod, RU + EN)
