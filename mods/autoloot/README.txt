@@ -1,4 +1,4 @@
-Risen AutoLoot 0.5
+Risen AutoLoot 0.6
 ==================
 
 Быстрый лут без окна и без анимации, как AutoLoot от Hedin в Готике. Только для 64-битного Risen 2023 года (Steam).
@@ -13,6 +13,8 @@ Risen AutoLoot 0.5
        По умолчанию берёт только то, что впереди (конус по направлению камеры, 120°; под ногами - всегда),
        и только нужные категории: золото, стрелы, оружие, броня, зелья/еда, свитки/руны, записки,
        разное - галки в F10. Летящие стрелы (свои и чужие) не подбираются.
+       Трупы обыскиваются и с оружием в руках, и без наведения на них: мясо, шкуры, когти зверей
+       и монстров игра создаёт сама, как при обычном наведении.
   F10  окно настроек всех моих модов прямо в игре (RU / EN - кнопка с глобусом). Пока оно открыто,
        игра стоит на паузе. Закрыть: Esc, F10 или кнопка.
   Что подобрано - видно слева в обычных игровых строчках "+ предмет".
@@ -80,7 +82,7 @@ Risen AutoLoot 0.5
 
 -------------------------------------------------------------------------------
 
-Risen AutoLoot 0.5 (English, beta)
+Risen AutoLoot 0.6 (English, beta)
 
 Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no animation. No game files are changed.
   Right mouse  on the focused dead body / open chest / ground item: everything goes straight into the inventory
@@ -89,6 +91,8 @@ Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no anim
                optionally also nearby dead bodies and open chests nobody owns. By default only in front of
                you (120° cone around the camera view, things at your feet always), with per-category filters
                (gold, ammo, weapons, armour, consumables, magic, written, misc). Arrows in flight are ignored.
+               Bodies are searched with the weapon drawn too, without focusing them: animal and monster
+               plunder (meat, skins, claws) is created the way the game does on focus.
   F10          in-game settings window for all my mods (game paused while open).
 Never taken: owned items (theft), quest items, locked chests, unconscious people. Uses the game's own loot
 script, so quests count the items as usual. A small silent sparkle (the game's own effect) marks each looted

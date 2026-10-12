@@ -114,6 +114,11 @@ Debug: `[Debug] DumpKey` logs everything around the player.
       theft = owner && !PSItem::Dropped (from Script_Game AssessTheft), friend's bugs fixed: arrows in flight
       (PSProjectile::IsActive + item must rest 2 ticks) and radius bodies never looted (body marked done while still
       dying -> now retried every 1 s up to 8 times until the script moves something)
+- [x] AutoLoot 0.6 (2026-10-12): radius bodies of animals/monsters were not looted - their plunder (meat, skins)
+      is created by Script_Game CanInteract_Player_<Kind> (24 kinds, IsGeneratedPlunder flag) only when the player
+      focuses the body. Fix: PSInteraction::CanInteractWith on the PLAYER with the body (verified: vulture meat).
+      By-hand loot (InvFilter_Loot + TransferAmountTo) kept as fallback while the weapon is drawn - check the log
+      ("script" vs "by hand") and drop it if the script always works
 - [ ] **Theft protection (user's main concern, 2026-10-12)**: never auto-loot anything NPCs would treat as stolen.
       Ground pickup already skips items with an owner - verify it covers merchant goods, items in houses/huts,
       owned chests; find out whether ownership can end (owner dead, guild change) and loot it then. Look for the

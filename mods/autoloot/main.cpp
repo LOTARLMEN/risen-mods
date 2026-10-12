@@ -292,6 +292,17 @@ static void Dump()
             item ? g_game.itemMission(&e) : 0, item ? g_game.itemAmount(&e) : 0, item ? g_game.itemCategory(&e) : -1,
             item ? g_game.itemDropped(&e) : 0, IsFlying(e), InFront(player, e, n.distance),
             item ? g_game.attachedToSlot(const_cast<Entity*>(&e)) : 0, lock, lock ? g_game.lockStatus(&e) : -1);
+        if (!inv || !npc || !g_game.isDead(&e))
+            continue;
+        // What the game's loot filter (used by its AutoLoot script) says about each stack of a dead body.
+        for (int i = 0, n = g_game.invStackCount(&e); i < n && i < 32; ++i) {
+            Entity tpl;
+            g_game.invTemplateItem(&e, &tpl, i);
+            char stackName[96];
+            EntityName(tpl, stackName, sizeof(stackName));
+            Log("      stack %d %-32s type=%d cat=%d amount=%d lootFilter=%lld", i, stackName, g_game.invStackType(&e, i),
+                g_game.invCategory(&e, i), g_game.invAmount(&e, i), ScriptCall("InvFilter_Loot", e.e, nullptr, i));
+        }
     }
 }
 
@@ -416,6 +427,7 @@ static bool Resting(const Entity& e, DWORD now)
 // call it again four times a second.
 struct LootTry {
     bool done = false;
+    bool generated = false; // GeneratePlunder asked
     int tries = 0;
     DWORD next = 0;
 };
@@ -427,6 +439,7 @@ static void AutoLootTick()
     if (!g_config.autoLoot || !g_autoActive || !GameReady(&player))
         return;
     DWORD now = GetTickCount();
+    bool combat = CombatMode(player) != 0;
     if (g_looted.size() > 1000)
         g_looted.clear();
     for (const Nearby& n : CollectNearby(player, g_config.autoRadius)) {
@@ -437,6 +450,20 @@ static void AutoLootTick()
                 PickUp(player, n.e, "autoloot");
             continue;
         }
+        Entity container = n.e;
+        // Animals and monsters get their plunder (meat, skins...) only when first focused: ask the game the same
+        // question the focus asks, once per body.
+        if (g_config.autoBodies && g_game.isNpc(&container) && g_game.isDead(&container) &&
+            g_game.invValid(&container)) {
+            LootTry& t = g_looted[container.e];
+            if (!t.generated) {
+                t.generated = true;
+                if (GeneratePlunder(player, container)) {
+                    char name[96];
+                    Log("autoloot: plunder created for %s", EntityName(container, name, sizeof(name)));
+                }
+            }
+        }
         bool body = g_config.autoBodies && IsDeadBody(n.e);
         bool chest = !body && g_config.autoChests && IsOpenChest(n.e);
         if (!body && !chest)
@@ -446,14 +473,21 @@ static void AutoLootTick()
             continue;
         char name[96];
         EntityName(n.e, name, sizeof(name));
-        int64_t moved = ScriptAutoLoot(player, n.e);
+        // Not sure yet whether the game's AutoLoot script gives anything while the player's weapon is drawn: when
+        // it doesn't, the same steps are done by hand.
+        int64_t moved = ScriptAutoLoot(player, container);
+        const char* how = "script";
+        if (moved <= 0 && combat) {
+            moved = LootContainer(player, container);
+            how = "by hand, weapon drawn";
+        }
         if (moved > 0)
             Sparkle(EntityPosition(n.e));
-        // Nothing taken: a body that just died (still in its death animation) gives nothing yet - try again in a
-        // second, a few times, then leave what the script won't take.
+        // Nothing taken: try again in a second, a few times, then leave what the game won't give.
         t.done = moved > 0 || ++t.tries >= 8;
         t.next = now + 1000;
-        Log("autoloot: %s %s -> %lld stacks (try %d)", body ? "body" : "chest", name, moved, t.tries + (moved > 0));
+        Log("autoloot: %s %s -> %lld stacks (%s, try %d)", body ? "body" : "chest", name, moved,
+            how, t.tries + (moved > 0));
     }
 }
 
@@ -605,7 +639,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.5");
+        Log("AutoLoot 0.6");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

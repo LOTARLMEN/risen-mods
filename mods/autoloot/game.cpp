@@ -55,6 +55,12 @@ bool GameApiInit()
     Resolve(script, "Script", g.invValid, "?IsValid@PSInventory@@QEBA_NXZ");
     Resolve(script, "Script", g.invStackCount, "?GetStackCount@PSInventory@@QEBAHXZ");
     Resolve(script, "Script", g.invInsertStack, "?InsertStack@PSInventory@@QEAAHAEBVEntity@@@Z");
+    Resolve(script, "Script", g.invTemplateItem, "?GetTemplateItem@PSInventory@@QEBA?AVEntity@@H@Z");
+    Resolve(script, "Script", g.invStackType, "?GetStackType@PSInventory@@QEBA?AW4gEStackType@@H@Z");
+    Resolve(script, "Script", g.invAmount, "?GetAmount@PSInventory@@QEBAHH@Z");
+    Resolve(script, "Script", g.invCategory, "?GetCategory@PSInventory@@QEBA?AW4gEItemCategory@@H@Z");
+    Resolve(script, "Script", g.invTransfer, "?TransferAmountTo@PSInventory@@QEAA_NHHAEAVEntity@@@Z");
+    Resolve(script, "Script", g.canInteractWith, "?CanInteractWith@PSInteraction@@QEAA_NVEntity@@@Z");
     Resolve(script, "Script", g.itemValid, "?IsValid@PSItem@@QEBA_NXZ");
     Resolve(script, "Script", g.itemMission, "?IsMissionItem@PSItem@@QEBA_NXZ");
     Resolve(script, "Script", g.itemAmount, "?GetAmount@PSItem@@QEBAKXZ");
@@ -108,20 +114,63 @@ bool HasOwner(const Entity& e)
     return owner.e != nullptr;
 }
 
+int64_t ScriptCall(const char* script, void* self, void* other, int64_t param)
+{
+    // eCScriptProxyScript is { vftable, eSScriptBase* } (16 bytes); built once per name, never destroyed (lives as
+    // long as the game). The bCString is only needed by the constructor's name lookup.
+    struct Proxy {
+        const char* name;
+        alignas(16) char data[64];
+    };
+    static Proxy proxies[4];
+    Proxy* p = nullptr;
+    for (Proxy& q : proxies)
+        if (q.name == script || !q.name) {
+            p = &q;
+            break;
+        }
+    if (!p)
+        return -1;
+    if (!p->name) {
+        alignas(8) char name[16] = {};
+        g_game.stringNew(name, script);
+        g_game.proxyNew(p->data, name);
+        g_game.stringFree(name);
+        p->name = script;
+    }
+    return g_game.proxyCall(p->data, self, other, param);
+}
+
 int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container)
 {
-    // eCScriptProxyScript is { vftable, eSScriptBase* } (16 bytes); built once, never destroyed (lives as long
-    // as the game). The bCString is only needed by the constructor's name lookup.
-    alignas(16) static char proxy[64];
-    static bool built;
-    if (!built) {
-        alignas(8) char name[16] = {};
-        g_game.stringNew(name, "AutoLoot");
-        g_game.proxyNew(proxy, name);
-        g_game.stringFree(name);
-        built = true;
+    return ScriptCall("AutoLoot", receiver.e, container.e, 0);
+}
+
+bool GeneratePlunder(Entity& player, Entity& body)
+{
+    // The player asks about the body, like the focus does (verified in game: a vulture got its meat).
+    int before = g_game.invStackCount(&body);
+    Entity other = body;
+    g_game.canInteractWith(&player, &other);
+    return g_game.invStackCount(&body) != before;
+}
+
+int64_t LootContainer(Entity& receiver, Entity& container)
+{
+    // What Script_Game's AutoLoot does, step by step: last stack first, the game's loot filter decides (it skips
+    // equipped / natural weapons and quest items), "+ item" line, then the transfer.
+    int64_t moved = 0;
+    for (int i = g_game.invStackCount(&container) - 1; i >= 0; --i) {
+        if (ScriptCall("InvFilter_Loot", container.e, nullptr, i) <= 0)
+            continue;
+        int amount = g_game.invAmount(&container, i);
+        Entity tpl;
+        g_game.invTemplateItem(&container, &tpl, i);
+        g_game.printItemLog(g_game.gui2, &tpl, amount);
+        if (g_game.invTransfer(&container, i, amount, &receiver))
+            ++moved;
     }
-    return g_game.proxyCall(proxy, receiver.e, container.e, 0);
+    return moved;
 }
 
 Vec3 EntityPosition(const Entity& e)

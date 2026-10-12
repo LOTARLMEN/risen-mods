@@ -53,6 +53,14 @@ struct GameApi {
     bool (*invValid)(const Entity*);
     int (*invStackCount)(const Entity*);
     int (*invInsertStack)(Entity* self, const Entity* item);
+    Entity* (*invTemplateItem)(const Entity* self, Entity* ret, int stack);
+    int (*invStackType)(const Entity* self, int stack); // gEStackType, 0 = normal (equipped etc. otherwise)
+    int (*invAmount)(const Entity* self, int stack);
+    int (*invCategory)(const Entity* self, int stack);
+    bool (*invTransfer)(Entity* self, int stack, int amount, Entity* target);
+    // PSInteraction::CanInteractWith(Entity) - what the focus asks; for animals and monsters the body's
+    // CanInteract_Player_<kind> script also creates the plunder (meat, skins...) the first time.
+    bool (*canInteractWith)(Entity* self, Entity* otherCopy);
     // PSItem
     bool (*itemValid)(const Entity*);
     bool (*itemMission)(const Entity*);
@@ -100,6 +108,13 @@ bool HasOwner(const Entity& e);
 // The game's "AutoLoot" script: moves the container's lootable stacks to the receiver, prints the item log,
 // fires the quest hooks. Returns the number of stacks moved.
 int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container);
+// Makes the game create a body's plunder (normally done when the player first focuses it). True when stacks
+// were added.
+bool GeneratePlunder(Entity& player, Entity& body);
+// The same done by hand, for when the script gives nothing (player's weapon drawn). Returns stacks moved.
+int64_t LootContainer(Entity& receiver, Entity& container);
+// Any game script by name (Script_Game's exported scripts: "InvFilter_Loot", ...). Up to 4 different names.
+int64_t ScriptCall(const char* script, void* self, void* other, int64_t param);
 Vec3 EntityPosition(const Entity& e);
 // Horizontal (x, z) view direction, unit length: the camera's, else the player's facing. False when neither is known.
 bool ViewDirection(const Entity& player, float* x, float* z);
