@@ -222,6 +222,13 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
 - [x] Hardening: /DEPENDENTLOADFLAG:0x800 (system DLLs only from System32 - no d3d9.dll/version.dll planted next to it)
 - [x] Discord overlay over the installer - gone (user, 2026-10-12)
 - [x] User test of the window, folder picker etc. - works (user, 2026-10-12)
+- [ ] **Menu as its own release asset (user's idea 2026-10-12)** - next session, together with the button below.
+      menu.dll is 880 KB, mods 160-230 KB: every zip carries it today. Plan: release gets RisenMenu-<ver>.zip
+      (menu.dll + README, version from mods/menu README title); mod zips = version.dll + mod dll + README only
+      (loader stays - without it a hand-installed mod doesn't load; mods work without the menu via ini).
+      Installer 1.2: menu is not a checkbox - installed/updated with any mod by its own version (dll log string),
+      removed with the last mod (already); bump INSTALLER_VERSION. Old installer 1.1 just shows "Menu" as a mod.
+      READMEs: manual install = mod zip + RisenMenu zip. Test install/update/remove on a fake game folder (--zips)
 - [ ] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
       reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen
 - [ ] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
