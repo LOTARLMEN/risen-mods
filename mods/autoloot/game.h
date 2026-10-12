@@ -11,6 +11,10 @@ struct Entity {
     explicit operator bool() const { return e != nullptr; }
 };
 
+// gEItemCategory values, from Script_Game's InvFilter_Category_* (the inventory tabs). 0 / 4 not seen in a filter.
+enum ItemCategory { ItemCatNone = 0, ItemCatWeapon = 1, ItemCatArmor = 2, ItemCatConsumable = 3, ItemCatMagic = 5,
+                    ItemCatMisc = 6, ItemCatWritten = 7 };
+
 struct Vec3 {
     float x, y, z;
 };
@@ -53,6 +57,14 @@ struct GameApi {
     bool (*itemValid)(const Entity*);
     bool (*itemMission)(const Entity*);
     unsigned long (*itemAmount)(const Entity*);
+    int (*itemCategory)(const Entity*); // gEItemCategory, see ItemCategory below
+    bool (*itemDropped)(const Entity*); // PSItem::PropertyDropped: thrown away by someone, taking it is not theft
+    // PSProjectile: an arrow / bolt in flight is an item in the world too
+    bool (*projValid)(const Entity*);
+    bool (*projActive)(const Entity*);
+    // Where the player and the camera look
+    Vec3* (*atVector)(const Entity*, Vec3* ret);
+    float* (*cameraPose)(float* retMatrix); // static, bCMatrix 4x4 rows
     // PSLock
     bool (*lockValid)(const Entity*);
     int (*lockStatus)(const Entity*); // PSLock::PropertyStatus -> gELockStatus (guess: called on the entity view)
@@ -89,6 +101,8 @@ bool HasOwner(const Entity& e);
 // fires the quest hooks. Returns the number of stacks moved.
 int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container);
 Vec3 EntityPosition(const Entity& e);
+// Horizontal (x, z) view direction, unit length: the camera's, else the player's facing. False when neither is known.
+bool ViewDirection(const Entity& player, float* x, float* z);
 bool EffectExists(const char* name);
 // Starts a one-shot effect at a world position, scaled; quiet = without its sounds (the game's own uses of the
 // effect keep them). False when the effect system is not there or the name is unknown.

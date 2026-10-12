@@ -4,7 +4,9 @@
 
 #include <windows.h>
 #include <algorithm>
-#include <unordered_set>
+#include <cmath>
+#include <cstring>
+#include <unordered_map>
 #include <vector>
 
 #include "common.h"
@@ -37,6 +39,23 @@ static const char kDefaultIni[] =
     "; Also loot dead bodies / open chests that belong to nobody within the radius\r\n"
     "Bodies=0\r\n"
     "Chests=0\r\n"
+    "; 1 = only in front of you: a cone around the camera's view, ConeAngle degrees wide (things right at your feet\r\n"
+    "; are always taken). 0 = the whole circle around you\r\n"
+    "Cone=1\r\n"
+    "ConeAngle=120\r\n"
+    "\r\n"
+    "[Filter]\r\n"
+    "; What AutoLoot picks up from the ground (QuickLoot always takes what you look at; bodies and chests are\r\n"
+    "; emptied by the game's own loot script, all of it)\r\n"
+    "Gold=1\r\n"
+    "Ammo=1\r\n"
+    "Weapons=1\r\n"
+    "Armor=1\r\n"
+    "Consumables=1\r\n"
+    "Magic=1\r\n"
+    "Written=1\r\n"
+    "Misc=1\r\n"
+    "Other=1\r\n"
     "\r\n"
     "[Effect]\r\n"
     "; A short game effect where something was looted\r\n"
@@ -67,6 +86,10 @@ struct Config {
     float autoRadius = 300.0f;
     bool autoBodies = false;
     bool autoChests = false;
+    bool autoCone = true;
+    float coneAngle = 120.0f;
+    bool takeGold = true, takeAmmo = true, takeWeapons = true, takeArmor = true, takeConsumables = true,
+         takeMagic = true, takeWritten = true, takeMisc = true, takeOther = true;
     bool effect = true;
     char effectName[96] = {};
     float effectHeight = 0.0f;
@@ -106,6 +129,17 @@ static void ConfigLoad(bool first)
     c.autoRadius = Clamp(IniFloat("AutoLoot", "Radius", 300.0f), 100.0f, 3000.0f);
     c.autoBodies = IniInt("AutoLoot", "Bodies", 0) != 0;
     c.autoChests = IniInt("AutoLoot", "Chests", 0) != 0;
+    c.autoCone = IniInt("AutoLoot", "Cone", 1) != 0;
+    c.coneAngle = Clamp(IniFloat("AutoLoot", "ConeAngle", 120.0f), 30.0f, 360.0f);
+    c.takeGold = IniInt("Filter", "Gold", 1) != 0;
+    c.takeAmmo = IniInt("Filter", "Ammo", 1) != 0;
+    c.takeWeapons = IniInt("Filter", "Weapons", 1) != 0;
+    c.takeArmor = IniInt("Filter", "Armor", 1) != 0;
+    c.takeConsumables = IniInt("Filter", "Consumables", 1) != 0;
+    c.takeMagic = IniInt("Filter", "Magic", 1) != 0;
+    c.takeWritten = IniInt("Filter", "Written", 1) != 0;
+    c.takeMisc = IniInt("Filter", "Misc", 1) != 0;
+    c.takeOther = IniInt("Filter", "Other", 1) != 0;
     c.effect = IniInt("Effect", "Enabled", 1) != 0;
     IniString("Effect", "Name", "eff_magic_telekinesis_target_once_01", c.effectName, sizeof(c.effectName));
     c.effectHeight = Clamp(IniFloat("Effect", "Height", 0.0f), -500.0f, 500.0f);
@@ -118,9 +152,11 @@ static void ConfigLoad(bool first)
     if (first)
         g_autoActive = c.autoActive;
     Log("config: quick=%d key=0x%02X ground=%d chests=%d | auto=%d active=%d key=0x%02X r=%.0f bodies=%d chests=%d | "
+        "cone=%d %.0f | take gold=%d ammo=%d weap=%d armor=%d cons=%d magic=%d written=%d misc=%d other=%d | "
         "effect=%d %s h=%.0f size=%.2f sound=%d | dump=0x%02X r=%.0f fxtest=0x%02X",
         c.quickLoot, c.quickKey, c.quickGround, c.quickChests, c.autoLoot, g_autoActive, c.autoKey, c.autoRadius,
-        c.autoBodies, c.autoChests, c.effect, c.effectName, c.effectHeight, c.effectSize, c.effectSound, c.dumpKey, c.dumpRadius, c.effectTestKey);
+        c.autoBodies, c.autoChests, c.autoCone, c.coneAngle, c.takeGold, c.takeAmmo, c.takeWeapons, c.takeArmor,
+        c.takeConsumables, c.takeMagic, c.takeWritten, c.takeMisc, c.takeOther, c.effect, c.effectName, c.effectHeight, c.effectSize, c.effectSound, c.dumpKey, c.dumpRadius, c.effectTestKey);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -163,6 +199,67 @@ static int CombatMode(const Entity& player)
     return g_game.combatValid(&player) ? g_game.combatMode(&player) : 0;
 }
 
+// An arrow / bolt still in flight (also the player's own: it used to be picked up right after the shot).
+static bool IsFlying(const Entity& e)
+{
+    return g_game.projValid(&e) && g_game.projActive(&e);
+}
+
+// Taking it would be theft. The game's AssessTheft: an item someone dropped is never theft, otherwise it may be
+// when the item has an owner - we stay on the safe side and skip every owned item.
+static bool WouldBeTheft(const Entity& e)
+{
+    return HasOwner(e) && !(g_game.itemValid(&e) && g_game.itemDropped(&e));
+}
+
+// Loose item that may be taken: not theft, not a quest item, not hanging in a slot (torches in holders etc.),
+// not an arrow in flight.
+static bool IsFreeGroundItem(Entity e)
+{
+    return g_game.isItem(&e) && g_game.itemValid(&e) && !g_game.itemMission(&e) && !g_game.attachedToSlot(&e) &&
+           !IsFlying(e) && !WouldBeTheft(e);
+}
+
+// Within the view cone (or the cone is off). Things right at the player's feet always count.
+static bool InFront(const Entity& player, const Entity& e, float distance)
+{
+    if (!g_config.autoCone || g_config.coneAngle >= 359.0f || distance < 100.0f)
+        return true;
+    float vx, vz;
+    if (!ViewDirection(player, &vx, &vz))
+        return true;
+    Vec3 p = EntityPosition(player), t = EntityPosition(e);
+    float dx = t.x - p.x, dz = t.z - p.z, len = sqrtf(dx * dx + dz * dz);
+    if (len < 1.0f)
+        return true;
+    return (dx * vx + dz * vz) / len >= cosf(g_config.coneAngle * 0.5f * 3.14159265f / 180.0f);
+}
+
+static bool NameStarts(const char* name, const char* prefix)
+{
+    return _strnicmp(name, prefix, strlen(prefix)) == 0;
+}
+
+// The [Filter] switches, for radius pickup only.
+static bool Wanted(const Entity& e)
+{
+    char name[96];
+    EntityName(e, name, sizeof(name));
+    if (_stricmp(name, "It_Gold") == 0 || NameStarts(name, "It_GoldBag"))
+        return g_config.takeGold;
+    if (NameStarts(name, "It_Arrow") || NameStarts(name, "It_Bolt"))
+        return g_config.takeAmmo;
+    switch (g_game.itemCategory(&e)) {
+    case ItemCatWeapon: return g_config.takeWeapons;
+    case ItemCatArmor: return g_config.takeArmor;
+    case ItemCatConsumable: return g_config.takeConsumables;
+    case ItemCatMagic: return g_config.takeMagic;
+    case ItemCatWritten: return g_config.takeWritten;
+    case ItemCatMisc: return g_config.takeMisc;
+    default: return g_config.takeOther;
+    }
+}
+
 static void Dump()
 {
     Entity player;
@@ -173,6 +270,15 @@ static void Dump()
     std::vector<Nearby> list = CollectNearby(player, g_config.dumpRadius);
     Log("dump: %u entities in list, %zu within %.0f, player combat mode %d", g_game.entities->count, list.size(),
         g_config.dumpRadius, CombatMode(player));
+    alignas(16) float cam[16] = {};
+    g_game.cameraPose(cam);
+    Vec3 at{};
+    g_game.atVector(&player, &at);
+    float vx = 0, vz = 0;
+    bool view = ViewDirection(player, &vx, &vz);
+    Log("dump: camera right (%.2f %.2f %.2f) up (%.2f %.2f %.2f) at (%.2f %.2f %.2f), player at (%.2f %.2f %.2f), "
+        "view %d (%.2f %.2f)", cam[0], cam[1], cam[2], cam[4], cam[5], cam[6], cam[8], cam[9], cam[10], at.x, at.y,
+        at.z, view, vx, vz);
     for (const Nearby& n : list) {
         const Entity& e = n.e;
         char name[96];
@@ -180,10 +286,11 @@ static void Dump()
         bool inv = g_game.invValid(&e), item = g_game.itemValid(&e), lock = g_game.lockValid(&e);
         bool npc = g_game.isNpc(&e); // IsDead/IsDown only for NPCs: they read the NPC's routine
         Log("  %6.0f %-40s npc=%d dead=%d down=%d item=%d obj=%d owner=%d inv=%d stacks=%d itemPS=%d mission=%d "
-            "amount=%lu slot=%d lock=%d status=%d",
+            "amount=%lu cat=%d dropped=%d flying=%d front=%d slot=%d lock=%d status=%d",
             n.distance, name, npc, npc && g_game.isDead(&e), npc && g_game.isDown(&e), g_game.isItem(&e),
             g_game.isInteractObject(&e), HasOwner(e), inv, inv ? g_game.invStackCount(&e) : -1, item,
-            item ? g_game.itemMission(&e) : 0, item ? g_game.itemAmount(&e) : 0,
+            item ? g_game.itemMission(&e) : 0, item ? g_game.itemAmount(&e) : 0, item ? g_game.itemCategory(&e) : -1,
+            item ? g_game.itemDropped(&e) : 0, IsFlying(e), InFront(player, e, n.distance),
             item ? g_game.attachedToSlot(const_cast<Entity*>(&e)) : 0, lock, lock ? g_game.lockStatus(&e) : -1);
     }
 }
@@ -210,12 +317,6 @@ static void EffectTest()
         at.z, exists, started);
 }
 
-// Loose item nobody owns, not a quest item, not hanging in a slot (torches in holders etc.).
-static bool IsFreeGroundItem(Entity e)
-{
-    return g_game.isItem(&e) && g_game.itemValid(&e) && !g_game.itemMission(&e) && !g_game.attachedToSlot(&e) &&
-           !HasOwner(e);
-}
 
 // Dead NPC or monster with something on it. Knocked-out people are left alone (looting them is theft).
 static bool IsDeadBody(const Entity& e)
@@ -248,12 +349,13 @@ static void PickUp(Entity& player, Entity e, const char* who)
     char name[96];
     EntityName(e, name, sizeof(name));
     unsigned long amount = g_game.itemAmount(&e);
+    int category = g_game.itemCategory(&e);
     Entity copy = e;
     g_game.printItemLog(g_game.gui2, &copy, static_cast<int>(amount));
     Vec3 at = EntityPosition(e);
     int slot = g_game.invInsertStack(&player, &e); // the world item is gone after this
     Sparkle(at);
-    Log("%s: %s x%lu -> stack %d", who, name, amount, slot);
+    Log("%s: %s x%lu (category %d) -> stack %d", who, name, amount, category, slot);
 }
 
 static void QuickLoot()
@@ -287,33 +389,71 @@ static void QuickLoot()
     Log("quickloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
 }
 
-// Bodies / chests the AutoLoot script already ran on: whatever it leaves behind (stacks it won't take) must not
-// make us call it again four times a second.
-static std::unordered_set<void*> g_looted;
+// Items are only taken once they lie still: seen at the same spot on two ticks in a row (~0.25 s). Catches anything
+// moving - arrows in flight (ours and the enemies'), thrown or falling things - even if PSProjectile says otherwise.
+struct Seen {
+    Vec3 at;
+    DWORD when;
+};
+static std::unordered_map<void*, Seen> g_seen;
+
+static bool Resting(const Entity& e, DWORD now)
+{
+    Vec3 at = EntityPosition(e);
+    if (g_seen.size() > 2000)
+        g_seen.clear();
+    auto it = g_seen.find(e.e);
+    bool still = false;
+    if (it != g_seen.end() && now - it->second.when < 1000) {
+        float dx = at.x - it->second.at.x, dy = at.y - it->second.at.y, dz = at.z - it->second.at.z;
+        still = dx * dx + dy * dy + dz * dz < 5.0f * 5.0f;
+    }
+    g_seen[e.e] = {at, now};
+    return still;
+}
+
+// Bodies / chests the AutoLoot script ran on: whatever it leaves behind (stacks it won't take) must not make us
+// call it again four times a second.
+struct LootTry {
+    bool done = false;
+    int tries = 0;
+    DWORD next = 0;
+};
+static std::unordered_map<void*, LootTry> g_looted;
 
 static void AutoLootTick()
 {
     Entity player;
     if (!g_config.autoLoot || !g_autoActive || !GameReady(&player))
         return;
+    DWORD now = GetTickCount();
+    if (g_looted.size() > 1000)
+        g_looted.clear();
     for (const Nearby& n : CollectNearby(player, g_config.autoRadius)) {
+        if (!InFront(player, n.e, n.distance))
+            continue;
         if (IsFreeGroundItem(n.e)) {
-            PickUp(player, n.e, "autoloot");
+            if (Wanted(n.e) && Resting(n.e, now))
+                PickUp(player, n.e, "autoloot");
             continue;
         }
         bool body = g_config.autoBodies && IsDeadBody(n.e);
         bool chest = !body && g_config.autoChests && IsOpenChest(n.e);
-        if ((!body && !chest) || g_looted.count(n.e.e))
+        if (!body && !chest)
             continue;
-        if (g_looted.size() > 1000)
-            g_looted.clear();
-        g_looted.insert(n.e.e);
+        LootTry& t = g_looted[n.e.e];
+        if (t.done || now < t.next)
+            continue;
         char name[96];
         EntityName(n.e, name, sizeof(name));
         int64_t moved = ScriptAutoLoot(player, n.e);
         if (moved > 0)
             Sparkle(EntityPosition(n.e));
-        Log("autoloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
+        // Nothing taken: a body that just died (still in its death animation) gives nothing yet - try again in a
+        // second, a few times, then leave what the script won't take.
+        t.done = moved > 0 || ++t.tries >= 8;
+        t.next = now + 1000;
+        Log("autoloot: %s %s -> %lld stacks (try %d)", body ? "body" : "chest", name, moved, t.tries + (moved > 0));
     }
 }
 
@@ -334,8 +474,9 @@ static const HubItem kItems[] = {
     /* 4 */ {HubCheckbox, "QuickLoot", "Chests", "Open chests", "Открытые сундуки", 1, 0, 0, 0, 0, nullptr, 1},
     /* 5 */ {HubHeader, nullptr, nullptr, "AutoLoot", "Автолут"},
     /* 6 */ {HubCheckbox, "AutoLoot", "Enabled", "Pick up loose items around you", "Подбирать предметы вокруг", 1,
-             0, 0, 0, 0, nullptr, -1, "Switched on and off with the key below. Items that belong to someone are never taken.",
-             "Включается и выключается клавишей ниже. Чужие предметы не берутся никогда."},
+             0, 0, 0, 0, nullptr, -1,
+             "Switched on and off with the key below. Never takes what would be theft, nor arrows in flight.",
+             "Включается и выключается клавишей ниже. Не берёт то, что было бы кражей, и летящие стрелы."},
     /* 7 */ {HubKey, "AutoLoot", "ToggleKey", "On / off key", "Клавиша вкл/выкл", 'F', 0, 0, 0, 0, nullptr, 6},
     /* 8 */ {HubSlider, "AutoLoot", "Radius", "Radius", "Радиус", 300, 1.0f, 30.0f, 0.5f, 0.01f, "%.1f m", 6},
     /* 9 */ {HubCheckbox, "AutoLoot", "Bodies", "Also search dead bodies", "Обыскивать трупы", 0, 0, 0, 0, 0,
@@ -345,12 +486,31 @@ static const HubItem kItems[] = {
              "Только ничьи и не запертые сундуки"},
     /*11 */ {HubCheckbox, "AutoLoot", "Active", "On at game start", "Включён при запуске игры", 0, 0, 0, 0, 0,
              nullptr, 6},
-    /*12 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
-    /*13 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
+    /*12 */ {HubCheckbox, "AutoLoot", "Cone", "Only in front of you", "Только впереди", 1, 0, 0, 0, 0, nullptr, 6,
+             "A cone around where the camera looks; off = the whole circle. Things at your feet are always taken.",
+             "Конус по направлению камеры; выключено = весь круг. То, что прямо под ногами, берётся всегда."},
+    /*13 */ {HubSlider, "AutoLoot", "ConeAngle", "Cone width", "Ширина конуса", 120, 30, 360, 5, 0, "%.0f°", 12},
+    /*14 */ {HubHeader, nullptr, nullptr, "What AutoLoot picks up", "Что подбирает автолут"},
+    /*15 */ {HubNote, nullptr, nullptr, "Items on the ground. QuickLoot always takes what you look at.",
+             "Предметы на земле. Быстрый лут всегда берёт то, на что смотришь."},
+    /*16 */ {HubCheckbox, "Filter", "Gold", "Gold", "Золото", 1, 0, 0, 0, 0, nullptr, 6},
+    /*17 */ {HubCheckbox, "Filter", "Ammo", "Arrows and bolts", "Стрелы и болты", 1, 0, 0, 0, 0, nullptr, 6},
+    /*18 */ {HubCheckbox, "Filter", "Weapons", "Weapons", "Оружие", 1, 0, 0, 0, 0, nullptr, 6},
+    /*19 */ {HubCheckbox, "Filter", "Armor", "Armour", "Броня", 1, 0, 0, 0, 0, nullptr, 6},
+    /*20 */ {HubCheckbox, "Filter", "Consumables", "Potions, food, plants", "Зелья, еда, растения", 1, 0, 0, 0, 0,
+             nullptr, 6},
+    /*21 */ {HubCheckbox, "Filter", "Magic", "Scrolls and runes", "Свитки и руны", 1, 0, 0, 0, 0, nullptr, 6},
+    /*22 */ {HubCheckbox, "Filter", "Written", "Letters, books, maps", "Письма, книги, карты", 1, 0, 0, 0, 0,
+             nullptr, 6},
+    /*23 */ {HubCheckbox, "Filter", "Misc", "Misc (trophies, ore, tools...)", "Разное (трофеи, руда, инструменты...)",
+             1, 0, 0, 0, 0, nullptr, 6},
+    /*24 */ {HubCheckbox, "Filter", "Other", "Everything else", "Всё остальное", 1, 0, 0, 0, 0, nullptr, 6},
+    /*25 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
+    /*26 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
              1, 0, 0, 0, 0, nullptr, -1, "A short game effect at the item, body or chest",
              "Короткий игровой эффект у предмета, трупа или сундука"},
-    /*14 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 13},
-    /*15 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 13},
+    /*27 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 26},
+    /*28 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 26},
 };
 
 static void OnMenuChanged()
@@ -445,7 +605,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.4");
+        Log("AutoLoot 0.5");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

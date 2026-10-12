@@ -28,7 +28,6 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - ReShade itself costs only ~0.3 s (+ ~1 s update check over WinINet: ReShade.ini CheckForUpdates=0)
 - [x] User test 2026-10-11: saves load, quicksave (F8)/quickload, new game, running around the start beach — all OK
 - [ ] Check loading screens (save load / level change) also got faster
-- [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) — could cache compiled shaders, low priority
 - [ ] Disable ReShade update check (ask user)
 - [x] Separate mods for friends: `dist/RisenFastStart-1.1.zip`, `RisenWindow-1.0.zip`, `RisenSpeed-1.0.zip` (loader + one mod each)
 - [x] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
@@ -86,8 +85,12 @@ Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified i
   - [ ] Friend's feedback; panel not yet tested in exclusive fullscreen / without the Window mod
   - [ ] Later grows into the Stage 5.5 settings window for all mods
 - [x] `.ini`: `[Speed] Multiplier` (default 3.0), `ToggleKey` (default Z), `[Panel] Key/Language`
-- [ ] Optional: second hotkey / step up-down keys
-- [ ] Check side effects: physics at high speed, dialogs, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)
+- [ ] **Step keys (user: great idea, 2026-10-12)**: optional, off by default, own checkbox in F10 - "faster"/"slower"
+      keys step the multiplier (e.g. x1.5 / x2 / x3 / x5), indicator shows the current value; toggle key unchanged
+- [ ] Option "no speed-up in dialogs" (IsDialogCameraActive, already used by AutoLoot): user talked to an NPC sped up
+      without problems, but is unsure it's safe for scripted dialogs/cutscenes
+- [ ] Test in exclusive fullscreen (Window mod off) - menu, indicator, Alt+Tab
+- [ ] Check side effects: physics at high speed, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)
 
 ## Stage 4/5 — AutoLoot mod (`mods/autoloot`, QuickLoot is part of it) — 0.1 works in game 2026-10-11
 Recon: `notes/loot-recon.md`. Script.dll `Entity` API + game script `AutoLoot(player, container)` via eCScriptProxyScript.
@@ -102,9 +105,24 @@ Debug: `[Debug] DumpKey` logs everything around the player.
 - [x] gui2.PrintItemLog shows the native "+ item" feed on the left for ground pickups - user likes it, no own feed
 - [ ] Chests: dump (K) near locked/unlocked/owned chests -> confirm PSLock status values (1 = open?) and owner
       (low priority: sailor chest looted, Sara's chest refused - behaviour already correct in practice)
-- [ ] Skip while GUI2 is browsing (inventory/trade/loot window), in combat, dialogs (IsDialogCameraActive done)
-- [ ] Owned items: check merchant goods / items in houses report an owner
-- [ ] Quest items: pick up a quest item -> quest advances?
+- [ ] AutoLoot 0.5 built + deployed 2026-10-12, NOT yet tested in game: cone (camera pose row 2, fallback player
+      at-vector; check with DumpKey that "view" matches where the camera looks), [Filter] categories (gEItemCategory
+      1 weapon 2 armor 3 consumable 5 magic 6 misc 7 written; gold = It_Gold/It_GoldBag*, ammo = It_Arrow/It_Bolt),
+      theft = owner && !PSItem::Dropped (from Script_Game AssessTheft), friend's bugs fixed: arrows in flight
+      (PSProjectile::IsActive + item must rest 2 ticks) and radius bodies never looted (body marked done while still
+      dying -> now retried every 1 s up to 8 times until the script moves something)
+- [ ] **Theft protection (user's main concern, 2026-10-12)**: never auto-loot anything NPCs would treat as stolen.
+      Ground pickup already skips items with an owner - verify it covers merchant goods, items in houses/huts,
+      owned chests; find out whether ownership can end (owner dead, guild change) and loot it then. Look for the
+      game's own "is stealing" check (what makes NPCs react) and use it instead of the raw owner field if it exists
+- [ ] Quest items: pick up a quest item via RMB QuickLoot -> journal / quest advances like with the native pickup
+- [ ] **Cone pickup (user's idea 2026-10-12)**: F10 "Area" = Cone (default) / Circle. Cone = items within the radius
+      AND within +-N deg (slider, default ~60) of the view direction (camera forward, fallback player facing):
+      dot(forward_xz, normalize(item - player)_xz) >= cos(N). Circle = current behaviour. Recon: camera forward
+      (Engine eCCameraBase?) or Entity rotation/matrix in Script.dll
+- [ ] **Item category filters (user: great idea, 2026-10-12)**: F10 checkboxes per category (gold, potions, food,
+      plants, weapons, armour, ammo, scrolls/runes, keys/lockpicks, misc/trophies...), separate for radius AutoLoot
+      and RMB QuickLoot? Recon: item category field on the item template (gCItem_PS?) and its values
 - [ ] Hand icon right of the hourglass while AutoLoot is on (comes with the hub below)
 - [ ] README + package
 
@@ -130,8 +148,6 @@ ini and calls the mod's onChanged on the game thread. Without menu.dll mods keep
       Script.dll: static `EffectSystem::StartEffect(bCString const&, bCVector const&)` (?StartEffect@EffectSystem@@SA?AVEffect@@AEBVbCString@@AEBVbCVector@@@Z),
       `Entity::GetPosition` (?GetPosition@Entity@@QEBA?AVbCVector@@XZ) - take it BEFORE InsertStack. Pick a short effect name from
       data\compiled\effects.pak (sparkle / glint). Fallback: Engine eCCameraBase::WorldToScreen + ImGui sparkle.
-- [ ] Later: item category filters for AutoLoot
-- [ ] Idea: with ReShade Addon present, also offer the pages in ReShade's menu (`reshade::register_overlay`)
 
 ## Stage 5.7 — No training limits (user's request 2026-10-11, small mod `mods/no-limits`)
 Risen caps how far attributes (strength, dexterity, ...) and skills can be trained (max value / per-teacher limit).
@@ -196,10 +212,24 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
       Installer 1.0 has no updater: its users update by hand once. EVERY new release must carry RisenModsInstaller.exe
       (the installer reads releases/latest), raise INSTALLER_VERSION for every published installer change.
 - [x] Hardening: /DEPENDENTLOADFLAG:0x800 (system DLLs only from System32 - no d3d9.dll/version.dll planted next to it)
-- [ ] Optional later: progress per file while applying
+- [x] Discord overlay over the installer - gone (user, 2026-10-12)
+- [x] User test of the window, folder picker etc. - works (user, 2026-10-12)
+- [ ] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
+      reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen
+- [ ] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
+      v2026.10.11 zips were built before the fix
 
 ## Maybe later
-- [ ] Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
+- [ ] (unlikely) Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
+
+## Stage 5.9 — Quick lockpick (user's idea 2026-10-12)
+Walk up to a locked chest (or door?), press a key: if the player's lockpicking skill allows this lock, one lockpick is
+spent and the lock opens without the lockpicking minigame; then loot as usual (RMB QuickLoot). Not enough skill or no
+lockpick -> short message, nothing happens. Same theft rules as the game (picking an owned chest seen by NPCs).
+- [ ] Recon: PSLock (status, difficulty), player's lockpicking skill value, lockpick item, the game's own unlock
+      path (script / interaction) - prefer calling it so skill checks, XP and witnesses work as in vanilla
+- [ ] Key in F10 (AutoLoot page or own small mod), hint when focused on a pickable chest
+- [ ] Test: easy/hard lock, no lockpicks, owned chest near NPCs, save/load keeps the chest open
 
 ## Stage 6 — Release
 - [ ] README with install/uninstall steps

@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 
 #include "common.h"
@@ -57,6 +58,12 @@ bool GameApiInit()
     Resolve(script, "Script", g.itemValid, "?IsValid@PSItem@@QEBA_NXZ");
     Resolve(script, "Script", g.itemMission, "?IsMissionItem@PSItem@@QEBA_NXZ");
     Resolve(script, "Script", g.itemAmount, "?GetAmount@PSItem@@QEBAKXZ");
+    Resolve(script, "Script", g.itemCategory, "?GetCategory@PSItem@@QEBA?AW4gEItemCategory@@XZ");
+    Resolve(script, "Script", g.itemDropped, "??BPropertyDropped@PSItem@@QEBA?B_NXZ");
+    Resolve(script, "Script", g.projValid, "?IsValid@PSProjectile@@QEBA_NXZ");
+    Resolve(script, "Script", g.projActive, "?IsActive@PSProjectile@@QEBA_NXZ");
+    Resolve(script, "Script", g.atVector, "?GetAtVector@Entity@@QEBA?AVbCVector@@XZ");
+    Resolve(script, "Script", g.cameraPose, "?GetCameraPose@Entity@@SA?AVbCMatrix@@XZ");
     Resolve(script, "Script", g.lockValid, "?IsValid@PSLock@@QEBA_NXZ");
     Resolve(script, "Script", g.lockStatus, "??BPropertyStatus@PSLock@@QEBA?BW4gELockStatus@@XZ");
     Resolve(script, "Script", g.combatValid, "?IsValid@PSCombatSystem@@QEBA_NXZ");
@@ -122,6 +129,27 @@ Vec3 EntityPosition(const Entity& e)
     Vec3 v{};
     g_game.getPosition(&e, &v);
     return v;
+}
+
+static bool Flat(float x, float z, float* outX, float* outZ)
+{
+    float len = sqrtf(x * x + z * z);
+    if (len < 0.1f)
+        return false;
+    *outX = x / len;
+    *outZ = z / len;
+    return true;
+}
+
+bool ViewDirection(const Entity& player, float* x, float* z)
+{
+    alignas(16) float m[16] = {};
+    g_game.cameraPose(m); // rows: right, up, at, position (Y-up)
+    if (Flat(m[8], m[10], x, z))
+        return true;
+    Vec3 at{};
+    g_game.atVector(&player, &at);
+    return Flat(at.x, at.z, x, z);
 }
 
 bool EffectExists(const char* name)
