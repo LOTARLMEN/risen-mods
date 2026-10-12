@@ -1,4 +1,4 @@
-Risen Quick Lockpick 0.1
+Risen Quick Lockpick 0.1.1
 ========================
 
 Проще всего - установщиком: RisenModsInstaller.exe со страницы
@@ -58,7 +58,8 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
 
 ЕСЛИ ЧТО-ТО НЕ ТАК
   - Игра не запускается или вылетает - удалите version.dll (см. УДАЛЕНИЕ), игра станет как была,
-    и пришлите мне файлы Risen\bin\mods\loader.log и quick_lockpick.log.
+    и пришлите мне файл Risen\bin\mods\RisenMods.log (а если игра вылетела и вы её уже перезапустили -
+    RisenMods.prev.log). Папку с ним открывает кнопка "Папка с логом" внизу окна F10.
   - Антивирус может ругаться на version.dll: это обычное ложное срабатывание на моды,
     которые загружаются через подмену системной DLL.
   - Несовместим с другими модами, которые ставят СВОЙ version.dll в Risen\bin.
@@ -66,7 +67,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
 
 -------------------------------------------------------------------------------
 
-Risen Quick Lockpick 0.1 (English)
+Risen Quick Lockpick 0.1.1 (English)
 
 Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
 game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.

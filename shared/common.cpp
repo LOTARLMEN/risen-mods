@@ -6,47 +6,108 @@
 #include <cstring>
 
 static char g_logPath[MAX_PATH];
+static char g_logTag[32];
 static char g_iniPath[MAX_PATH];
-static CRITICAL_SECTION g_logLock;
 static FILETIME g_iniWriteTime;
+static volatile LONG g_logFullNoted;
+
+static const char kSharedLog[] = "RisenMods.log";
+static const char kSharedLogPrev[] = "RisenMods.prev.log";
 
 void ModInitAt(const char* basePath)
 {
-    InitializeCriticalSection(&g_logLock);
     snprintf(g_logPath, MAX_PATH, "%s.log", basePath);
     snprintf(g_iniPath, MAX_PATH, "%s.ini", basePath);
-    FILE* f = nullptr;
-    if (fopen_s(&f, g_logPath, "w") == 0 && f) // fresh log every launch
-        fclose(f);
+    g_logTag[0] = 0;
+    DeleteFileA(g_logPath); // fresh log every run
 }
 
 void ModInit(HINSTANCE instance, const char* name)
 {
-    char base[MAX_PATH];
-    GetModuleFileNameA(instance, base, MAX_PATH);
-    char* slash = strrchr(base, '\\');
-    char* dst = slash ? slash + 1 : base;
-    strcpy_s(dst, MAX_PATH - (dst - base), name);
-    ModInitAt(base);
+    char dir[MAX_PATH];
+    GetModuleFileNameA(instance, dir, MAX_PATH);
+    if (char* slash = strrchr(dir, '\\'))
+        *slash = 0;
+    snprintf(g_iniPath, MAX_PATH, "%s\\%s.ini", dir, name);
+    snprintf(g_logPath, MAX_PATH, "%s\\%s", dir, kSharedLog);
+    snprintf(g_logTag, sizeof(g_logTag), "%s", name);
+}
+
+void LogStartSession(const char* modsDir)
+{
+    char prev[MAX_PATH], path[MAX_PATH];
+    snprintf(g_logPath, MAX_PATH, "%s\\%s", modsDir, kSharedLog);
+    snprintf(prev, MAX_PATH, "%s\\%s", modsDir, kSharedLogPrev);
+    snprintf(g_iniPath, MAX_PATH, "%s\\loader.ini", modsDir);
+    snprintf(g_logTag, sizeof(g_logTag), "loader");
+    if (!MoveFileExA(g_logPath, prev, MOVEFILE_REPLACE_EXISTING))
+        DeleteFileA(g_logPath);
+    // Per-mod logs of older versions would only confuse whoever looks for the log.
+    WIN32_FIND_DATAA fd;
+    snprintf(path, MAX_PATH, "%s\\*.log", modsDir);
+    HANDLE find = FindFirstFileA(path, &fd);
+    if (find != INVALID_HANDLE_VALUE) {
+        do {
+            if (_strnicmp(fd.cFileName, "RisenMods", 9) != 0) {
+                snprintf(path, MAX_PATH, "%s\\%s", modsDir, fd.cFileName);
+                DeleteFileA(path);
+            }
+        } while (FindNextFileA(find, &fd));
+        FindClose(find);
+    }
+}
+
+const char* LogPath()
+{
+    return g_logPath;
+}
+
+// One WriteFile per line on a FILE_APPEND_DATA handle: lines from several DLLs and threads don't interleave.
+static void LogLine(const char* fmt, va_list args, bool always)
+{
+    if (!g_logPath[0])
+        return;
+    char line[1200];
+    const int room = static_cast<int>(sizeof(line)) - 2; // CR LF
+    SYSTEMTIME t;
+    GetLocalTime(&t);
+    int n = g_logTag[0] ? snprintf(line, room, "%02d:%02d:%02d.%03d [%s] ", t.wHour, t.wMinute, t.wSecond,
+                                   t.wMilliseconds, g_logTag)
+                        : snprintf(line, room, "%02d:%02d:%02d.%03d  ", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
+    int m = vsnprintf(line + n, room - n, fmt, args);
+    n = m < 0 ? n : (n + m < room ? n + m : room - 1); // cut long lines
+    line[n++] = '\r';
+    line[n++] = '\n';
+    HANDLE f = CreateFileA(g_logPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (f == INVALID_HANDLE_VALUE)
+        return;
+    LARGE_INTEGER size{};
+    GetFileSizeEx(f, &size);
+    DWORD written;
+    if (always || size.QuadPart < kLogMaxBytes) {
+        WriteFile(f, line, n, &written, nullptr);
+    } else if (InterlockedExchange(&g_logFullNoted, 1) == 0) {
+        static const char kFull[] = "... log full: the rest of this launch is not logged (crashes still are)\r\n";
+        WriteFile(f, kFull, sizeof(kFull) - 1, &written, nullptr);
+    }
+    CloseHandle(f);
 }
 
 void Log(const char* fmt, ...)
 {
-    char msg[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(msg, sizeof(msg), fmt, args);
+    LogLine(fmt, args, false);
     va_end(args);
+}
 
-    SYSTEMTIME t;
-    GetLocalTime(&t);
-    EnterCriticalSection(&g_logLock);
-    FILE* f = nullptr;
-    if (fopen_s(&f, g_logPath, "a") == 0 && f) {
-        fprintf(f, "%02d:%02d:%02d.%03d  %s\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, msg);
-        fclose(f);
-    }
-    LeaveCriticalSection(&g_logLock);
+void LogAlways(const char* fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    LogLine(fmt, args, true);
+    va_end(args);
 }
 
 // ---------------------------------------------------------------------------------------------

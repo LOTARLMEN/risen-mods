@@ -1,7 +1,8 @@
 // Risen mod loader. Placed in Risen\bin as version.dll (SharedBase.dll imports VERSION.dll and the game folder is
 // searched first), forwards the real version.dll API and loads every Risen\bin\mods\*.dll in alphabetical order.
 // Mods are loaded right here in DllMain, before the game starts loading its data, so they can patch it early.
-// Log: Risen\bin\mods\loader.log
+// Starts the shared log of the whole family (Risen\bin\mods\RisenMods.log, see common.h) and the crash reports
+// (crash_log.h).
 
 #include <windows.h>
 #include <algorithm>
@@ -9,9 +10,27 @@
 #include <vector>
 
 #include "common.h"
+#include "crash_log.h"
 
-BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
+// Windows version as the kernel reports it (GetVersionEx lies to programs without a manifest).
+static void LogSystem()
 {
+    using RtlGetVersionFn = LONG(WINAPI*)(OSVERSIONINFOW*);
+    OSVERSIONINFOW v = {sizeof(v)};
+    auto get = reinterpret_cast<RtlGetVersionFn>(GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion"));
+    if (get && get(&v) == 0)
+        Log("windows %lu.%lu build %lu", v.dwMajorVersion, v.dwMinorVersion, v.dwBuildNumber);
+    char exe[MAX_PATH];
+    GetModuleFileNameA(nullptr, exe, MAX_PATH);
+    Log("game %s", exe);
+}
+
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
+{
+    if (reason == DLL_PROCESS_DETACH && reserved) { // the process ends normally (a crash never gets here)
+        Log("game closed normally");
+        return TRUE;
+    }
     if (reason != DLL_PROCESS_ATTACH)
         return TRUE;
     DisableThreadLibraryCalls(instance);
@@ -22,12 +41,15 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
         *slash = 0;
     std::wstring modsDir = std::wstring(dir) + L"\\mods";
 
-    // Log next to the mods; ModInit takes the directory from a module path, so give it a file inside mods\.
     CreateDirectoryW(modsDir.c_str(), nullptr);
-    char logBase[MAX_PATH];
-    WideCharToMultiByte(CP_ACP, 0, (modsDir + L"\\loader").c_str(), -1, logBase, MAX_PATH, nullptr, nullptr);
-    ModInitAt(logBase);
-    Log("Risen mod loader 1.0");
+    char modsDirA[MAX_PATH];
+    WideCharToMultiByte(CP_ACP, 0, modsDir.c_str(), -1, modsDirA, MAX_PATH, nullptr, nullptr);
+    LogStartSession(modsDirA);
+    SYSTEMTIME now;
+    GetLocalTime(&now);
+    Log("Risen mod loader 1.1, %04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
+    LogSystem();
+    CrashLogInstall();
 
     std::vector<std::wstring> names;
     WIN32_FIND_DATAW fd;

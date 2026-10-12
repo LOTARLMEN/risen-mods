@@ -41,7 +41,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
         // The loader runs us before the game starts loading its data, so the hooks are in place in time.
         bool fastIo = IniInt("Performance", "FastPakReads", 1) && FastIoInstall();
         bool dxDiag = IniInt("Performance", "SkipDxDiag", 1) && DxDiagStubInstall();
-        Log("Fast Start 1.2: fast pak reads %s, dxdiag stub %s", fastIo ? "on" : "off", dxDiag ? "on" : "off");
+        Log("Fast Start 1.2.1: fast pak reads %s, dxdiag stub %s", fastIo ? "on" : "off", dxDiag ? "on" : "off");
         if (HANDLE t = CreateThread(nullptr, 0, RegisterPage, nullptr, 0, nullptr))
             CloseHandle(t);
     }

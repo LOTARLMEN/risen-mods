@@ -1,4 +1,4 @@
-Risen Menu 1.1
+Risen Menu 1.1.1
 ==============
 
 Проще всего ставить моды установщиком: RisenModsInstaller.exe со страницы релизов
@@ -31,11 +31,11 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - он сам найдё
       [Icons]
       Show=1             значки в левом верхнем углу (0 = не показывать)
       Scale=1.0          их размер
-  Лог: Risen\bin\mods\menu.log
+  Лог всех модов: Risen\bin\mods\RisenMods.log (после вылета и перезапуска - RisenMods.prev.log)
 
 -------------------------------------------------------------------------------
 
-Risen Menu 1.1 (English)
+Risen Menu 1.1.1 (English)
 
 Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
 game, installs the mods you pick together with this menu and keeps them updated. Manual install is optional.

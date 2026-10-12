@@ -348,7 +348,7 @@ Can mods add their own lines to the game's character / attributes screen (e.g. "
       filter. Expected: an opened-by-hand container that AutoLoot had skipped stays manual (or follows the same rule
       as before opening) - confirm the wanted behavior with the user
 - [x] (0.7) Option in F10 (AutoLoot page): "Pick up quest items" (default off) - AutoLoot also takes quest items
-- [ ] (0.7: plunder asked up to 5 times while the body is empty + "ms after it was seen dead" in the log - read
+- [x] (user 2026-10-12: no delay any more) (0.7: plunder asked up to 5 times while the body is empty + "ms after it was seen dead" in the log - read
       the log after play) Investigate: AutoLoot sometimes reacts slowly (noticeable delay before it loots nearby items). Check scan
       interval, the order targets are processed, busy/animation waits, per-tick limits; log timings to find the cause
 - [x] (0.7, user-tested OK: (b) done - Game.dll focus module (+0x83A2C0) converts eCLocString("FO_"+name); its
@@ -384,7 +384,9 @@ Can mods add their own lines to the game's character / attributes screen (e.g. "
       colour scale of the entity it just spawned (and its children) (gold / weapons / potions / quest...). Ways: a different
       existing eff_* per category (find ones with distinct colours, test visually), or recolour our deep copy of
       the sequence (find the colour fields of the particle commands). F10: on/off, maybe colour per category
-- [ ] Test: quest grain with QuickLoot (hold RMB), quest chest skipped -> open by hand, option on/off, delay measured
+- [x] Test (user 2026-10-12): quest grain is collected, no AutoLoot delay
+- [ ] (low priority, user 2026-10-12) Holding RMB for QuickLoot "doesn't quite work as it should" - ask what exactly
+- [ ] Re-check after 0.8 (user asked): arrows / bolts in flight are not picked up - shoot with F on, read the log
 
 ## Stage 5.14 — "Slash and Craft" mode: attributes grow from combat (user's idea 2026-10-12, big, own sessions)
 Inspired by the "New Balance" mod for Gothic 2 Night of the Raven. Part of character growth comes from fighting:
@@ -404,6 +406,22 @@ the game's menus. Needs saving per-save progress too (same question as the theft
       whether killing weak monsters can be farmed (anti-farm rule?)
 - [ ] Progress bars / counters on the character screen (via 5.12), F10 page: on/off, multipliers
 - [ ] Per-save storage of progress
+
+## Stage 5.15 — One log for the whole family + crash reports (user's request 2026-10-12, a friend crashed on stream)
+- [x] shared/common.cpp: every mod writes to bin\mods\RisenMods.log, lines "[mod]"-tagged, one WriteFile per line
+      on a FILE_APPEND_DATA handle (no interleaving between DLLs), 2 MB cap per launch. Same ModInit/Log API, so new
+      mods get it for free; the installer keeps its own %TEMP% log (ModInitAt). Loader 1.1: LogStartSession moves
+      the old log to RisenMods.prev.log (a crash survives the restart), deletes old per-mod logs, logs Windows
+      build + exe path, "game closed normally" on a clean exit (missing line = crash / killed)
+- [x] loader/crash_log.cpp: vectored handler (sentry replaces SetUnhandledExceptionFilter, so the VEH is what
+      sees crashes), fatal codes only, max 6 per launch: code, module+offset, AV address, registers, stack via
+      RtlLookupFunctionEntry/RtlVirtualUnwind. Tested with a temporary null write (key End): logged
+      autoloot.dll+0x856f, writing 0x0, 3 frames; test key removed. Map offsets: tools\pe_symbol.py
+- [x] F10: "Log folder" button (explorer /select the log) next to Close, tooltip which file to send. READMEs RU
+      updated (EN sections never mentioned logs)
+- [x] Released v2026.10.12.8: every mod +0.0.1 (each zip carries loader 1.1; installer updates by version)
+- [ ] Installer: also delete RisenMods*.log in CleanupIfEmpty (with the next installer change)
+- [ ] Friend's crash: ask for RisenMods.prev.log once he runs this version
 
 ## Stage 6 — Release
 - [x] README with install/uninstall steps (every mod, RU + EN)

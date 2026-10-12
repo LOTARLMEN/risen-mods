@@ -1,4 +1,4 @@
-Risen Fast Start 1.2
+Risen Fast Start 1.2.1
 ====================
 
 Проще всего - установщиком: RisenModsInstaller.exe со страницы
@@ -33,7 +33,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
         [Performance]
         FastPakReads=0
         SkipDxDiag=0
-    (0 = выключено). Логи: Risen\bin\mods\loader.log и fast_start.log
+    (0 = выключено). Лог всех модов: Risen\bin\mods\RisenMods.log (после вылета и перезапуска - RisenMods.prev.log)
   - Антивирус может ругаться на version.dll: это обычное ложное срабатывание
     на моды, которые загружаются через подмену системной DLL.
   - Несовместим с другими модами, которые ставят СВОЙ version.dll в Risen\bin.
@@ -42,7 +42,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
 
 -------------------------------------------------------------------------------
 
-Risen Fast Start 1.2 (English)
+Risen Fast Start 1.2.1 (English)
 
 Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
 game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.

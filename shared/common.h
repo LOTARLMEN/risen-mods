@@ -1,16 +1,30 @@
 #pragma once
 
 // Code shared by all mods. Each mod DLL links its own copy, so the state below is per mod.
-// A mod named "speed" lives in Risen\bin\mods\speed.dll and uses mods\speed.ini and mods\speed.log.
+// A mod named "speed" lives in Risen\bin\mods\speed.dll and uses mods\speed.ini.
+//
+// Log: the whole family writes to ONE file, Risen\bin\mods\RisenMods.log, every line tagged with the mod:
+//   12:00:01.234 [speed] ...
+// The loader starts it on every launch and keeps the previous launch as RisenMods.prev.log (so a crash survives the
+// restart), and writes crashes there with a module+offset stack. A player only ever sends these two files.
+// Each launch is capped at kLogMaxBytes; crash reports are written even past the cap.
 
 #include <windows.h>
 
-// Call first thing in DllMain(DLL_PROCESS_ATTACH). Sets up the paths and starts a fresh log.
+constexpr long long kLogMaxBytes = 2 * 1024 * 1024;
+
+// Call first thing in DllMain(DLL_PROCESS_ATTACH): the mod's tag in the shared log and its ini path.
 void ModInit(HINSTANCE instance, const char* name);
-// Same with an explicit path without extension: "<base>.log", "<base>.ini".
+// Standalone programs (the installer): own fresh "<base>.log" and "<base>.ini" instead of the shared log.
 void ModInitAt(const char* basePath);
+// Loader only: modsDir\RisenMods.log -> RisenMods.prev.log, a fresh log tagged "loader", old per-mod logs removed.
+void LogStartSession(const char* modsDir);
 
 void Log(const char* fmt, ...);
+// Same, ignoring the size cap (crash reports).
+void LogAlways(const char* fmt, ...);
+// The log file this module writes to.
+const char* LogPath();
 
 // Path of the mod's ini. If it doesn't exist yet, it is created from defaultText (pass nullptr to skip).
 const char* IniPath(const char* defaultText = nullptr);

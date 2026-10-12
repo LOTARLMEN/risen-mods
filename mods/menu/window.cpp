@@ -26,6 +26,20 @@ const char* Text(const char* en, const char* ru)
     return MenuGetConfig().russian && ru ? ru : en;
 }
 
+// Explorer with the shared log selected (what a player sends when something went wrong).
+void ShowLogFile()
+{
+    char cmd[MAX_PATH + 32];
+    snprintf(cmd, sizeof(cmd), "explorer.exe /select,\"%s\"", LogPath());
+    STARTUPINFOA si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+    if (CreateProcessA(nullptr, cmd, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    Log("log folder opened");
+}
+
 float ReadValue(const HubPage& page, const HubItem& item)
 {
     char buf[64];
@@ -297,6 +311,15 @@ void WindowDraw(float scale)
         }
         ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetStyle().WindowPadding.y - footer);
         ImGui::Separator();
+        float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+        if (ImGui::Button(Text("Log folder", "Папка с логом"), ImVec2(half, 0)))
+            ShowLogFile();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", Text("If something went wrong (a crash too), send RisenMods.log - and "
+                                         "RisenMods.prev.log after a crash: the game was restarted since",
+                                         "Если что-то пошло не так (и при вылете), пришли RisenMods.log, а после "
+                                         "вылета - RisenMods.prev.log: игру с тех пор перезапускали"));
+        ImGui::SameLine();
         if (ImGui::Button(Text("Close", "Закрыть"), ImVec2(-FLT_MIN, 0)))
             keepOpen = false;
     }

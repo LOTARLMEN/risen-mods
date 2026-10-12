@@ -410,7 +410,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "quick_lockpick");
-        Log("Risen Quick Lockpick 0.1");
+        Log("Risen Quick Lockpick 0.1.1");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

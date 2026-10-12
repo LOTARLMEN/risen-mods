@@ -818,7 +818,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.8");
+        Log("AutoLoot 0.8.1");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

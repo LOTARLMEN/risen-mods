@@ -286,7 +286,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "no_limits");
-        Log("No Limits 0.2");
+        Log("No Limits 0.2.1");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

@@ -1,4 +1,4 @@
-Risen Window 1.2
+Risen Window 1.2.1
 ================
 
 Проще всего - установщиком: RisenModsInstaller.exe со страницы
@@ -27,7 +27,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
       Borderless=1         безрамочное окно на весь монитор
       HideSystemCursor=1   прятать курсор Windows
       ClipCursor=1         держать мышь внутри окна
-  Лог: Risen\bin\mods\window.log
+  Лог всех модов: Risen\bin\mods\RisenMods.log (после вылета и перезапуска - RisenMods.prev.log)
 
 УДАЛЕНИЕ
   Удалить Risen\bin\mods\window.dll (и version.dll с папкой mods, если других модов нет).
