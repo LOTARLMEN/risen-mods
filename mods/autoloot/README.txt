@@ -1,6 +1,11 @@
 Risen AutoLoot 0.6
 ==================
 
+Проще всего - установщиком: RisenModsInstaller.exe со страницы
+https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт игру, поставит выбранные моды
+вместе с меню настроек (F10 в игре - настройки всех модов) и будет их обновлять.
+Ручная установка ниже - по желанию.
+
 Быстрый лут без окна и без анимации, как AutoLoot от Hedin в Готике. Только для 64-битного Risen 2023 года (Steam).
 Игровые файлы не изменяются, сохранения тоже. Бета-версия: делайте сохранение перед тестом.
 
@@ -33,7 +38,9 @@ Risen AutoLoot 0.6
      Должно получиться:
          Risen\bin\version.dll         - загрузчик модов (общий для всех моих модов)
          Risen\bin\mods\autoloot.dll   - сам мод
-         Risen\bin\mods\menu.dll       - меню настроек F10 (общее для всех моих модов)
+         Меню настроек F10 - отдельный архив RisenMenu, распаковывается так же
+         (Risen\bin\mods\menu.dll). Без него мод работает, но без окна F10 и значков,
+         настройки - только в .ini.
   4. Запустить игру. При первом запуске появится Risen\bin\mods\autoloot.ini с настройками.
 
 УДАЛЕНИЕ (игра станет ровно как была)
@@ -84,6 +91,9 @@ Risen AutoLoot 0.6
 
 Risen AutoLoot 0.6 (English, beta)
 
+Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
+game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.
+
 Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no animation. No game files are changed.
   Right mouse  on the focused dead body / open chest / ground item: everything goes straight into the inventory
                (not with the weapon drawn).
@@ -99,7 +109,9 @@ script, so quests count the items as usual. A small silent sparkle (the game's o
 spot; size / sound / off in F10.
 
 Install:   close the game, extract into the Risen folder -> Risen\bin\version.dll (mod loader)
-           + Risen\bin\mods\autoloot.dll + Risen\bin\mods\menu.dll (F10 menu).
+           + Risen\bin\mods\autoloot.dll.
+           F10 menu (optional, without it settings are in the .ini only): the RisenMenu zip,
+           extracted the same way -> Risen\bin\mods\menu.dll.
 Uninstall: close the game, delete Risen\bin\version.dll and the Risen\bin\mods folder. Nothing else is changed.
 Settings:  F10 in game, or Risen\bin\mods\autoloot.ini ([QuickLoot] Key/GroundItems/Chests,
            [AutoLoot] Active/ToggleKey/Radius/Bodies/Chests/Cone/ConeAngle, [Filter] Gold/Ammo/Weapons/

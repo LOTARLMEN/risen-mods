@@ -1,5 +1,7 @@
 # Packs each release mod into dist\Risen<Name>-<version>.zip with the layout of the game folder:
-#   bin\version.dll, bin\mods\<mod>.dll, bin\mods\menu.dll, README.txt
+#   bin\version.dll, bin\mods\<mod>.dll, README.txt
+# The F10 menu is its own zip, RisenMenu-<version>.zip (bin\mods\menu.dll, README.txt): the mods work without it,
+# the installer adds it with the first mod.
 # The version is taken from the first line of the mod's README.txt ("Risen Fast Start 1.1").
 # Run build.bat first. Usage: powershell -File tools\package.ps1
 $ErrorActionPreference = 'Stop'
@@ -18,10 +20,9 @@ foreach ($dir in Get-ChildItem (Join-Path $root 'mods') -Directory) {
     $stage = Join-Path $env:TEMP ("risen-pack-" + $dll)
     Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force (Join-Path $stage 'bin\mods') | Out-Null
-    Copy-Item (Join-Path $root 'build\bin\version.dll') (Join-Path $stage 'bin')
+    # The loader is shared by all mods: every mod zip carries it, the files are identical.
+    if ($dll -ne 'menu') { Copy-Item (Join-Path $root 'build\bin\version.dll') (Join-Path $stage 'bin') }
     Copy-Item (Join-Path $root "build\bin\mods\$dll.dll") (Join-Path $stage 'bin\mods')
-    # The F10 settings menu is shared by all mods like the loader: every zip carries it, the newest one wins.
-    Copy-Item (Join-Path $root 'build\bin\mods\menu.dll') (Join-Path $stage 'bin\mods')
     Copy-Item $readme $stage
 
     $zip = Join-Path $dist $zipName

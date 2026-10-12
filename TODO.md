@@ -166,6 +166,15 @@ Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an 
       first. Patch confirmed applied in game; [ ] user test at a strength/dexterity teacher past his old limit
 - [x] Menu bug: items without the parent field had parent 0 -> first checkbox locked itself (Speed "Enabled",
       Window "Borderless"); menu now accepts only parents above the item. Speed 1.4, Window 1.2
+- [x] **No Limits 0.2: past 200** (user, 2026-10-12: "думал ты снимешь в целом ограничения, чтобы качаться 200+").
+      ms_arrSkillInfos lives in .bss, filled by Game.dll's static initializer (+0x478900; strength/dexterity
+      min 0, max 200, default 100); all 361 refs read max from the table (GetTotal / GetSkillInfo / GetSkillMaxValue
+      clamp with it), teach cost = fixed gCInfo::LearnPointCost per dialog option (no table to overflow). Mod writes
+      MaxValue (ini/F10 slider 200-2000, ini up to 9999, default 1000) into entries 7/8 [+4], 200 back when off;
+      table values checked first. In game: log shows max 1000 written + patch on.
+- [ ] User test No Limits 0.2: teacher past 200, character screen shows > 200, potion of strength past 200, save /
+      load keeps the value; J (DumpKey) logs base/total/max of the player
+- [ ] Maybe: intelligence and other attributes too (user said "в целом ограничения прокачки") - ask
 - [ ] (old) Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
       (per-teacher max level), or a hard max in the attribute code (PSSkills / gCSkillValue?)
 - [ ] Pick the smallest hook (patch the max-value check or the teacher limit table), learning point costs unchanged
@@ -222,7 +231,12 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
 - [x] Hardening: /DEPENDENTLOADFLAG:0x800 (system DLLs only from System32 - no d3d9.dll/version.dll planted next to it)
 - [x] Discord overlay over the installer - gone (user, 2026-10-12)
 - [x] User test of the window, folder picker etc. - works (user, 2026-10-12)
-- [ ] **Menu as its own release asset (user's design 2026-10-12, final)** - next session, with the button below.
+- [x] **Menu as its own release asset (user's design 2026-10-12, final)** - done in session 9 (2026-10-12), installer 1.2.
+      Built + CLI-tested on a fake folder (all 4 cases below pass), screenshots RU/EN; menu.dll is now "Risen Mods
+      Menu 1.1" (dll string = installed version) so every older menu.dll is offered as an update. Menu row under
+      the mods (no checkbox): "comes with the first mod" / installed / update / missing -> counted in "Update (N)".
+      The menu is handled only when something is installed or updated (a plain removal never downloads it).
+      Window height 800 -> 880 for the extra row. Not released yet; user test of the window pending.
       Mod zips WITHOUT menu.dll: version.dll + mod dll + README (loader stays: without it a hand-installed mod
       doesn't load; mods work without the menu via ini). Release gets RisenMenu-<ver>.zip (menu.dll + README; add
       mods/menu/README.txt, its title gives the version; package.ps1 packs it and drops menu.dll from mod zips).
@@ -235,9 +249,11 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
       (link); F10 opens the settings menu of all mods" - manual install is the user's own choice after that.
       Test on a fake game folder (--zips): first mod -> menu added, second mod -> menu untouched, newer menu ->
       updated, last mod removed -> menu removed
-- [ ] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
-      reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen
-- [ ] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
+- [x] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
+      reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen.
+      Done in 1.2: shown under "Change..." only while the chosen folder differs from the found one
+- [ ] Release with installer 1.2 + RisenMenu-1.1.zip + mod zips without menu.dll (ask the user first)
+- [x] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
       v2026.10.11 zips were built before the fix
 
 ## Stage 5.10 - German and Polish (user's request 2026-10-12, own session)

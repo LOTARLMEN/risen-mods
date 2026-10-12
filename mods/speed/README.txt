@@ -1,6 +1,11 @@
 Risen Speed 1.5
 ===============
 
+Проще всего - установщиком: RisenModsInstaller.exe со страницы
+https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт игру, поставит выбранные моды
+вместе с меню настроек (F10 в игре - настройки всех модов) и будет их обновлять.
+Ручная установка ниже - по желанию.
+
 Ускорение игры по кнопке, как Z-mod в Готике. Только для 64-битного Risen 2023 года (Steam).
 Игровые файлы не изменяются, сохранения тоже.
 
@@ -21,7 +26,9 @@ Risen Speed 1.5
      Должно получиться:
          Risen\bin\version.dll        - загрузчик модов (общий для всех моих модов)
          Risen\bin\mods\speed.dll     - сам мод
-         Risen\bin\mods\menu.dll       - меню настроек F10 (общее для всех моих модов)
+         Меню настроек F10 - отдельный архив RisenMenu, распаковывается так же
+         (Risen\bin\mods\menu.dll). Без него мод работает, но без окна F10 и значков,
+         настройки - только в .ini.
   4. Запустить игру. При первом запуске появится Risen\bin\mods\speed.ini с настройками.
 
 УДАЛЕНИЕ (игра станет ровно как была)
@@ -66,6 +73,9 @@ Risen Speed 1.5
 
 Risen Speed 1.5 (English)
 
+Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
+game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.
+
 Game speed toggle for Risen (64-bit 2023 re-release, Steam), like Gothic's Z-mod. No game files are changed.
   Z    toggles x3 speed; an hourglass + x3 indicator shows while it is on.
   Optional (F10): normal speed in dialogs (hourglass dimmed meanwhile); step keys (NumPad + / -) change the
@@ -73,7 +83,9 @@ Game speed toggle for Risen (64-bit 2023 re-release, Steam), like Gothic's Z-mod
   F10  in-game settings window for all my mods (language RU/EN); the game is paused while it is open.
 
 Install:   close the game, extract into the Risen folder -> Risen\bin\version.dll (mod loader)
-           + Risen\bin\mods\speed.dll + Risen\bin\mods\menu.dll (F10 menu, hourglass).
+           + Risen\bin\mods\speed.dll.
+           F10 menu (optional, without it settings are in the .ini only): the RisenMenu zip,
+           extracted the same way -> Risen\bin\mods\menu.dll.
 Uninstall: close the game, delete Risen\bin\version.dll and the Risen\bin\mods folder. Nothing else is changed.
 Settings:  F10 in game, or Risen\bin\mods\speed.ini ([Speed] Enabled/Multiplier/ToggleKey/NormalInDialogs,
            [Steps] Enabled/FasterKey/SlowerKey/StepUp/StepDown,

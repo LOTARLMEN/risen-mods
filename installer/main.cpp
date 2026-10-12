@@ -40,7 +40,7 @@ namespace {
 
 const char kVersion[] = INSTALLER_VERSION;
 const wchar_t kReleasesPage[] = L"https://github.com/LOTARLMEN/risen-mods/releases/latest";
-const float kWidth = 760.0f, kHeight = 800.0f; // window size at 100% scaling
+const float kWidth = 760.0f, kHeight = 880.0f; // window size at 100% scaling
 
 // ---------------------------------------------------------------------------------------------
 // State shared with the worker thread (g_lock around everything below up to g_busy).
@@ -50,6 +50,7 @@ std::wstring g_game;            // game folder, empty = not found
 GameCheck g_gameCheck = GameCheck::NoExe;
 std::vector<Mod> g_mods;
 std::vector<bool> g_want;       // checkbox per mod
+Mod g_menu;                     // the F10 menu: no checkbox, installed / updated with the mods
 std::string g_tag;              // release tag
 std::string g_fetchError;       // last failed fetch
 std::string g_message;          // result of the last apply
@@ -65,6 +66,7 @@ std::string g_newVersion;
 bool g_selfUpdateFailed; // offer the releases page instead
 bool g_commandMode;      // --list / --install / --remove: no self-update
 
+std::wstring g_autoGame;  // found at start (exe folder, Steam); UI thread only
 std::wstring g_localZips; // --zips
 std::wstring g_screenshot; // --screenshot
 bool g_russian;
@@ -186,7 +188,8 @@ void FetchJob()
     std::vector<Mod> mods;
     std::string tag, error;
     ReleaseInstaller installer;
-    bool ok = FetchMods(g_localZips, &mods, &tag, &installer, &error);
+    Mod menu;
+    bool ok = FetchMods(g_localZips, &mods, &menu, &tag, &installer, &error);
     if (ok && !g_commandMode && !installer.source.empty())
         std::thread([installer] { // in the background: the mod list is usable meanwhile
             std::vector<unsigned char> exe;
@@ -208,8 +211,11 @@ void FetchJob()
         Log("fetch FAILED: %s", error.c_str());
         return;
     }
-    if (!g_game.empty())
+    if (!g_game.empty()) {
         ScanInstalled(g_game, &mods);
+        ScanMenu(g_game, &menu);
+    }
+    g_menu = std::move(menu);
     g_want.clear();
     for (const Mod& m : mods) // ticked = installed; the user ticks what to add
         g_want.push_back(!m.installed.empty());
@@ -252,8 +258,19 @@ void ApplyJob()
                 ++removed;
         }
     }
+    // The menu: added with the first mod, updated with any install or update (not on a plain removal).
+    const char* menuDone = nullptr;
+    if (error.empty() && (installed + updated > 0 || g_updateMode)) {
+        ScanInstalled(g_game, &g_mods);
+        ScanMenu(g_game, &g_menu);
+        if (MenuNeedsWork(g_mods, g_menu) && LoadModFiles(&g_menu, &error, &g_progress) &&
+            InstallMod(g_game, g_menu, &error))
+            menuDone = g_menu.installed.empty() ? T(" The F10 menu is installed.", " Меню F10 установлено.")
+                                                : T(" The F10 menu is updated.", " Меню F10 обновлено.");
+    }
     CleanupIfEmpty(g_game);
     ScanInstalled(g_game, &g_mods);
+    ScanMenu(g_game, &g_menu);
     for (size_t i = 0; i < g_mods.size(); ++i) {
         if (i >= g_want.size())
             g_want.push_back(false);
@@ -274,6 +291,8 @@ void ApplyJob()
         snprintf(text, sizeof(text), T("Done: %d installed, %d updated, %d removed.",
                                        "Готово: установлено %d, обновлено %d, удалено %d."),
                  installed, updated, removed);
+        if (menuDone)
+            strcat_s(text, menuDone);
         if (windowed)
             strcat_s(text, T(" The game is switched to windowed mode.", " Игра переключена в оконный режим."));
     }
@@ -335,6 +354,7 @@ void SetGameFolder(std::wstring folder)
         g_gameCheck == GameCheck::Ok ? "ok" : g_gameCheck == GameCheck::Not64Bit ? "32-bit" : "no bin\\Risen.exe");
     if (!g_game.empty() && g_fetched) {
         ScanInstalled(g_game, &g_mods);
+        ScanMenu(g_game, &g_menu);
         g_want.resize(g_mods.size());
         for (size_t i = 0; i < g_mods.size(); ++i)
             g_want[i] = !g_mods[i].installed.empty();
@@ -401,6 +421,48 @@ bool CloseButton(float size)
     return clicked;
 }
 
+// The menu's line under the mods: no checkbox, it follows the mods (call under g_lock).
+void MenuRow()
+{
+    const Mod& m = g_menu;
+    if (m.version.empty() && m.installed.empty())
+        return; // an older release without a menu zip
+    bool anyMod = false;
+    for (const Mod& mod : g_mods)
+        anyMod |= !mod.installed.empty();
+    char text[128];
+    ImVec4 color = ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+    if (MenuNeedsWork(g_mods, m)) {
+        if (m.installed.empty())
+            snprintf(text, sizeof(text), "%s %s", T("missing, will install", "нет, будет установлено"), m.version.c_str());
+        else if (m.installed == "?")
+            snprintf(text, sizeof(text), "%s %s", T("installed, update to", "установлено, обновление до"), m.version.c_str());
+        else
+            snprintf(text, sizeof(text), "%s %s -> %s", T("update", "обновление"), m.installed.c_str(), m.version.c_str());
+        color = kGood;
+    } else if (!m.installed.empty()) {
+        snprintf(text, sizeof(text), "%s %s", T("installed", "установлено"), m.installed.c_str());
+    } else {
+        snprintf(text, sizeof(text), "%s", anyMod ? "" : T("comes with the first mod", "ставится с первым модом"));
+    }
+    float indent = ImGui::GetFrameHeight() + ImGui::GetStyle().ItemInnerSpacing.x;
+    ImGui::AlignTextToFramePadding();
+    ImGui::Indent(indent);
+    ImGui::TextUnformatted(T("F10 menu", "Меню F10"));
+    float w = ImGui::CalcTextSize(text).x;
+    ImGui::SameLine(ImGui::GetContentRegionMax().x - w);
+    ImGui::TextColored(color, "%s", text);
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::PushFont(nullptr, 17.0f * g_scale);
+    ImGui::TextWrapped("%s", T("Settings of all mods in the game and the status icons. Installed and removed together "
+                               "with the mods.",
+                               "Настройки всех модов прямо в игре и значки на экране. Ставится и удаляется вместе с "
+                               "модами."));
+    ImGui::PopFont();
+    ImGui::PopStyleColor();
+    ImGui::Unindent(indent);
+}
+
 void DrawUi()
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -437,7 +499,7 @@ void DrawUi()
     ImGui::PopFont();
     ImGui::PopStyleColor();
     ImGui::SameLine();
-    ImGui::TextDisabled("%s %s", T("installer", "установщик"), kVersion);
+    ImGui::TextDisabled("%s", kVersion);
     float frame = ImGui::GetFrameHeight();
     if (LanguageButton(g_russian, frame + ImGui::GetStyle().ItemSpacing.x))
         g_russian = !g_russian;
@@ -488,6 +550,21 @@ void DrawUi()
             if (!folder.empty())
                 SetGameFolder(folder);
             lock.lock();
+        }
+        // After a wrong pick by hand: back to the folder the start-up search finds.
+        if (!g_autoGame.empty() && _wcsicmp(g_autoGame.c_str(), g_game.c_str()) != 0) {
+            const char* findText = T("Find the game automatically", "Найти игру автоматически");
+            float findW = ImGui::CalcTextSize(findText).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+            ImGui::SetCursorPosX(ImGui::GetContentRegionMax().x - findW);
+            if (ImGui::Button(findText, ImVec2(findW, 0))) {
+                lock.unlock();
+                std::wstring found = FindGameFolder();
+                if (!found.empty()) {
+                    g_autoGame = found;
+                    SetGameFolder(found);
+                }
+                lock.lock();
+            }
         }
         ImGui::EndDisabled();
         if (g_gameCheck == GameCheck::Not64Bit)
@@ -557,6 +634,7 @@ void DrawUi()
                 ImGui::Spacing();
                 ImGui::PopID();
             }
+            MenuRow();
         }
     }
     ImGui::EndChild();
@@ -608,6 +686,8 @@ void DrawUi()
             if (has && ModNeedsUpdate(m))
                 ++update;
         }
+        if (MenuNeedsWork(g_mods, g_menu))
+            ++update;
         ImGui::PushTextWrapPos(0.0f);
         if (!g_message.empty())
             ImGui::TextColored(g_messageError ? kBad : kGood, "%s", g_message.c_str());
@@ -913,6 +993,8 @@ int RunCommand(const std::vector<std::string>& install, const std::vector<std::s
             if (id == m.id)
                 g_want[i] = false;
     }
+    Log("menu %-9s offered %-5s installed %s", "", g_menu.version.empty() ? "-" : g_menu.version.c_str(),
+        g_menu.installed.empty() ? "-" : g_menu.installed.c_str());
     return 0;
 }
 
@@ -953,7 +1035,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
             command = true;
     }
     LocalFree(argv);
-    SetGameFolder(game.empty() ? FindGameFolder() : game);
+    g_autoGame = FindGameFolder();
+    SetGameFolder(game.empty() ? g_autoGame : game);
 
     g_commandMode = command;
     if (!command)

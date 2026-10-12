@@ -7,20 +7,21 @@ small proxy `version.dll`; no game files or saves are changed, uninstalling = de
 |---|---|
 | **AutoLoot** | Right mouse button loots the focused body / open chest / item at once, no loot window or animation. `F` toggles automatic pickup of loose items (optionally bodies and unowned open chests) around you - by default only in front of you (camera cone), with per-category filters (gold, ammo, weapons, armour, potions, scrolls...). A small silent sparkle marks each looted spot. Owned items, quest items, locked chests and unconscious people are never touched. |
 | **Speed** | `Z` toggles a game speed-up (x3 by default, hourglass icon while on), like Gothic's Z-mod. Optional: normal speed in dialogs, step keys to change the speed by a set step (x1 to x10). |
-| **No Limits** | Strength and dexterity teachers train up to the game's maximum (200) instead of their personal limit. Learning point costs unchanged. |
+| **No Limits** | Strength and dexterity go past the game's maximum of 200 (1000 by default, configurable), and their teachers train them that far instead of their personal limit. Learning point costs unchanged. |
 | **Fast Start** | The game window appears in ~10 s instead of ~32 s (buffered `.pak` reads, skips the DxDiag video card probe). |
 | **Window** | Borderless window over the whole monitor, hides the double Windows cursor, instant Alt+Tab. |
-| **Menu** | `F10` in-game settings for all mods (RU / EN), styled with the game's own parchment, cursor and fonts. Shipped with every mod. |
+| **Menu** | `F10` in-game settings for all mods (RU / EN), styled with the game's own parchment, cursor and fonts, plus the status icons. Its own zip; the installer adds it with the first mod. |
 
 ## Install
 
 **Installer:** download `RisenModsInstaller.exe` from [Releases](../../releases) and run it. It finds Risen (Steam), lists
-the mods of the latest release, installs, updates and removes them (close the game first). Your settings are kept.
-The exe is not signed, so Windows SmartScreen may warn: "More info" → "Run anyway".
+the mods of the latest release, installs, updates and removes them together with the F10 menu (close the game
+first). Your settings are kept. The exe is not signed, so Windows SmartScreen may warn: "More info" → "Run anyway".
 
 **By hand:** download the zips from [Releases](../../releases), close the game, extract into the Risen folder
-(Steam → Risen → Manage → Browse local files). You get `bin\version.dll` (loader), `bin\mods\<mod>.dll` and
-`bin\mods\menu.dll`. Extract any number of mods; shared files are identical, the newest wins.
+(Steam → Risen → Manage → Browse local files). A mod zip gives `bin\version.dll` (loader, the same in every zip)
+and `bin\mods\<mod>.dll`; `RisenMenu-<version>.zip` adds `bin\mods\menu.dll` (the F10 window and the status icons -
+without it the mods still work, settings are then in their `.ini` files only).
 Every zip has a README (Russian + English) with details, settings and uninstall steps.
 
 **Uninstall:** delete `bin\version.dll` and the `bin\mods` folder.
@@ -48,7 +49,9 @@ its archives at runtime.
 
 Моды для удобства в **Risen** (64-битное переиздание 2023 года, Steam): быстрый лут и автоподбор, ускорение
 игры, сила и ловкость без лимитов учителей, быстрый запуск, окно без рамки и меню настроек на `F10`.
-Файлы игры и сохранения не меняются. Архивы — в [Releases](../../releases), в каждом README с установкой.
+Файлы игры и сохранения не меняются. Проще всего ставить установщиком `RisenModsInstaller.exe` из
+[Releases](../../releases): сам найдёт игру, поставит выбранные моды вместе с меню F10 и будет их обновлять.
+Там же архивы для ручной установки, в каждом README с инструкцией.
 
 ## License
 

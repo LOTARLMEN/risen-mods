@@ -12,6 +12,7 @@ namespace {
 
 const wchar_t kReleaseApi[] = L"https://api.github.com/repos/LOTARLMEN/risen-mods/releases/latest";
 const char kLoaderMarker[] = "Risen mod loader"; // string inside our bin\version.dll
+const char kMenuLogTitle[] = "Risen Mods Menu";  // menu.dll logs "Risen Mods Menu 1.1" at start
 
 struct KnownMod {
     const char* id;
@@ -28,8 +29,10 @@ const KnownMod kKnown[] = {
      {"Z toggles a game speed-up (x3 by default) with an hourglass icon, like Gothic's Z-mod.",
       "Z включает ускорение игры (по умолчанию x3), на экране песочные часы. Как Z-mod в Готике."}},
     {"no_limits", "No Limits",
-     {"Strength and dexterity teachers train up to the game's maximum (200) instead of their own limit.",
-      "Учителя силы и ловкости учат до максимума игры (200), а не до своего предела."}},
+     {"Strength and dexterity go past the game's maximum of 200 (up to 1000, configurable), and teachers train "
+      "them that far instead of their own limit.",
+      "Сила и ловкость выше максимума игры 200 (до 1000, настраивается), и учителя учат до него, а не до своего "
+      "предела."}},
     {"fast_start", "Fast Start",
      {"The game window appears in about 10 seconds instead of about 30.",
       "Игра запускается примерно за 10 секунд вместо 30."}},
@@ -227,9 +230,18 @@ bool ModNeedsUpdate(const Mod& mod)
            (mod.installed == "?" || CompareVersions(mod.installed, mod.version) < 0);
 }
 
-bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::string* releaseTag,
+Mod MenuMod()
+{
+    Mod menu;
+    menu.id = "menu";
+    menu.title = "Menu";
+    return menu;
+}
+
+bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, Mod* menu, std::string* releaseTag,
                ReleaseInstaller* installer, std::string* error)
 {
+    *menu = MenuMod();
     struct Asset {
         std::string name, version;
         std::wstring source; // URL or file path
@@ -300,6 +312,13 @@ bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::strin
         mod.version = a.version;
         mod.source = a.source;
         Log("release: %s %s", mod.id.c_str(), mod.version.c_str());
+        if (mod.id == "menu") {
+            if (CompareVersions(menu->version, mod.version) < 0) {
+                menu->version = mod.version;
+                menu->source = mod.source;
+            }
+            continue;
+        }
         // Two archives of one mod (shouldn't happen in a release): keep the newer one.
         bool replaced = false;
         for (Mod& m : *mods)
@@ -403,6 +422,32 @@ void ScanInstalled(const std::wstring& game, std::vector<Mod>* mods)
     FindClose(find);
 }
 
+void ScanMenu(const std::wstring& game, Mod* menu)
+{
+    menu->installed.clear();
+    std::wstring dll = ModsDir(game) + L"\\menu.dll";
+    if (!FileExists(dll))
+        return;
+    menu->installed = DllVersion(dll, kMenuLogTitle);
+    if (menu->installed.empty()) {
+        wchar_t version[64];
+        GetPrivateProfileStringW(L"Mods", L"menu", L"?", version, 64, InstalledIni(game).c_str());
+        char v[64];
+        WideCharToMultiByte(CP_UTF8, 0, version, -1, v, 64, nullptr, nullptr);
+        menu->installed = v;
+    }
+}
+
+bool MenuNeedsWork(const std::vector<Mod>& mods, const Mod& menu)
+{
+    if (menu.version.empty())
+        return false; // an older release: menu.dll comes inside the mod zips
+    bool anyMod = false;
+    for (const Mod& m : mods)
+        anyMod |= !m.installed.empty();
+    return anyMod && (menu.installed.empty() || ModNeedsUpdate(menu));
+}
+
 bool InstallMod(const std::wstring& game, const Mod& mod, std::string* error)
 {
     CreateDirectoryW((game + L"\\bin").c_str(), nullptr);
@@ -476,6 +521,7 @@ void CleanupIfEmpty(const std::wstring& game)
         FindClose(find);
     }
     DeleteIfExists(dir + L"\\menu.dll", nullptr);
+    DeleteIfExists(dir + L"\\menu.README.txt", nullptr);
     DeleteIfExists(dir + L"\\menu.log", nullptr);
     DeleteIfExists(dir + L"\\loader.log", nullptr);
     DeleteIfExists(InstalledIni(game), nullptr);

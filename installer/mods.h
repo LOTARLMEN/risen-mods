@@ -2,7 +2,9 @@
 
 // The installer's model: mods offered by the latest GitHub release (or a local folder of zips) and what is
 // installed in the game folder. Every zip has the layout of the game folder: bin\version.dll (loader),
-// bin\mods\<id>.dll, bin\mods\menu.dll (F10 menu shared by all mods), README.txt.
+// bin\mods\<id>.dll, README.txt. The F10 menu shared by all mods is its own zip (RisenMenu-<version>.zip:
+// bin\mods\menu.dll, README.txt): not a choice of the user, it comes with the first mod and goes with the last.
+// Releases before installer 1.2 had menu.dll inside every mod zip and no menu zip.
 // Installed versions are kept in bin\mods\installed.ini ([Mods] <id>=<version>).
 
 #include <atomic>
@@ -42,21 +44,28 @@ struct ReleaseInstaller {
 
 // Lists the mods of the latest release (or the *.zip files in localZips when not empty); one small request,
 // the archives themselves are fetched by LoadModFiles. The mod id comes from the asset name
-// ("RisenFastStart-1.2.zip" -> fast_start). False + error text on failure.
-bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, std::string* releaseTag,
+// ("RisenFastStart-1.2.zip" -> fast_start). The menu zip goes to *menu (version empty when the release has none).
+// False + error text on failure.
+bool FetchMods(const std::wstring& localZips, std::vector<Mod>* mods, Mod* menu, std::string* releaseTag,
                ReleaseInstaller* installer, std::string* error);
+Mod MenuMod(); // id "menu", nothing offered or installed yet
 
 // Downloads / reads the mod's zip and unpacks it into Mod::files (checks that it holds bin\mods\<id>.dll).
 bool LoadModFiles(Mod* mod, std::string* error, FetchProgress* progress);
 
 // Fills Mod::installed from the game folder and adds rows for installed mods missing from the list.
 void ScanInstalled(const std::wstring& game, std::vector<Mod>* mods);
+// Fills menu->installed (version from menu.dll, then installed.ini, else "?"; empty = no menu.dll).
+void ScanMenu(const std::wstring& game, Mod* menu);
+// The menu has to be installed or updated: some mod is installed and the release has a newer (or any, when
+// it's missing) menu.
+bool MenuNeedsWork(const std::vector<Mod>& mods, const Mod& menu);
 
 // Writes the mod's files (shared files are overwritten, the user's .ini files are never touched).
 bool InstallMod(const std::wstring& game, const Mod& mod, std::string* error);
 // Deletes the mod's dll, readme and log; its .ini (settings) stays. False when a file is locked.
 bool RemoveMod(const std::wstring& game, const std::string& id, std::string* error);
-// When no mod dll is left in bin\mods: removes menu.dll, bin\version.dll (only our loader) and installed.ini.
+// When no mod dll is left in bin\mods: removes menu.dll (+ readme, log), bin\version.dll (only our loader) and installed.ini.
 void CleanupIfEmpty(const std::wstring& game);
 
 // The Window mod needs the game in windowed mode: FullScreen="false" in data\ini\ConfigLocal.xml (a backup

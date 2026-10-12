@@ -1,6 +1,11 @@
 Risen Fast Start 1.2
 ====================
 
+Проще всего - установщиком: RisenModsInstaller.exe со страницы
+https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт игру, поставит выбранные моды
+вместе с меню настроек (F10 в игре - настройки всех модов) и будет их обновлять.
+Ручная установка ниже - по желанию.
+
 Ускоряет запуск Risen: окно игры появляется примерно через 10 секунд вместо ~30.
 Игровые файлы не изменяются. Только для 64-битного Risen 2023 года (Steam).
 
@@ -38,6 +43,9 @@ Risen Fast Start 1.2
 -------------------------------------------------------------------------------
 
 Risen Fast Start 1.2 (English)
+
+Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
+game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.
 
 Makes Risen (64-bit 2023 re-release, Steam) start in ~10 s instead of ~30 s. No game files are changed.
 

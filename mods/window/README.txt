@@ -1,6 +1,11 @@
 Risen Window 1.2
 ================
 
+Проще всего - установщиком: RisenModsInstaller.exe со страницы
+https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт игру, поставит выбранные моды
+вместе с меню настроек (F10 в игре - настройки всех модов) и будет их обновлять.
+Ручная установка ниже - по желанию.
+
 Безрамочное окно на весь экран для Risen (64-битный Risen 2023 года, Steam).
 Выглядит как полноэкранный режим, но Alt+Tab работает мгновенно и игра не зависает
 (в настоящем полноэкранном режиме с ReShade игра может зависнуть при Alt+Tab).
@@ -11,7 +16,9 @@ Risen Window 1.2
   1. Распаковать архив в папку игры Risen:
          Risen\bin\version.dll         - загрузчик модов (общий для всех моих модов)
          Risen\bin\mods\window.dll     - сам мод
-         Risen\bin\mods\menu.dll       - меню настроек F10 (общее для всех моих модов)
+         Меню настроек F10 - отдельный архив RisenMenu, распаковывается так же
+         (Risen\bin\mods\menu.dll). Без него мод работает, но без окна F10 и значков,
+         настройки - только в .ini.
   2. Включить в игре оконный режим. Или вручную: в файле Risen\data\ini\ConfigLocal.xml
      поставить FullScreen="false".
 
@@ -29,6 +36,9 @@ Risen Window 1.2
 Антивирус может ругаться на version.dll - это ложное срабатывание. Windows должна быть на диске C:.
 
 -------------------------------------------------------------------------------
+Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
+game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.
+
 English: borderless fullscreen window for Risen (64-bit 2023, Steam), hides the Windows cursor and keeps
 the mouse inside the window. Set FullScreen="false" in data\ini\ConfigLocal.xml. Extract into the Risen folder.
 Settings: bin\mods\window.ini (hot-reloaded).
