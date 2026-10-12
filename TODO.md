@@ -252,7 +252,7 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
 - [x] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
       reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen.
       Done in 1.2: shown under "Change..." only while the chosen folder differs from the found one
-- [ ] Release with installer 1.2 + RisenMenu-1.1.zip + mod zips without menu.dll (ask the user first)
+- [x] Released v2026.10.12.4 (installer 1.2, RisenMenu-1.1.zip, No Limits 0.2, mod zips without menu.dll), commits 7e96435 + 699652f
 - [x] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
       v2026.10.11 zips were built before the fix
 
