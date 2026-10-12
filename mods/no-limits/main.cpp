@@ -1,5 +1,11 @@
-// No Limits: teachers train strength and dexterity up to the game's own maximum (200) instead of their personal
-// limit. Other skills keep the teachers' limits. Learning point costs are unchanged.
+// No Limits: strength and dexterity go past the game's maximum of 200 (MaxValue, 1000 by default) and teachers
+// train them up to that maximum instead of their personal limit. Other skills keep the teachers' limits. Learning
+// point costs are unchanged (each teach option has a fixed cost).
+//
+// The maximum: gCSkills_PS::ms_arrSkillInfos (Game.dll, 0x80 bytes per skill: min, max, default, ...) is filled by
+// a static initializer (strength / dexterity: 0, 200, 100). Every clamp of the game (GetTotal, GetSkillInfo,
+// GetSkillMaxValue, ...) reads max from there, so the mod writes its MaxValue into it and 200 back when switched off.
+// A save with a value above 200 loaded without the mod shows 200 (the stored base value isn't touched).
 //
 // How: gCInfoConditionCanTeachSkill::IsSatisfied (Game.dll) decides whether a teach option is shown. For every
 // skill range of the teacher it checks  teacher.min <= player's value + amount <= teacher.max.  We patch the end of
@@ -19,9 +25,11 @@ static const char kDefaultIni[] =
     "; No Limits mod settings. Changes are picked up while the game is running.\r\n"
     "\r\n"
     "[NoLimits]\r\n"
-    "; Teachers train strength and dexterity up to the game's maximum (200) instead of their own limit.\r\n"
-    "; Other skills are unchanged, so are the learning point costs.\r\n"
+    "; Strength and dexterity go up to MaxValue instead of 200; teachers train them that far instead of\r\n"
+    "; their own limit. Other skills are unchanged, so are the learning point costs.\r\n"
     "Enabled=1\r\n"
+    "; Maximum of strength and dexterity (the game's own is 200)\r\n"
+    "MaxValue=1000\r\n"
     "\r\n"
     "[Debug]\r\n"
     "; Writes the skill table and the player's skills to no_limits.log\r\n"
@@ -29,6 +37,7 @@ static const char kDefaultIni[] =
 
 static WNDPROC g_origProc;
 static bool g_enabled = true;
+static int g_maxValue = 1000;
 static int g_dumpKey;
 constexpr UINT WM_NOLIMITS_DUMP = WM_APP + 0x5501;
 constexpr UINT WM_NOLIMITS_APPLY = WM_APP + 0x5502;
@@ -69,6 +78,11 @@ static const uint8_t kCave[] = {
 };
 constexpr size_t kJumpSize = 14; // jmp [rip+0] + 8-byte address
 
+constexpr int kSkills[] = {7, 8}; // strength, dexterity
+constexpr int kGameMax = 200;
+static int32_t* g_skillInfos; // gCSkills_PS::ms_arrSkillInfos, 32 ints per skill, [1] = max
+static int g_writtenMax;      // what the table holds now (kGameMax = as in the game)
+
 static uint8_t* g_site;
 static uint8_t* g_cave;
 static bool g_patched;
@@ -85,7 +99,11 @@ static bool Prepare()
     auto isSatisfied = reinterpret_cast<uint8_t*>(
         GetProcAddress(game, "?IsSatisfied@gCInfoConditionCanTeachSkill@@UEAA_NAEBVgCInfo@@@Z"));
     g_site = base + kSiteRva;
-    if (isSatisfied != base + kIsSatisfiedRva || memcmp(g_site, kSiteOriginal, sizeof(kSiteOriginal)) != 0) {
+    g_skillInfos = reinterpret_cast<int32_t*>(GetProcAddress(game, "?ms_arrSkillInfos@gCSkills_PS@@2PAUgSSkillInfo@@A"));
+    bool tableOk = g_skillInfos != nullptr;
+    for (int id : kSkills)
+        tableOk = tableOk && g_skillInfos[id * 32] == 0 && g_skillInfos[id * 32 + 1] == kGameMax;
+    if (isSatisfied != base + kIsSatisfiedRva || memcmp(g_site, kSiteOriginal, sizeof(kSiteOriginal)) != 0 || !tableOk) {
         Log("patch: Game.dll is not the expected version (Steam Rev. 2045), mod disabled");
         g_state = -1;
         return false;
@@ -102,6 +120,7 @@ static bool Prepare()
     DWORD old;
     VirtualProtect(g_cave, 4096, PAGE_EXECUTE_READ, &old);
     FlushInstructionCache(GetCurrentProcess(), g_cave, 4096);
+    g_writtenMax = kGameMax;
     g_state = 1;
     return true;
 }
@@ -118,7 +137,16 @@ static void WriteCode(uint8_t* at, const uint8_t* bytes, size_t size)
 // Game thread only: IsSatisfied runs there too, so it is never half-way through the patched bytes.
 static void Apply()
 {
-    if (!Prepare() || g_enabled == g_patched)
+    if (!Prepare())
+        return;
+    int max = g_enabled ? g_maxValue : kGameMax;
+    if (max != g_writtenMax) {
+        for (int id : kSkills)
+            g_skillInfos[id * 32 + 1] = max;
+        g_writtenMax = max;
+        Log("maximum of strength / dexterity: %d", max);
+    }
+    if (g_enabled == g_patched)
         return;
     if (g_enabled) {
         uint8_t jump[kJumpSize] = {0xFF, 0x25, 0, 0, 0, 0};
@@ -129,7 +157,7 @@ static void Apply()
         WriteCode(g_site, kSiteOriginal, kJumpSize);
     }
     g_patched = g_enabled;
-    Log("patch: strength / dexterity teacher limits %s", g_patched ? "OFF (game maximum)" : "back ON (as in the game)");
+    Log("patch: strength / dexterity teacher limits %s", g_patched ? "OFF (up to the maximum)" : "back ON (as in the game)");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -189,17 +217,25 @@ static void Dump()
 static void ConfigLoad()
 {
     g_enabled = IniInt("NoLimits", "Enabled", 1) != 0;
+    g_maxValue = IniInt("NoLimits", "MaxValue", 1000);
+    if (g_maxValue < kGameMax)
+        g_maxValue = kGameMax;
+    if (g_maxValue > 9999)
+        g_maxValue = 9999;
     g_dumpKey = IniKey("Debug", "DumpKey", 0);
-    Log("config: enabled=%d dump=0x%02X", g_enabled, g_dumpKey);
+    Log("config: enabled=%d max=%d dump=0x%02X", g_enabled, g_maxValue, g_dumpKey);
 }
 
 static const HubItem kItems[] = {
-    {HubCheckbox, "NoLimits", "Enabled", "Strength and dexterity without teacher limits",
-     "Сила и ловкость без лимитов учителей", 1, 0, 0, 0, 0, nullptr, -1,
-     "Teachers train them up to the game's maximum of 200. Other skills and learning point costs are unchanged.",
-     "Учителя учат их до максимума игры - 200. Остальные навыки и стоимость в очках обучения не меняются."},
-    {HubNote, nullptr, nullptr, "Saves are not changed: without the mod the teachers have their limits again.",
-     "Сохранения не меняются: без мода у учителей снова их лимиты."},
+    {HubCheckbox, "NoLimits", "Enabled", "Strength and dexterity without limits", "Сила и ловкость без лимитов", 1,
+     0, 0, 0, 0, nullptr, -1,
+     "Past the game's maximum of 200, and teachers train them that far instead of their own limit. Other skills "
+     "and learning point costs are unchanged.",
+     "Выше максимума игры (200), и учителя учат до него, а не до своего предела. Остальные навыки и стоимость в "
+     "очках обучения не меняются."},
+    {HubSlider, "NoLimits", "MaxValue", "Maximum", "Максимум", 1000, 200, 2000, 10, 0, "%.0f", 0},
+    {HubNote, nullptr, nullptr, "Without the mod a save shows at most 200 again, the trained points stay in it.",
+     "Без мода в сохранении снова будет не больше 200, вкачанное в нём остаётся."},
 };
 
 static void OnMenuChanged()
@@ -250,7 +286,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "no_limits");
-        Log("No Limits 0.1");
+        Log("No Limits 0.2");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))
