@@ -375,6 +375,11 @@ Can mods add their own lines to the game's character / attributes screen (e.g. "
 - [ ] Recon: how GUI2.dll builds the character screen (layout from gui2.pak? script-filled list?), whether a line
       can be added through exported calls; fallback - our own ImGui panel drawn next to the game's screen while it
       is open (menu.dll overlay, detect the screen is open)
+      Leads from 2026-10-12 (Press START skip): game screens are gCHudPage2 pages with a gEHudPage id (start screen
+      0x1A/0x1B, main menu 0x0D); scripts open/close them with GUI2::Open / Close / IsVisible (Script.dll exports,
+      global `gui2`); each page has a PageControl script (eCScriptProxyScript) with handlers in Script_Game such as
+      OnX360Paint_Start / OnX360GameMsg_Menu_Load; gCHudSystem2::FindPage(gEHudPage); page layouts are loaded with
+      gCHudPage2::LoadBinary/LoadRaw (from gui2.pak?). Same route for the main menu / options ("Mods" item, line 318)
 
 ## Stage 5.13 — AutoLoot / QuickLoot fixes (user's report 2026-10-12)
 - [x] Bug (0.7, user-tested OK): QuickLoot skips quest items (e.g. grain for a quest - every stalk needs a click). QuickLoot must take
