@@ -231,19 +231,26 @@ static bool IsFlying(const Entity& e)
     return g_game.projValid(&e) && g_game.projActive(&e);
 }
 
-// Taking it would be theft. The game's AssessTheft: an item someone dropped is never theft, otherwise it may be
-// when the item has an owner - we stay on the safe side and skip every owned item.
-static bool WouldBeTheft(const Entity& e)
+// Loose item that can be taken: not hanging in a slot (torches in holders etc.), not an arrow in flight.
+// Theft (WouldBeTheft) and quest items (QuestItemOk) are checked separately.
+static bool IsGroundItem(Entity e)
 {
-    return HasOwner(e) && !(g_game.itemValid(&e) && g_game.itemDropped(&e));
+    return g_game.isItem(&e) && g_game.itemValid(&e) && !g_game.attachedToSlot(&e) && !IsFlying(e);
 }
 
-// Loose item that may be taken: not theft, not hanging in a slot (torches in holders etc.), not an arrow in flight.
-// Quest items are checked separately (QuestItemOk).
-static bool IsFreeGroundItem(Entity e)
+// QuickLoot of something that would be theft: allowed, but first the game's own theft check runs, as when picking
+// it up by hand - NPCs who see it react. False (nothing may be taken) when this game version has no broadcast.
+static bool TheftAllowed(const Entity& e, const char* name)
 {
-    return g_game.isItem(&e) && g_game.itemValid(&e) && !g_game.attachedToSlot(&e) && !IsFlying(e) &&
-           !WouldBeTheft(e);
+    if (!WouldBeTheft(e))
+        return true;
+    if (!ReportTheft(e)) {
+        Log("quickloot: %s would be theft, left alone (unknown game version)", name);
+        return false;
+    }
+    Log("quickloot: %s is theft (owner %d, security %d), reported to the NPCs around", name, HasOwner(e),
+        SecurityLevel(e));
+    return true;
 }
 
 // A quest item is taken only when the game says the player may take it now (special quest objects like the skulls
@@ -266,10 +273,10 @@ static const char* WhyNot(const Entity& e, char* buf, size_t size)
     bool item = g_game.isItem(&e), ps = item && g_game.itemValid(&e), inv = g_game.invValid(&e);
     bool lock = g_game.lockValid(&e), npc = g_game.isNpc(&e);
     snprintf(buf, size, "item=%d itemPS=%d mission=%d slot=%d flying=%d owner=%d dropped=%d npc=%d dead=%d inv=%d "
-             "stacks=%d lock=%d status=%d", item, ps, ps && g_game.itemMission(&e),
+             "stacks=%d lock=%d status=%d security=%d", item, ps, ps && g_game.itemMission(&e),
              item && g_game.attachedToSlot(const_cast<Entity*>(&e)), IsFlying(e), HasOwner(e),
              ps && g_game.itemDropped(&e), npc, npc && g_game.isDead(&e), inv, inv ? g_game.invStackCount(&e) : -1,
-             lock, lock ? g_game.lockStatus(&e) : -1);
+             lock, lock ? g_game.lockStatus(&e) : -1, SecurityLevel(e));
     return buf;
 }
 
@@ -391,12 +398,14 @@ static void Dump()
         bool inv = g_game.invValid(&e), item = g_game.itemValid(&e), lock = g_game.lockValid(&e);
         bool npc = g_game.isNpc(&e); // IsDead/IsDown only for NPCs: they read the NPC's routine
         Log("  %6.0f %-40s npc=%d dead=%d down=%d item=%d obj=%d owner=%d inv=%d stacks=%d itemPS=%d mission=%d "
-            "amount=%lu cat=%d dropped=%d flying=%d front=%d slot=%d lock=%d status=%d",
+            "amount=%lu cat=%d dropped=%d flying=%d front=%d slot=%d lock=%d status=%d security=%d sight=%d "
+            "y=%.0f",
             n.distance, name, npc, npc && g_game.isDead(&e), npc && g_game.isDown(&e), g_game.isItem(&e),
             g_game.isInteractObject(&e), HasOwner(e), inv, inv ? g_game.invStackCount(&e) : -1, item,
             item ? g_game.itemMission(&e) : 0, item ? g_game.itemAmount(&e) : 0, item ? g_game.itemCategory(&e) : -1,
             item ? g_game.itemDropped(&e) : 0, IsFlying(e), InFront(player, e, n.distance),
-            item ? g_game.attachedToSlot(const_cast<Entity*>(&e)) : 0, lock, lock ? g_game.lockStatus(&e) : -1);
+            item ? g_game.attachedToSlot(const_cast<Entity*>(&e)) : 0, lock, lock ? g_game.lockStatus(&e) : -1,
+            SecurityLevel(e), LineOfSight(player, e), EntityPosition(e).y);
         if (!inv || !npc || !g_game.isDead(&e))
             continue;
         // What the game's loot filter (used by its AutoLoot script) says about each stack of a dead body.
@@ -442,11 +451,11 @@ static bool IsLocked(const Entity& e)
     return g_game.lockValid(&e) && g_game.lockStatus(&e) != 1;
 }
 
-// Container that isn't an NPC or item, has stacks, belongs to nobody and is not locked.
-// PSLock status 1 = open (checked in game).
+// Container that isn't an NPC or item, has stacks and is not locked. PSLock status 1 = open (checked in game).
+// Whose it is and where it stands (theft) is checked separately.
 static bool IsOpenChest(const Entity& e)
 {
-    if (g_game.isNpc(&e) || g_game.isItem(&e) || !g_game.invValid(&e) || g_game.invStackCount(&e) <= 0 || HasOwner(e))
+    if (g_game.isNpc(&e) || g_game.isItem(&e) || !g_game.invValid(&e) || g_game.invStackCount(&e) <= 0)
         return false;
     return !g_game.lockValid(&e) || g_game.lockStatus(&e) == 1;
 }
@@ -518,10 +527,10 @@ static void QuickLoot()
     }
     char name[96], why[256];
     EntityName(target, name, sizeof(name));
-    if (IsFreeGroundItem(target)) {
+    if (IsGroundItem(target)) {
         if (!g_config.quickGround)
             return;
-        if (QuestItemOk(player, target))
+        if (QuestItemOk(player, target) && TheftAllowed(target, name))
             PickUp(player, target, "quickloot");
         return;
     }
@@ -536,6 +545,8 @@ static void QuickLoot()
         Log("quickloot: focus %s is not lootable (%s)", name, WhyNot(target, why, sizeof(why)));
         return;
     }
+    if (chest && !TheftAllowed(target, name))
+        return;
     SparkleKind kind = ContainerSparkle(target, true);
     int64_t moved = ScriptAutoLoot(player, target), quest = LootQuestStacks(player, target);
     if (moved + quest > 0)
@@ -594,10 +605,11 @@ static void AutoLootTick()
             g_wasLocked[n.e.e] = true; // remembered even outside the cone: the player may turn to it later
         if (!InFront(player, n.e, n.distance))
             continue;
-        if (IsFreeGroundItem(n.e)) {
+        if (IsGroundItem(n.e)) {
             if (g_game.itemMission(&n.e) && !g_config.autoQuest)
                 continue;
-            if (Wanted(n.e) && Resting(n.e, now) && QuestItemOk(player, n.e))
+            if (Wanted(n.e) && Resting(n.e, now) && !WouldBeTheft(n.e) && LineOfSight(player, n.e) &&
+                QuestItemOk(player, n.e))
                 PickUp(player, n.e, "autoloot");
             continue;
         }
@@ -620,11 +632,12 @@ static void AutoLootTick()
             }
         }
         bool body = g_config.autoBodies && IsDeadBody(n.e);
-        bool chest = !body && g_config.autoChests && !g_wasLocked.count(n.e.e) && IsOpenChest(n.e);
+        bool chest = !body && g_config.autoChests && !g_wasLocked.count(n.e.e) && IsOpenChest(n.e) &&
+                     !WouldBeTheft(n.e);
         if (!body && !chest)
             continue;
         LootTry& t = g_looted[n.e.e];
-        if (t.done || now < t.next)
+        if (t.done || now < t.next || !LineOfSight(player, n.e))
             continue;
         char name[96];
         EntityName(n.e, name, sizeof(name));
@@ -805,7 +818,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.7");
+        Log("AutoLoot 0.8");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

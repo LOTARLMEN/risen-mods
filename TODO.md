@@ -119,10 +119,19 @@ Debug: `[Debug] DumpKey` logs everything around the player.
       focuses the body. Fix: PSInteraction::CanInteractWith on the PLAYER with the body (verified: vulture meat).
       By-hand loot (InvFilter_Loot + TransferAmountTo) kept as fallback while the weapon is drawn - check the log
       ("script" vs "by hand") and drop it if the script always works
-- [ ] (0.5: owner && !PSItem::Dropped, from AssessTheft - no theft reports so far) **Theft protection (user's main concern, 2026-10-12)**: never auto-loot anything NPCs would treat as stolen.
-      Ground pickup already skips items with an owner - verify it covers merchant goods, items in houses/huts,
-      owned chests; find out whether ownership can end (owner dead, guild change) and loot it then. Look for the
-      game's own "is stealing" check (what makes NPCs react) and use it instead of the raw owner field if it exists
+- [x] (0.8, user-tested 2026-10-12: no theft by F, RMB theft noticed as vanilla; released v2026.10.12.7) **Theft (user report 2026-10-12: AutoLoot stole from houses
+      unpunished, and looted through walls)**. Script_Game AssessTheft (0xc1740) does NOT look at the owner: theft =
+      !PSItem::Dropped && sub_eebd0(item) != 0 = security level of where it lies: first area property found
+      (Entity::GetListOfPropertyNames) of SL_Public/Watched/Forbidden/Inquisition/Graveyard/Vulcan/Casern -> the
+      script of the same name; if none or 0 -> Entity::GetRoom().GetAIZoneSecurityLevel(). Our SecurityLevel() copies
+      it; WouldBeTheft = !dropped && (owner || security). User's decision: AutoLoot (F) never takes theft; RMB QuickLoot
+      takes it but first runs the game's broadcast sub_ed3e0(_, Entity item, eCScriptProxyScript "AssessTheft") (by
+      value, as Interact_Player_TakeItem +0x3fb and PreInteract_Player_Chest do; bytes + call site checked, else
+      refused) -> NPCs who see it react as vanilla. QuickLoot chests may now be owned (theft broadcast on the chest).
+      Walls: AutoLoot needs LineOfSight = eCPhysicsScene::TraceRayFirstHit(from chest +120, dir to target +30, flags
+      0x1B as Game.dll) with SetQueryIgnoreEntities {player, target}, reset after. Test: dump K shows security= sight=
+      y= (check player y vs ground items: +120 assumes feet), steal in a house seen / unseen, items behind a wall,
+      bushes/grass must not block
 - [x] (0.7, user-tested) Quest items: pick up a quest item via RMB QuickLoot -> journal / quest advances like with the native pickup
 - [x] (0.5) **Cone pickup (user's idea 2026-10-12)**: F10 "Area" = Cone (default) / Circle. Cone = items within the radius
       AND within +-N deg (slider, default ~60) of the view direction (camera forward, fallback player facing):
@@ -307,7 +316,7 @@ chest seen by NPCs = theft reaction as vanilla).
 - [x] Bug fixed: WM_APP ids 0x5601/0x5602 collided with menu.dll -> F10 opened nothing (our proc swallowed
       WM_MENU_OPEN). Now 0x57xx; the per-mod id blocks are listed in shared/common.h
 - [x] User test (2026-10-12): RMB without skill -> hero's vanilla "who could teach me" line. Released 0.1 (README
-      RU/EN, zip). Installer has no description for it yet (kKnown in installer/mods.cpp, needs installer 1.3)
+      RU/EN, zip), release v2026.10.12.6. Installer has no description for it yet (kKnown in installer/mods.cpp, needs installer 1.3)
 - [ ] Friend's / user's test with skill + lockpicks: break chance, lines, doors, loot after, save/load
 
 ## Stage 5.11 — Pickpocket rework (user's idea 2026-10-12, own session, after 5.9)

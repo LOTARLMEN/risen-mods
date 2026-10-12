@@ -31,6 +31,21 @@ struct EntityArray {
     uint32_t capacity;
 };
 
+// bTObjArray<bCString>: bCString is one pointer
+struct StringArray {
+    void** data = nullptr;
+    uint32_t count = 0;
+    uint32_t capacity = 0;
+};
+
+// bTPtrArray<eCGeometryEntity*>: the engine only copies data / count from it, the vftable is never used
+struct PtrArray {
+    void* vftable = nullptr;
+    void** data = nullptr;
+    int count = 0;
+    int capacity = 0;
+};
+
 struct GameApi {
     // Entity
     Entity* (*getPlayer)(Entity* ret);
@@ -46,6 +61,10 @@ struct GameApi {
     void* (*getName)(const Entity*, void* retString); // bCString
     bool (*isDialogCamera)();
     Vec3* (*getPosition)(const Entity*, Vec3* ret);
+    // Where a thing lies, for the theft check (see SecurityLevel)
+    bool (*propertyNames)(Entity* self, StringArray* out); // names of the areas it is in ("SL_Watched"...)
+    Entity* (*getRoom)(const Entity*, Entity* ret);
+    int (*zoneSecurity)(const Entity* room); // GetAIZoneSecurityLevel -> gESecurityLevel, 0 = free to take
     // EffectSystem (static): effects by name from library.pak, e.g. "eff_magic_telekinesis_target_once_01"
     Effect* (*startEffect)(Effect* ret, const void* name, const Vec3* position);
     bool (*existsEffect)(const void* name);
@@ -96,6 +115,17 @@ struct GameApi {
     void* (*stringNew)(void* self, const char* text);
     const char* (*stringText)(const void*);
     void (*stringFree)(void*);
+    void* (*memAdmin)(); // bCMemoryAdmin::GetInstance
+    void (*memFree)(void* admin, void* p);
+    // eCPhysicsScene (Engine.dll): ray tests, as the game's own line-of-sight checks do them
+    void* (*physicsScene)();
+    void (*physicsIgnore)(void* scene, PtrArray* entities);
+    bool (*traceFirstHit)(void* scene, const Vec3* from, const Vec3* direction, const void* ignore,
+                          unsigned long flags, const void* ignore2, int propertySetType, int shapeGroup);
+    // Script_Game.dll (not exported, Steam Rev. 2045 only, else null): runs the given script ("AssessTheft") for
+    // every NPC that may notice the player, as the game's own pickup does before taking. Item and script are passed
+    // by value (pointers to copies the function destroys).
+    void (*theftBroadcast)(void* unused, Entity* itemCopy, void* scriptCopy);
     // eCScriptProxyScript (Engine.dll): runs a script by name, like the game does for AutoLoot in water/lava
     void* (*proxyNew)(void* self, const void* name);
     int64_t (*proxyCall)(const void* self, void* selfEntity, void* otherEntity, int64_t param);
@@ -110,6 +140,17 @@ bool GameApiInit();
 Entity Player();
 const char* EntityName(const Entity& e, char* buf, size_t size);
 bool HasOwner(const Entity& e);
+// The game's own "is taking this theft" (Script_Game AssessTheft -> sub_eebd0): an area property SL_Public,
+// SL_Watched... asks its script, otherwise (or when that says 0) the room's AI zone decides. Not 0 = theft when
+// someone sees it.
+int SecurityLevel(const Entity& e);
+// Nothing solid (walls, floors, closed doors) between the player's chest and the target. True when unknown.
+bool LineOfSight(const Entity& player, const Entity& target);
+// Taking this would be theft (not dropped by someone, and the owner or SecurityLevel says so).
+bool WouldBeTheft(const Entity& e);
+// What the game does right before the player takes something: NPCs who see it react to the theft as in vanilla.
+// False when this game version has no known broadcast (then nothing may be taken that would be theft).
+bool ReportTheft(const Entity& item);
 // The game's "AutoLoot" script: moves the container's lootable stacks to the receiver, prints the item log,
 // fires the quest hooks. Returns the number of stacks moved.
 int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container);

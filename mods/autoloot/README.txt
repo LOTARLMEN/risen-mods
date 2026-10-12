@@ -1,4 +1,4 @@
-Risen AutoLoot 0.7
+Risen AutoLoot 0.8
 ==================
 
 Проще всего - установщиком: RisenModsInstaller.exe со страницы
@@ -33,8 +33,11 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
   Размер, звук или отключение - в F10, раздел "Эффект".
   Пустой сундук или труп видно сразу при наведении: к имени добавляется "(Пусто)" (отключается в F10).
 
-  Никогда не берётся: чужие вещи (у которых есть владелец и которые никто не выбросил - иначе это
-  кража, как считает сама игра), запертые сундуки без ключа, люди без сознания (их обыск - кража),
+  Кража - как в самой игре. Чужое (вещь с владельцем или лежащая в чужом доме, лагере, охраняемом
+  месте - игра решает это сама по зоне) по ПКМ взять можно, но это кража: кто это видел - отреагирует
+  так же, как при обычном подборе. Если никто не видел - ничего не будет.
+  Автоподбор (F) чужое не берёт никогда, и ничего не берёт сквозь стены, пол и закрытые двери.
+  Никогда не берётся: запертые сундуки без ключа, люди без сознания (их обыск - кража),
   квестовые объекты, которые игра пока не даёт взять (черепа и т.п.). Это остаётся для обычного взаимодействия.
   Лут идёт через собственный скрипт игры, так что квесты на сбор предметов засчитываются как обычно.
 
@@ -100,7 +103,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
 
 -------------------------------------------------------------------------------
 
-Risen AutoLoot 0.7 (English, beta)
+Risen AutoLoot 0.8 (English, beta)
 
 Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
 game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.
@@ -117,7 +120,10 @@ Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no anim
                plunder (meat, skins, claws) is created the way the game does on focus. Quest items only
                when "Also quest items" is on. A chest you unlocked yourself (key, lockpick) is left to you.
   F10          in-game settings window for all my mods (game paused while open).
-Never taken: owned items (theft), locked chests, unconscious people, quest objects the game won't let you take
+Theft works as in the game itself: RMB may take what isn't yours (owned, or lying in someone's house, camp or a
+guarded place - the game decides by the zone), but NPCs who see it react as to a normal theft; unseen, nothing
+happens. AutoLoot (F) never takes what would be theft, and nothing through walls, floors or closed doors.
+Never taken: locked chests, unconscious people, quest objects the game won't let you take
 yet (skulls and the like). Uses the game's own loot script, so quests count the items as usual.
 A small silent sparkle (the game's own effect) marks each looted spot, coloured by what was taken: gold = quest
 item, red = weapons and ammo, light blue = armour, violet = scrolls and runes, green = potions, food and plants,

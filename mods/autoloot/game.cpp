@@ -51,6 +51,9 @@ bool GameApiInit()
     Resolve(script, "Script", g.getName, "?GetName@Entity@@QEBA?AVbCString@@XZ");
     Resolve(script, "Script", g.isDialogCamera, "?IsDialogCameraActive@Entity@@SA_NXZ");
     Resolve(script, "Script", g.getPosition, "?GetPosition@Entity@@QEBA?AVbCVector@@XZ");
+    Resolve(script, "Script", g.propertyNames, "?GetListOfPropertyNames@Entity@@QEAA_NAEAV?$bTObjArray@VbCString@@@@@Z");
+    Resolve(script, "Script", g.getRoom, "?GetRoom@Entity@@QEBA?AV1@XZ");
+    Resolve(script, "Script", g.zoneSecurity, "?GetAIZoneSecurityLevel@Entity@@QEBA?AW4gESecurityLevel@@XZ");
     Resolve(script, "Script", g.startEffect, "?StartEffect@EffectSystem@@SA?AVEffect@@AEBVbCString@@AEBVbCVector@@@Z");
     Resolve(script, "Script", g.existsEffect, "?ExistsEffect@EffectSystem@@SA_NAEBVbCString@@@Z");
     Resolve(script, "Script", g.invValid, "?IsValid@PSInventory@@QEBA_NXZ");
@@ -88,8 +91,37 @@ bool GameApiInit()
     Resolve(base, "SharedBase", g.stringNew, "??0bCString@@QEAA@PEBD@Z");
     Resolve(base, "SharedBase", g.stringText, "?GetText@bCString@@QEBAPEBDXZ");
     Resolve(base, "SharedBase", g.stringFree, "??1bCString@@QEAA@XZ");
+    Resolve(base, "SharedBase", g.memAdmin, "?GetInstance@bCMemoryAdmin@@SAAEAV1@XZ");
+    Resolve(base, "SharedBase", g.memFree, "?Free@bCMemoryAdmin@@QEAAXPEAX@Z");
+    Resolve(engine, "Engine", g.physicsScene, "?GetInstance@eCPhysicsScene@@SAAEAV1@XZ");
+    Resolve(engine, "Engine", g.physicsIgnore,
+            "?SetQueryIgnoreEntities@eCPhysicsScene@@QEAAXAEAV?$bTPtrArray@PEAVeCGeometryEntity@@@@@Z");
+    Resolve(engine, "Engine", g.traceFirstHit,
+            "?TraceRayFirstHit@eCPhysicsScene@@QEAA_NAEBVbCVector@@0PEBVeCGeometryEntity@@K1W4eEPropertySetType@@"
+            "W4eEShapeGroup@@@Z");
     Resolve(engine, "Engine", g.proxyNew, "??0eCScriptProxyScript@@QEAA@AEBVbCString@@@Z");
     Resolve(engine, "Engine", g.proxyCall, "??ReCScriptProxyScript@@QEBA_JPEAVeCEntity@@0_J@Z");
+
+    // Optional: the theft broadcast, only on the expected Script_Game.dll (its first bytes and the call to it from
+    // Interact_Player_TakeItem, the game's own pickup)
+    static const uint8_t kBroadcastStart[] = {0x4C, 0x89, 0x44, 0x24, 0x18, 0x48, 0x89, 0x54, 0x24, 0x10, 0x48,
+                                              0x89, 0x4C, 0x24, 0x08, 0x55, 0x53, 0x56, 0x57, 0x41, 0x54, 0x41,
+                                              0x55, 0x41, 0x56, 0x41, 0x57, 0x48, 0x8D, 0xAC, 0x24, 0xC8};
+    g.theftBroadcast = nullptr;
+    if (HMODULE scriptGame = GetModuleHandleA("Script_Game.dll")) {
+        auto* fn = reinterpret_cast<uint8_t*>(scriptGame) + 0xed3e0;
+        auto* take = reinterpret_cast<uint8_t*>(GetProcAddress(
+            scriptGame, "?Interact_Player_TakeItem@@YA_NAEAV?$bTObjStack@UgScriptRunTimeSingleState@@@@PEAVgCScriptProcessingUnit@@@Z"));
+        int32_t rel = 0;
+        if (take)
+            memcpy(&rel, take + 0x3fb + 1, 4);
+        if (take && take == reinterpret_cast<uint8_t*>(scriptGame) + 0x1215f0 && take[0x3fb] == 0xE8 &&
+            take + 0x3fb + 5 + rel == fn && memcmp(fn, kBroadcastStart, sizeof(kBroadcastStart)) == 0)
+            g.theftBroadcast = reinterpret_cast<decltype(g.theftBroadcast)>(fn);
+    }
+    if (!g.theftBroadcast)
+        Log("game api: Script_Game.dll is not the expected version (Steam Rev. 2045): QuickLoot never takes "
+            "what would be theft");
 
     state = g_missing ? -1 : 1;
     Log("game api: %s", state > 0 ? "ready" : "INCOMPLETE (game updated?), loot features disabled");
@@ -128,7 +160,7 @@ int64_t ScriptCall(const char* script, void* self, void* other, int64_t param)
         const char* name;
         alignas(16) char data[64];
     };
-    static Proxy proxies[4];
+    static Proxy proxies[16];
     Proxy* p = nullptr;
     for (Proxy& q : proxies)
         if (q.name == script || !q.name) {
@@ -145,6 +177,81 @@ int64_t ScriptCall(const char* script, void* self, void* other, int64_t param)
         p->name = script;
     }
     return g_game.proxyCall(p->data, self, other, param);
+}
+
+int SecurityLevel(const Entity& e)
+{
+    // The order Script_Game checks them in; each name is also the script that gives the level (it may depend on
+    // the time of day, the player's guild...).
+    static const char* const kAreas[] = {"SL_Public", "SL_Watched", "SL_Forbidden", "SL_Inquisition",
+                                         "SL_Graveyard", "SL_Vulcan", "SL_Casern"};
+    Entity self = e;
+    StringArray names;
+    g_game.propertyNames(&self, &names);
+    const char* area = nullptr;
+    for (const char* a : kAreas) {
+        for (uint32_t i = 0; i < names.count && !area; ++i) {
+            const char* text = g_game.stringText(&names.data[i]);
+            if (text && strcmp(text, a) == 0)
+                area = a;
+        }
+        if (area)
+            break;
+    }
+    for (uint32_t i = 0; i < names.count; ++i)
+        g_game.stringFree(&names.data[i]);
+    if (names.data)
+        g_game.memFree(g_game.memAdmin(), names.data);
+    int64_t level = area ? ScriptCall(area, nullptr, nullptr, 0) : 0;
+    if (level)
+        return static_cast<int>(level);
+    Entity room;
+    g_game.getRoom(&e, &room);
+    return g_game.zoneSecurity(&room);
+}
+
+bool LineOfSight(const Entity& player, const Entity& target)
+{
+    void* scene = g_game.physicsScene();
+    if (!scene)
+        return true;
+    Vec3 from = EntityPosition(player), to = EntityPosition(target);
+    from.y += 120.0f; // chest height, assuming positions are at the feet (cm, Y up; see "y=" in the dump)
+    to.y += 30.0f;    // a little above the floor the thing lies on
+    Vec3 dir = {to.x - from.x, to.y - from.y, to.z - from.z};
+    if (dir.x * dir.x + dir.y * dir.y + dir.z * dir.z < 1.0f)
+        return true;
+    // The player and the target themselves don't block. Same arguments as the game's own checks (Game.dll).
+    void* ignore[2] = {player.e, target.e};
+    PtrArray list;
+    list.data = ignore;
+    list.count = list.capacity = 2;
+    g_game.physicsIgnore(scene, &list);
+    bool hit = g_game.traceFirstHit(scene, &from, &dir, nullptr, 0x1B, nullptr, 0, 0);
+    PtrArray none;
+    g_game.physicsIgnore(scene, &none);
+    return !hit;
+}
+
+bool WouldBeTheft(const Entity& e)
+{
+    if (g_game.itemValid(&e) && g_game.itemDropped(&e))
+        return false;
+    return HasOwner(e) || SecurityLevel(e) != 0;
+}
+
+bool ReportTheft(const Entity& item)
+{
+    if (!g_game.theftBroadcast)
+        return false;
+    alignas(16) char script[64] = {};
+    alignas(8) char name[16] = {};
+    g_game.stringNew(name, "AssessTheft");
+    g_game.proxyNew(script, name);
+    g_game.stringFree(name);
+    Entity copy = item;
+    g_game.theftBroadcast(nullptr, &copy, script);
+    return true;
 }
 
 int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container)
