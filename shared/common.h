@@ -36,5 +36,8 @@ HWND FindGameWindow();
 HWND WaitForGameWindow();
 
 // Replaces the game window's procedure; returns the previous one for CallOriginalWndProc.
+// Every mod posts its own WM_APP + 0xNNxx messages to the shared window, one block per mod - a duplicate is
+// swallowed by whichever mod sees it first: speed 0x52xx, window 0x53xx, autoloot 0x54xx, no-limits 0x55xx,
+// menu 0x56xx, quick-lockpick 0x57xx.
 WNDPROC SubclassWindow(HWND hwnd, WNDPROC proc);
 LRESULT CallOriginalWndProc(WNDPROC orig, HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);

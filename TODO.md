@@ -1,8 +1,7 @@
 # Risen (2023, x64) mods — TODO
 
 Target: Steam Risen, 64-bit THQ Nordic re-release (`D:\SteamLibrary\steamapps\common\Risen`).
-Project lives in `Risen
-isen-mods` (inside the game folder). Approach: native C++ DLL loaded into `Risen.exe`, calling functions exported by the game DLLs
+Project lives in `Risen\risen-mods` (inside the game folder). Approach: native C++ DLL loaded into `Risen.exe`, calling functions exported by the game DLLs
 (`Engine.dll`, `Game.dll`, `bin/scripts/Script_Game.dll` export thousands of named C++ symbols).
 
 Goals:
@@ -14,7 +13,8 @@ Layout (since 2026-10-11): `loader/` builds `bin\version.dll` (proxy of the syst
 `bin\mods\*.dll` in alphabetical order from its DllMain. One folder per mod in `mods/` -> `bin\mods\<mod>.dll`,
 settings `bin\mods\<mod>.ini`, log `bin\mods\<mod>.log`. Shared code in `shared/` (log, ini, keys, game window, IAT).
 `build.bat [deploy]` builds everything; `tools\package.ps1` makes `dist\Risen<Mod>-<ver>.zip` for every mod with a README.
-Mods: fast-start, window (borderless + cursor), speed (F4), startup-trace (developer only, not deployed/packed).
+Mods: fast-start, window (borderless + cursor), speed (Z), autoloot, no-limits, menu (F10 hub), installer;
+startup-trace (developer only, not deployed/packed). Public: github.com/LOTARLMEN/risen-mods, releases = zips + installer.
 
 ## Faster game startup — DONE 2026-10-11: window at 9.7 s instead of 32.3 s
 Measured with `mods/startup-trace` (copy `startup_trace.dll` into `bin\mods` -> `bin\mods\startup_trace.log`: DLL loads with call stacks,
@@ -40,24 +40,24 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - [x] `git init`
 - [x] Install universal-modder plugin (`/plugin marketplace add rehan-remade/universal-modder`)
 - [x] Install C++ toolchain — VS Build Tools 2022, MSVC 14.44.35207
-- [ ] Install Ghidra (+ JDK) — ask before downloading
-- [ ] Back up original `bin/` (copy to `risen-mods\backup\bin-original`)
+- [x] Ghidra not needed: dumpbin + tools/pe_disasm.py / pe_symbol.py / pe_exports.py cover it
+- [x] Back up original `bin/` (copy to `risen-mods\backup\bin-original`)
 
 ## Stage 1 — Recon
-- [ ] List DLLs imported by `Risen.exe`, pick a proxy-DLL candidate for loading our DLL
+- [x] (version.dll, imported by SharedBase.dll) List DLLs imported by `Risen.exe`, pick a proxy-DLL candidate for loading our DLL
       (NOTE: `bin/d3d9.dll` is now ReShade 6.6.2 Addon build — don't use d3d9 as proxy; consider a ReShade addon `.addon64` instead)
-- [ ] Dump all exports of `Engine.dll`, `Game.dll`, `Script_Game.dll`, `SharedBase.dll` into `notes/exports/`
-- [ ] Find how to get the player entity (e.g. `gCSession`, `eCEntity` getters)
-- [ ] Find a per-frame hook point (to poll hotkeys and run logic on the game thread)
-- [ ] Study loot-related exports in `Script_Game.dll`:
+- [x] Dump all exports of `Engine.dll`, `Game.dll`, `Script_Game.dll`, `SharedBase.dll` into `notes/exports/`
+- [x] (Script.dll Entity::GetPlayer) Find how to get the player entity (e.g. `gCSession`, `eCEntity` getters)
+- [x] (WndProc subclass + PostMessage, D3D9 Present for the overlay) Find a per-frame hook point (to poll hotkeys and run logic on the game thread)
+- [x] (notes/loot-recon.md) Study loot-related exports in `Script_Game.dll`:
       `Interact_Player_Loot`, `Interact_Player_AutoLoot`, `AutoLoot`, `BtnEvent_OnClick_LootAll`,
       `CanInteract_Player_Loot`, `AssessPlayerLooting`, `CanInteract_Player_TakeItem_*`
-- [ ] Study time exports in `Engine.dll`: `eCTimer::GetInstance`, `eCTimer::SetTimeScaling(float)`,
+- [x] Study time exports in `Engine.dll`: `eCTimer::GetInstance`, `eCTimer::SetTimeScaling(float)`,
       `eCTimer::GetTimeScaling`; console command `timer.fTimeScale`
 
 ## Stage 2 — Proof of concept
 - [x] Proxy DLL (`version.dll`) that loads with the game and writes a log file — verified in game 2026-10-11
-- [ ] Call `eCTimer::GetInstance()` and log `GetTimeScaling()` — proves calling game exports works
+- [x] Call `eCTimer::GetInstance()` and log `GetTimeScaling()` — proves calling game exports works
 - [x] `.ini` reader with hot reload
 
 ## Stage 2.5 — Borderless window (quick win)
@@ -85,7 +85,7 @@ Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified i
   - [x] Enabled, multiplier slider, rebind toggle/panel keys, indicator on/off + size, RU/EN switch (globe button)
   - [x] Defaults changed to Z / x3 (user's request); `dist/RisenSpeed-1.2.zip` for a friend
   - [ ] Friend's feedback; panel not yet tested in exclusive fullscreen / without the Window mod
-  - [ ] Later grows into the Stage 5.5 settings window for all mods
+  - [x] Grew into the Stage 5.5 settings window for all mods
 - [x] `.ini`: `[Speed] Multiplier` (default 3.0), `ToggleKey` (default Z), `[Panel] Key/Language`
 - [x] Speed 1.5 (user-tested 2026-10-12, "очаровательно"): **Step keys**, then changed on user's wish to StepUp/StepDown
       sliders (default 0.5, x1..x10, never below x1) instead of a fixed ladder. Original plan:: optional, off by default, own checkbox in F10 - "faster"/"slower"
@@ -106,9 +106,9 @@ Debug: `[Debug] DumpKey` logs everything around the player.
 - [x] Test after rebinding (2026-10-11, user: works great): RMB on focused body/item/open chest, no loot with weapon drawn,
       nothing in dialogs / on empty focus, F toggle. Sara's hut chest correctly refused (owned or locked)
 - [x] gui2.PrintItemLog shows the native "+ item" feed on the left for ground pickups - user likes it, no own feed
-- [ ] Chests: dump (K) near locked/unlocked/owned chests -> confirm PSLock status values (1 = open?) and owner
+- [x] (0.7: status 1 = open confirmed by the key unlock) Chests: dump (K) near locked/unlocked/owned chests -> confirm PSLock status values (1 = open?) and owner
       (low priority: sailor chest looted, Sara's chest refused - behaviour already correct in practice)
-- [ ] AutoLoot 0.5 built + deployed 2026-10-12, NOT yet tested in game: cone (camera pose row 2, fallback player
+- [x] (user-tested, released) AutoLoot 0.5: cone (camera pose row 2, fallback player
       at-vector; check with DumpKey that "view" matches where the camera looks), [Filter] categories (gEItemCategory
       1 weapon 2 armor 3 consumable 5 magic 6 misc 7 written; gold = It_Gold/It_GoldBag*, ammo = It_Arrow/It_Bolt),
       theft = owner && !PSItem::Dropped (from Script_Game AssessTheft), friend's bugs fixed: arrows in flight
@@ -119,20 +119,20 @@ Debug: `[Debug] DumpKey` logs everything around the player.
       focuses the body. Fix: PSInteraction::CanInteractWith on the PLAYER with the body (verified: vulture meat).
       By-hand loot (InvFilter_Loot + TransferAmountTo) kept as fallback while the weapon is drawn - check the log
       ("script" vs "by hand") and drop it if the script always works
-- [ ] **Theft protection (user's main concern, 2026-10-12)**: never auto-loot anything NPCs would treat as stolen.
+- [ ] (0.5: owner && !PSItem::Dropped, from AssessTheft - no theft reports so far) **Theft protection (user's main concern, 2026-10-12)**: never auto-loot anything NPCs would treat as stolen.
       Ground pickup already skips items with an owner - verify it covers merchant goods, items in houses/huts,
       owned chests; find out whether ownership can end (owner dead, guild change) and loot it then. Look for the
       game's own "is stealing" check (what makes NPCs react) and use it instead of the raw owner field if it exists
-- [ ] Quest items: pick up a quest item via RMB QuickLoot -> journal / quest advances like with the native pickup
-- [ ] **Cone pickup (user's idea 2026-10-12)**: F10 "Area" = Cone (default) / Circle. Cone = items within the radius
+- [x] (0.7, user-tested) Quest items: pick up a quest item via RMB QuickLoot -> journal / quest advances like with the native pickup
+- [x] (0.5) **Cone pickup (user's idea 2026-10-12)**: F10 "Area" = Cone (default) / Circle. Cone = items within the radius
       AND within +-N deg (slider, default ~60) of the view direction (camera forward, fallback player facing):
       dot(forward_xz, normalize(item - player)_xz) >= cos(N). Circle = current behaviour. Recon: camera forward
       (Engine eCCameraBase?) or Entity rotation/matrix in Script.dll
-- [ ] **Item category filters (user: great idea, 2026-10-12)**: F10 checkboxes per category (gold, potions, food,
+- [x] (0.5, one set for radius pickup) **Item category filters (user: great idea, 2026-10-12)**: F10 checkboxes per category (gold, potions, food,
       plants, weapons, armour, ammo, scrolls/runes, keys/lockpicks, misc/trophies...), separate for radius AutoLoot
       and RMB QuickLoot? Recon: item category field on the item template (gCItem_PS?) and its values
-- [ ] Hand icon right of the hourglass while AutoLoot is on (comes with the hub below)
-- [ ] README + package
+- [x] Hand icon right of the hourglass while AutoLoot is on
+- [x] README + package (0.7 released v2026.10.12.5 - user: final unless friends find bugs)
 
 ## Stage 5.5 — Mod hub: one F10 window for all mods (session 5, 2026-10-11)
 Each mod DLL has its own ImGui copy -> mods can't draw into another mod's window. Design: `mods/menu` -> `menu.dll`
@@ -175,9 +175,9 @@ Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an 
 - [ ] User test No Limits 0.2: teacher past 200, character screen shows > 200, potion of strength past 200, save /
       load keeps the value; J (DumpKey) logs base/total/max of the player
 - [ ] Maybe: intelligence and other attributes too (user said "в целом ограничения прокачки") - ask
-- [ ] (old) Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
+- [x] (0.1/0.2) Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
       (per-teacher max level), or a hard max in the attribute code (PSSkills / gCSkillValue?)
-- [ ] Pick the smallest hook (patch the max-value check or the teacher limit table), learning point costs unchanged
+- [x] (0.1/0.2) Pick the smallest hook (patch the max-value check or the teacher limit table), learning point costs unchanged
 - [ ] Test: train past the old cap at a teacher; saves stay compatible with the mod removed
 
 ## Stage 5.8 — Installer (user's idea 2026-10-11)
@@ -218,9 +218,9 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
 - [x] Installed version read from the mod dll itself ("<Title> <version>" log string), then installed.ini, else "?"
       -> hand-installed old zips are offered as updates (tested with a patched "Speed 1.3" dll)
 - [x] Own icon installer\installer.ico (tools\make_installer_icon.ps1, no game art) + VERSIONINFO via installer.rc
-- [ ] Discord shows its game overlay over the installer (user, 2026-10-11): check whether it's the exe living in the
+- [x] (gone, see below) Discord shows its game overlay over the installer (user, 2026-10-11): check whether it's the exe living in the
       Risen folder (Discord "Registered games") - run a copy from Downloads
-- [ ] User test of the window: clicks, drag, folder picker, apply on the real game folder (overwrites dev dlls with release ones)
+- [x] (see below) User test of the window: clicks, drag, folder picker, apply on the real game folder (overwrites dev dlls with release ones)
 - [x] Published 2026-10-11: commit efafa2d, RisenModsInstaller.exe added to release v2026.10.11 (RU/EN notes, SmartScreen note); downloaded asset verified
 - [x] Self-update (installer 1.1): release asset sha256 ("digest" in the API) vs own exe; differs -> download,
       VERSIONINFO compared (installer/version.h is the single version source) -> banner "new installer version" +
@@ -270,16 +270,45 @@ Menu, all mod pages and the installer in EN / RU / DE / PL.
 ## Maybe later
 - [ ] (unlikely) Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
 
-## Stage 5.9 — Quick lockpick (user's idea 2026-10-12)
-Walk up to a locked chest (or door?), press a key: if the player's lockpicking skill allows this lock, one lockpick is
-spent and the lock opens without the lockpicking minigame; then loot as usual (RMB QuickLoot). Not enough skill or no
-lockpick -> short message, nothing happens. Same theft rules as the game (picking an owned chest seen by NPCs).
-- [ ] Recon: PSLock (status, difficulty), player's lockpicking skill value, lockpick item, the game's own unlock
-      path (script / interaction) - prefer calling it so skill checks, XP and witnesses work as in vanilla
-- [ ] Key in F10 (AutoLoot page or own small mod), hint when focused on a pickable chest
-- [ ] Test: easy/hard lock, no lockpicks, owned chest near NPCs, save/load keeps the chest open
-- [ ] User will report how the vanilla lockpicking looks once they reach it in the game (minigame, skill, lockpicks,
-      "not enough skill" message) - start the stage after that
+## Stage 5.9 — Quick lockpick (user's idea 2026-10-12; own mod `mods/quick-lockpick`, grows out of QuickLoot)
+User's design (2026-10-12): a separate mod. Look at a locked chest, press a key (player picks it in F10): one lockpick
+is spent and the lock opens at once, no minigame. F10 option "Loot the chest right after picking" (QuickLoot right
+away). User thinks Risen lockpicking works like Gothic 1/2 (left/right combination minigame), not like Gothic 3
+(skill level required) - check in recon and tell the user if it's different. Same theft rules as the game (owned
+chest seen by NPCs = theft reaction as vanilla).
+- [x] Recon (session 11): Risen is a HYBRID. Script_Game CanOpenLock(self=player, other=lock) +0x10ebf0: open -> ok;
+      key in inventory (PSLock::GetKey + HasItems) -> ok; Difficulty > 3 (or <= 0) without key -> "Impossible"/"NoKey"
+      (key-only locks); skill 0x1B (27, PSSkills::GetTotal / GetLockpick) < 1 -> "NoSkillLockpick"; Difficulty 2 needs
+      skill >= 2, Difficulty 3 needs skill >= 3 -> "TooDifficult"; no It_Lockpick -> "NoLockpick"/"NoLockpickOrKey";
+      failure shows the game's own message (sub_f0160). So like Gothic 3 a skill level gates the lock, then a Gothic 1/2
+      minigame: Unlock +0x10e8b0 -> UseLockPick +0x10e1d0 (GUI2::SendLockpickInfo, lockpick action map) ->
+      LockPickLoop +0x10d8d0: PSLock::GetLockPickCombination(i) (gELockCombi left/right) vs pressed key; wrong ->
+      GetRandomNumber decides "LockpickBroke" (DeleteItems It_Lockpick, eff_ani_human_interact_lockpick_broke_01,
+      "LastLockpick" when none left) or "LockpickAgain" (restart); all right -> Achievement::OnHandleLockpick,
+      "OpenLock", eff_ani_human_interact_lockpick_end_01. Quick path plan: ScriptCall("CanOpenLock", player, chest)
+      for all vanilla checks + messages, then DeleteItems one It_Lockpick, PSLock status = 1 (as UnlockWithKey in
+      AutoLoot 0.7, fires OnLockStatusChanged), Achievement::OnHandleLockpick, end effect; optional QuickLoot.
+      Old note: PSLock (status, difficulty / combination), player's lockpicking skill (skill table id), lockpick item
+      (It_Lockpick?), the game's own pick path (interaction script / minigame end) - prefer calling the game's
+      "lock picked" path so skill checks, XP, witnesses and lockpick breaking work as in vanilla
+- [x] User's decisions (2026-10-12): skill gate exactly as the game (CanOpenLock, vanilla messages); the lockpick
+      may survive - break chance falls with the lockpick skill (proposal: skill 1 = 50%, 2 = 30%, 3 = 15%, F10
+      sliders, user to confirm); chests AND doors; F10 option "Loot right after picking". Later idea (user, maybe):
+      quick lockpicking as its own trainable skill once 5.12 (own stats in the character screen) works
+- [x] (0.1, session 12, built + deployed, needs game test) mods/quick-lockpick: key (default MOUSE2, same as
+      QuickLoot) + break chances 50/30/15 by skill + "loot right after" on F10 page "Взлом". Flow: focus locked
+      (status 0) chest/door, not owned, no weapon drawn -> ScriptCall CanOpenLock (vanilla refusal lines) -> key or
+      difficulty 0: just open; else roll break (FindStackIndex It_Lockpick + DeleteItems 1), lock opens anyway ->
+      status 1, Achievement::OnHandleLockpick, hero line via Script_Game sub_efef0 (+0xefef0, bytes checked;
+      bool(void*, bCString by value, variants): "OpenLock" 5 / "LockpickBroke" 3 / "LastLockpick" 1), effects
+      lockpick_end_01 / broke_01, optional ScriptCall AutoLoot. Vanilla minigame: a lockpick breaks only on a
+      wrong move, 50%, never on the first step; success costs nothing.
+      Owned locks are left to the vanilla minigame (theft broadcast sub_ed3e0 isn't exported) - ask the user
+- [x] Bug fixed: WM_APP ids 0x5601/0x5602 collided with menu.dll -> F10 opened nothing (our proc swallowed
+      WM_MENU_OPEN). Now 0x57xx; the per-mod id blocks are listed in shared/common.h
+- [x] User test (2026-10-12): RMB without skill -> hero's vanilla "who could teach me" line. Released 0.1 (README
+      RU/EN, zip). Installer has no description for it yet (kKnown in installer/mods.cpp, needs installer 1.3)
+- [ ] Friend's / user's test with skill + lockpicks: break chance, lines, doors, loot after, save/load
 
 ## Stage 5.11 — Pickpocket rework (user's idea 2026-10-12, own session, after 5.9)
 Rework stealing from NPCs: RMB while standing BEHIND a person = a pickpocket attempt, success by chance.
@@ -368,5 +397,5 @@ the game's menus. Needs saving per-save progress too (same question as the theft
 - [ ] Per-save storage of progress
 
 ## Stage 6 — Release
-- [ ] README with install/uninstall steps
+- [x] README with install/uninstall steps (every mod, RU + EN)
 - [ ] Test full playthrough segments with saves (back up saves first)
