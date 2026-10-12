@@ -34,6 +34,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
         FastPakReads=0
         SkipDxDiag=0
     (0 = выключено). Лог всех модов: Risen\bin\mods\RisenMods.log (после вылета и перезапуска - RisenMods.prev.log)
+    Баги и вылеты: создайте issue на https://github.com/LOTARLMEN/risen-mods/issues и приложите туда лог.
   - Антивирус может ругаться на version.dll: это обычное ложное срабатывание
     на моды, которые загружаются через подмену системной DLL.
   - Несовместим с другими модами, которые ставят СВОЙ version.dll в Risen\bin.
@@ -59,3 +60,6 @@ Requires Windows on drive C:.
 
 F10 in game: settings window of all my mods (bin\mods\menu.dll), tab "Fast Start".
 Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.
+
+Bugs and crashes: open an issue at https://github.com/LOTARLMEN/risen-mods/issues and attach Risen\bin\mods\RisenMods.log
+(after a crash and a restart: RisenMods.prev.log; F10 > "Log folder" opens the folder).

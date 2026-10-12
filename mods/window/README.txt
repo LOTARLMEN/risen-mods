@@ -28,6 +28,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
       HideSystemCursor=1   прятать курсор Windows
       ClipCursor=1         держать мышь внутри окна
   Лог всех модов: Risen\bin\mods\RisenMods.log (после вылета и перезапуска - RisenMods.prev.log)
+  Баги и вылеты: создайте issue на https://github.com/LOTARLMEN/risen-mods/issues и приложите туда лог.
 
 УДАЛЕНИЕ
   Удалить Risen\bin\mods\window.dll (и version.dll с папкой mods, если других модов нет).
@@ -44,3 +45,6 @@ the mouse inside the window. Set FullScreen="false" in data\ini\ConfigLocal.xml.
 Settings: bin\mods\window.ini (hot-reloaded).
 
 Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.
+
+Bugs and crashes: open an issue at https://github.com/LOTARLMEN/risen-mods/issues and attach Risen\bin\mods\RisenMods.log
+(after a crash and a restart: RisenMods.prev.log; F10 > "Log folder" opens the folder).

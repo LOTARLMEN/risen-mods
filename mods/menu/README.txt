@@ -32,6 +32,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - он сам найдё
       Show=1             значки в левом верхнем углу (0 = не показывать)
       Scale=1.0          их размер
   Лог всех модов: Risen\bin\mods\RisenMods.log (после вылета и перезапуска - RisenMods.prev.log)
+  Баги и вылеты: создайте issue на https://github.com/LOTARLMEN/risen-mods/issues и приложите туда лог.
 
 -------------------------------------------------------------------------------
 
@@ -50,3 +51,6 @@ Uninstall: delete Risen\bin\mods\menu.dll and menu.ini; the mods keep working.
 Settings:  F10 -> "Menu" page, or bin\mods\menu.ini ([Menu] Key, Language EN/RU; [Icons] Show, Scale).
 
 Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.
+
+Bugs and crashes: open an issue at https://github.com/LOTARLMEN/risen-mods/issues and attach Risen\bin\mods\RisenMods.log
+(after a crash and a restart: RisenMods.prev.log; F10 > "Log folder" opens the folder).

@@ -28,6 +28,10 @@ Every zip has a README (Russian + English) with details, settings and uninstall 
 
 Only the Steam 64-bit build (`RISEN, V1.0.0 (Rev. 2045)`) is tested. Windows must be on drive `C:`.
 
+**Bugs and crashes:** open an [issue](../../issues) and attach `Risen\bin\mods\RisenMods.log` - the one log of all
+mods (after a crash and a restart: `RisenMods.prev.log`). The "Log folder" button at the bottom of the F10 window
+opens its folder.
+
 ## Build
 
 Visual Studio 2022 Build Tools (MSVC x64). `build.bat` builds everything into `build\bin`;
@@ -52,6 +56,9 @@ its archives at runtime.
 Файлы игры и сохранения не меняются. Проще всего ставить установщиком `RisenModsInstaller.exe` из
 [Releases](../../releases): сам найдёт игру, поставит выбранные моды вместе с меню F10 и будет их обновлять.
 Там же архивы для ручной установки, в каждом README с инструкцией.
+
+**Баги и вылеты:** создайте [issue](../../issues) и приложите `Risen\bin\mods\RisenMods.log` - общий лог всех модов
+(после вылета и перезапуска игры - `RisenMods.prev.log`). Папку с ним открывает кнопка "Папка с логом" внизу окна F10.
 
 ## License
 

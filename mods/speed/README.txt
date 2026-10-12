@@ -64,6 +64,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
   - Игра не запускается или вылетает - удалите version.dll (см. УДАЛЕНИЕ), игра станет как была,
     и пришлите мне файл Risen\bin\mods\RisenMods.log (а если игра вылетела и вы её уже перезапустили -
     RisenMods.prev.log). Папку с ним открывает кнопка "Папка с логом" внизу окна F10.
+  Баги и вылеты: создайте issue на https://github.com/LOTARLMEN/risen-mods/issues и приложите туда лог.
   - Антивирус может ругаться на version.dll: это обычное ложное срабатывание на моды,
     которые загружаются через подмену системной DLL.
   - Несовместим с другими модами, которые ставят СВОЙ version.dll в Risen\bin.
@@ -94,3 +95,6 @@ Settings:  F10 in game, or Risen\bin\mods\speed.ini ([Speed] Enabled/Multiplier/
 Requires Windows on drive C:.
 
 Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.
+
+Bugs and crashes: open an issue at https://github.com/LOTARLMEN/risen-mods/issues and attach Risen\bin\mods\RisenMods.log
+(after a crash and a restart: RisenMods.prev.log; F10 > "Log folder" opens the folder).
