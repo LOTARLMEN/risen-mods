@@ -278,6 +278,27 @@ lockpick -> short message, nothing happens. Same theft rules as the game (pickin
       path (script / interaction) - prefer calling it so skill checks, XP and witnesses work as in vanilla
 - [ ] Key in F10 (AutoLoot page or own small mod), hint when focused on a pickable chest
 - [ ] Test: easy/hard lock, no lockpicks, owned chest near NPCs, save/load keeps the chest open
+- [ ] User will report how the vanilla lockpicking looks once they reach it in the game (minigame, skill, lockpicks,
+      "not enough skill" message) - start the stage after that
+
+## Stage 5.11 — Pickpocket rework (user's idea 2026-10-12, own session, after 5.9)
+Rework stealing from NPCs: RMB while standing BEHIND a person = a pickpocket attempt, success by chance.
+Chance depends on the pickpocket skill and on how often the player has stolen (lately / from this NPC?) - the more
+thefts, the lower the chance (NPCs get wary). Failure = caught, the game's own theft reaction (anger, fight, guards).
+- [ ] Recon: vanilla pickpocket (skill PickPocket = 28 in the skill table, dialog option / interaction in
+      Script_Game.dll, what it gives - one item or the NPC's whole inventory, how "caught" is triggered), "behind"
+      test (player position vs NPC facing), NPC states where it must not work (fight, sleeping?, talking)
+- [ ] Design with the user: chance formula (skill tiers, theft counter: global / per NPC, decay over game time),
+      what is stolen, how failure looks, whether the vanilla dialog option stays
+- [ ] Theft counter stored where? Saves can't get our data easily - a per-save side file or an existing game
+      variable (recon)
+- [ ] F10 page: key, base chance, penalty per theft; feedback on screen (success / caught)
+
+## Stage 5.12 — Own stats in the character screen (user's idea 2026-10-12, research first)
+Can mods add their own lines to the game's character / attributes screen (e.g. "Thefts: 12", pickpocket chance)?
+- [ ] Recon: how GUI2.dll builds the character screen (layout from gui2.pak? script-filled list?), whether a line
+      can be added through exported calls; fallback - our own ImGui panel drawn next to the game's screen while it
+      is open (menu.dll overlay, detect the screen is open)
 
 ## Stage 6 — Release
 - [ ] README with install/uninstall steps
