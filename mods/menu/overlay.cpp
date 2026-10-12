@@ -125,9 +125,11 @@ void DrawStatusRow(float screenScale)
 
     RegistryLock();
     for (const HubStatus* s : Statuses()) {
-        char text[32] = "";
-        if (!s->query(text, sizeof(text)))
+        char buf[32] = "";
+        if (!s->query(buf, sizeof(buf)))
             continue;
+        bool dim = buf[0] == HUB_STATUS_DIM;
+        const char* text = dim ? buf + 1 : buf;
         float iconW = (s->icon == HubIconHand ? 32.0f : 22.0f) * scale;
         ImVec2 textSize = text[0] ? g_font->CalcTextSizeA(fontSize, FLT_MAX, 0.0f, text) : ImVec2(0, 0);
         float boxW = pad * 2 + iconW + (text[0] ? pad + textSize.x : 0.0f);
@@ -136,13 +138,16 @@ void DrawStatusRow(float screenScale)
         dl->AddRect(ImVec2(x, y), ImVec2(x + boxW, y + boxH), IM_COL32(200, 170, 110, 120), 8.0f * scale, 0,
                     1.5f * scale);
         float iy = y + (boxH - iconH) * 0.5f;
+        float iconPhase = dim ? 0.25f : phase; // paused: no animation
         if (s->icon == HubIconHand)
-            DrawHand(dl, x + pad, iy, iconW, iconH, phase, 2.0f * scale);
+            DrawHand(dl, x + pad, iy, iconW, iconH, iconPhase, 2.0f * scale);
         else
-            DrawHourglass(dl, x + pad, iy, iconW, iconH, phase, 2.0f * scale);
+            DrawHourglass(dl, x + pad, iy, iconW, iconH, iconPhase, 2.0f * scale);
         if (text[0])
             dl->AddText(g_font, fontSize, ImVec2(x + pad * 2 + iconW, y + (boxH - textSize.y) * 0.5f),
                         IM_COL32(245, 235, 210, 255), text);
+        if (dim) // on, but paused: darken the whole box
+            dl->AddRectFilled(ImVec2(x, y), ImVec2(x + boxW, y + boxH), IM_COL32(10, 8, 5, 150), 8.0f * scale);
         x += boxW + 8.0f * scale;
     }
     RegistryUnlock();

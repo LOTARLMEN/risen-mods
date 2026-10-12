@@ -6,7 +6,7 @@ small proxy `version.dll`; no game files or saves are changed, uninstalling = de
 | Mod | What it does |
 |---|---|
 | **AutoLoot** | Right mouse button loots the focused body / open chest / item at once, no loot window or animation. `F` toggles automatic pickup of loose items (optionally bodies and unowned open chests) around you - by default only in front of you (camera cone), with per-category filters (gold, ammo, weapons, armour, potions, scrolls...). A small silent sparkle marks each looted spot. Owned items, quest items, locked chests and unconscious people are never touched. |
-| **Speed** | `Z` toggles a game speed-up (x3 by default, hourglass icon while on), like Gothic's Z-mod. |
+| **Speed** | `Z` toggles a game speed-up (x3 by default, hourglass icon while on), like Gothic's Z-mod. Optional: normal speed in dialogs, step keys to change the speed by a set step (x1 to x10). |
 | **No Limits** | Strength and dexterity teachers train up to the game's maximum (200) instead of their personal limit. Learning point costs unchanged. |
 | **Fast Start** | The game window appears in ~10 s instead of ~32 s (buffered `.pak` reads, skips the DxDiag video card probe). |
 | **Window** | Borderless window over the whole monitor, hides the double Windows cursor, instant Alt+Tab. |

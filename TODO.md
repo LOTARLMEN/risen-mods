@@ -28,6 +28,8 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - ReShade itself costs only ~0.3 s (+ ~1 s update check over WinINet: ReShade.ini CheckForUpdates=0)
 - [x] User test 2026-10-11: saves load, quicksave (F8)/quickload, new game, running around the start beach — all OK
 - [ ] Check loading screens (save load / level change) also got faster
+- [ ] Remaining ~3 s: D3DX shader compilation at startup (d3dx9_39) - cache the compiled shaders on disk
+      (user asked 2026-10-12 "can it be even faster?" - measure first with StartupTrace, then decide)
 - [ ] Disable ReShade update check (ask user)
 - [x] Separate mods for friends: `dist/RisenFastStart-1.1.zip`, `RisenWindow-1.0.zip`, `RisenSpeed-1.0.zip` (loader + one mod each)
 - [x] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
@@ -85,9 +87,10 @@ Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified i
   - [ ] Friend's feedback; panel not yet tested in exclusive fullscreen / without the Window mod
   - [ ] Later grows into the Stage 5.5 settings window for all mods
 - [x] `.ini`: `[Speed] Multiplier` (default 3.0), `ToggleKey` (default Z), `[Panel] Key/Language`
-- [ ] **Step keys (user: great idea, 2026-10-12)**: optional, off by default, own checkbox in F10 - "faster"/"slower"
+- [x] Speed 1.5 (user-tested 2026-10-12, "очаровательно"): **Step keys**, then changed on user's wish to StepUp/StepDown
+      sliders (default 0.5, x1..x10, never below x1) instead of a fixed ladder. Original plan:: optional, off by default, own checkbox in F10 - "faster"/"slower"
       keys step the multiplier (e.g. x1.5 / x2 / x3 / x5), indicator shows the current value; toggle key unchanged
-- [ ] Option "no speed-up in dialogs" (IsDialogCameraActive, already used by AutoLoot): user talked to an NPC sped up
+- [x] Option "no speed-up in dialogs" (NormalInDialogs; hourglass dimmed via HUB_STATUS_DIM text marker, menu.dll) (IsDialogCameraActive, already used by AutoLoot): user talked to an NPC sped up
       without problems, but is unsure it's safe for scripted dialogs/cutscenes
 - [ ] Test in exclusive fullscreen (Window mod off) - menu, indicator, Alt+Tab
 - [ ] Check side effects: physics at high speed, cutscenes, combat slomo (`gCCombatMoveMelee::SetSlomoTimeScale`)

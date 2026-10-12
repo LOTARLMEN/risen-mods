@@ -45,11 +45,14 @@ struct HubPage {
 
 enum HubIcon { HubIconHourglass, HubIconHand };
 
+#define HUB_STATUS_DIM '\x01'
+
 struct HubStatus {
     const char* id;
     int order; // left to right
     int icon;  // HubIcon
     // Game thread, every frame: true shows the icon; text (empty by default) is drawn next to it, e.g. "x3".
+    // Text starting with HUB_STATUS_DIM draws the icon dimmed and still (on, but paused); the marker isn't shown.
     bool (*query)(char* text, int size);
 };
 

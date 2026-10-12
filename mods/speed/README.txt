@@ -1,4 +1,4 @@
-Risen Speed 1.4
+Risen Speed 1.5
 ===============
 
 Ускорение игры по кнопке, как Z-mod в Готике. Только для 64-битного Risen 2023 года (Steam).
@@ -6,6 +6,11 @@ Risen Speed 1.4
 
   Z    включить / выключить ускорение (по умолчанию x3).
        Пока ускорение включено, в левом верхнем углу горят песочные часы и множитель (x3).
+  По желанию (галки в F10):
+       - обычная скорость в диалогах: на время разговора ускорение замирает (часы темнеют),
+         после диалога возвращается само;
+       - клавиши шага (по умолчанию NumPad + и -): быстрее / медленнее на заданный шаг
+         (по умолчанию 0.5), от x1 до x10. "Быстрее" заодно включает ускорение.
   F10  окно настроек всех моих модов прямо в игре (RU / EN - кнопка с глобусом). Пока оно открыто,
        игра стоит на паузе. Закрыть: Esc, F10 или кнопка.
 
@@ -36,6 +41,13 @@ Risen Speed 1.4
       Enabled=1          мод включён (0 = выключен)
       Multiplier=3.0     во сколько раз ускорять (максимум 10)
       ToggleKey=Z        кнопка: F1-F24, A-Z, 0-9, NUMPAD0-9, MOUSE3/4/5 и т.д.
+      NormalInDialogs=0  обычная скорость в диалогах (1 = да)
+      [Steps]
+      Enabled=0          клавиши шага (1 = включены)
+      FasterKey=NUMPAD+  быстрее
+      SlowerKey=NUMPAD-  медленнее
+      StepUp=0.5         шаг "быстрее"
+      StepDown=0.5       шаг "медленнее" (ниже x1 не опускается)
       [Indicator]
       Show=1             показывать песочные часы (0 = не показывать)
   Кнопка окна F10, язык и размер значков - в Risen\bin\mods\menu.ini (или вкладка "Меню").
@@ -52,16 +64,19 @@ Risen Speed 1.4
 
 -------------------------------------------------------------------------------
 
-Risen Speed 1.4 (English)
+Risen Speed 1.5 (English)
 
 Game speed toggle for Risen (64-bit 2023 re-release, Steam), like Gothic's Z-mod. No game files are changed.
   Z    toggles x3 speed; an hourglass + x3 indicator shows while it is on.
+  Optional (F10): normal speed in dialogs (hourglass dimmed meanwhile); step keys (NumPad + / -) change the
+  speed by a set step (default 0.5) between x1 and x10.
   F10  in-game settings window for all my mods (language RU/EN); the game is paused while it is open.
 
 Install:   close the game, extract into the Risen folder -> Risen\bin\version.dll (mod loader)
            + Risen\bin\mods\speed.dll + Risen\bin\mods\menu.dll (F10 menu, hourglass).
 Uninstall: close the game, delete Risen\bin\version.dll and the Risen\bin\mods folder. Nothing else is changed.
-Settings:  F10 in game, or Risen\bin\mods\speed.ini ([Speed] Enabled/Multiplier/ToggleKey,
+Settings:  F10 in game, or Risen\bin\mods\speed.ini ([Speed] Enabled/Multiplier/ToggleKey/NormalInDialogs,
+           [Steps] Enabled/FasterKey/SlowerKey/StepUp/StepDown,
            [Indicator] Show; hot-reloaded); window key, language, icon size: menu.ini.
 Requires Windows on drive C:.
 
