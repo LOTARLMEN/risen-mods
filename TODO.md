@@ -222,15 +222,17 @@ fonts, globe button) - menu.dll uses them too (also fixed: blue checkbox bg, ImG
 - [x] Hardening: /DEPENDENTLOADFLAG:0x800 (system DLLs only from System32 - no d3d9.dll/version.dll planted next to it)
 - [x] Discord overlay over the installer - gone (user, 2026-10-12)
 - [x] User test of the window, folder picker etc. - works (user, 2026-10-12)
-- [ ] **Menu versioned separately (user's design 2026-10-12)** - next session, together with the button below.
-      Mod zips stay as they are (version.dll + mod + menu.dll + README: one zip is enough for a manual install).
-      Release also gets RisenMenu-<ver>.zip (menu.dll + README, version from the mods/menu README title).
-      Installer 1.2: from a mod zip it writes the mod (+ loader) but menu.dll only when none is installed or the
-      installed one is older (version from the dll's "<Title> <version>" log string, like the mods); shows a
-      "Menu update" when RisenMenu-<ver>.zip is newer than the installed menu, even if no mod changed; menu is not
-      a checkbox; removed with the last mod (already). Bump INSTALLER_VERSION. Old installer 1.1 just lists "Menu"
-      as a mod. Download size stays the same (zip is fetched whole) - fine, ~650 KB per mod.
-      Test install/update/remove + "older menu in zip" on a fake game folder (--zips)
+- [ ] **Menu as its own release asset (user's design 2026-10-12, final)** - next session, with the button below.
+      Mod zips WITHOUT menu.dll: version.dll + mod dll + README (loader stays: without it a hand-installed mod
+      doesn't load; mods work without the menu via ini). Release gets RisenMenu-<ver>.zip (menu.dll + README; add
+      mods/menu/README.txt, its title gives the version; package.ps1 packs it and drops menu.dll from mod zips).
+      Installer 1.2: menu is not a checkbox - downloaded and installed with the first mod when missing, updated
+      whenever the release has a newer one (installed version from the dll's "<Title> <version>" log string), also
+      as its own "Menu update" line when no mod changed; removed with the last mod (already). Bump INSTALLER_VERSION.
+      Old installer 1.1 lists "Menu" as a normal mod (user ticks it) - acceptable, it offers the self-update.
+      Mod READMEs: manual install = mod zip (+ RisenMenu zip for the F10 window).
+      Test on a fake game folder (--zips): first mod -> menu added, second mod -> menu untouched, newer menu ->
+      updated, last mod removed -> menu removed
 - [ ] **"Find the game automatically" button** (user, 2026-10-12): after picking a wrong folder by hand, one click
       reruns the start-up detection (exe folder, Steam libraries) and switches back to the found Risen
 - [ ] Next release must carry the rebuilt menu.dll (blue checkbox fix, commit efafa2d) in every zip - the
