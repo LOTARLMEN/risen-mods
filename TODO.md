@@ -300,6 +300,73 @@ Can mods add their own lines to the game's character / attributes screen (e.g. "
       can be added through exported calls; fallback - our own ImGui panel drawn next to the game's screen while it
       is open (menu.dll overlay, detect the screen is open)
 
+## Stage 5.13 — AutoLoot / QuickLoot fixes (user's report 2026-10-12)
+- [x] Bug (0.7, user-tested OK): QuickLoot skips quest items (e.g. grain for a quest - every stalk needs a click). QuickLoot must take
+      everything the vanilla pickup can take, quest items included. Find where our filter drops them (quest flag /
+      item category check) and remove it for QuickLoot
+- [x] Bug (0.7, user-tested OK; cause: the chests were LOCKED - unlocking set PSLock status 1 and the next tick
+      emptied them under the loot window; fix: chests ever seen locked are never auto-looted): a chest AutoLoot skipped (looks like a quest chest) gets looted instantly by AutoLoot the moment the player
+      opens it by hand. Find why: opening changes its state (lock / quest flag / "already opened") so it passes our
+      filter. Expected: an opened-by-hand container that AutoLoot had skipped stays manual (or follows the same rule
+      as before opening) - confirm the wanted behavior with the user
+- [x] (0.7) Option in F10 (AutoLoot page): "Pick up quest items" (default off) - AutoLoot also takes quest items
+- [ ] (0.7: plunder asked up to 5 times while the body is empty + "ms after it was seen dead" in the log - read
+      the log after play) Investigate: AutoLoot sometimes reacts slowly (noticeable delay before it loots nearby items). Check scan
+      interval, the order targets are processed, busy/animation waits, per-tick limits; log timings to find the cause
+- [x] (0.7, user-tested OK: (b) done - Game.dll focus module (+0x83A2C0) converts eCLocString("FO_"+name); its
+      Engine import ??BeCLocString hooked, suffix only for return address +0x83A3E3 (GetFocusName hook did NOT work, (16-byte
+      prologue checked), " (Пусто)"/" (Empty)" by menu.ini language, [Empty] Mark/Text, F10 "Пустые"; (a) = the sparkle,
+      (c) left: RMB on empty shows the mark already) Feature: show that a chest was looted. (a) Feedback when AutoLoot empties a chest - short on-screen message /
+      marker at the chest. (b) Empty-container hint on focus: when the player looks at an empty chest, show "(Empty)" - user approved this exact look -
+      (next to the game's focus name or our overlay) so it doesn't have to be opened. (c) RMB QuickLoot on an empty
+      chest - message "Empty" instead of nothing. Recon: can we change the focus name text / add a suffix, or draw our
+      own label (menu.dll overlay, world->screen position); option in F10 to turn it off
+- [x] (0.7, needs game test) RMB on a locked chest (nobody's) when the player carries its key: unlock
+      (PSLock PropertyStatus = 1, fires OnLockStatusChanged) and loot at once
+- [x] (released with 0.7) NEXT SESSION (user's decision 2026-10-12): finish sparkle colours, then release AutoLoot 0.7 WITH them
+      (commit + push + release only after colours work; the rest of 0.7 below is user-tested and waits uncommitted)
+- [x] (0.7, user-tested: "очень красиво") DONE: deep copy of the sequence per colour; vtable hook of
+      gCEffectCommandSpawnEntity::OnStart marks our copy's spawn commands, Game.dll's Engine import
+      eCEntity::PatchWithTemplate then recolours the fresh entity's eCParticle_PS colour keys (brightness kept) and
+      its children. Palette (user's): quest gold, weapons/ammo red, armor light blue, magic violet, consumables
+      green, coins and rest own colour; chests/bodies = most important taken thing, flash x1.25.
+      Note: one-shot effects don't keep spawned entities (gCEffect +0x88 only for permanent ones).
+      Idea (user 2026-10-12): sparkle colour by item type - user prefers recolouring. Recon so far:
+      gCEffect::GetSpawnedEntities (Game.dll) -> spawned entities of a started effect (may appear a bit later than
+      StartEffect); Engine eCParticle_PS has Set/AccessFaceInFactor / FaceOutFactor (bCFloatAlphaColor, used by
+      CalcColorFactor - likely a tint), UseColorScale; colour-scale keys are not exported. Try: tint FaceIn/Out on
+      the spawned particle entities, test in game with EffectTestKey
+      Session 10 findings: Engine eCParticle_PS +0x290 UseColorScale, +0x4A8 eCColorScale {+8 items, +0x10 count,
+      +0x18 wrap}, item = {float t, r, g, b, a} 0x14 bytes (CalcColor / eCColorScale::CalcValue; FaceIn/OutFactor
+      only apply during fades). Particle PS type = 0x49 (eCEntity::GetPropertySet(type)). gCEffect +0x88 = spawned
+      entities (bTObjArray<eCEntityProxy>, proxy 16 bytes?). Probe result: spawned=0 at StartEffect and 60 ms
+      later; at 300 ms the gCEffect was already freed (garbage, game CRASHED) - never keep gCEffect* across frames.
+      Next idea: one deep copy of the sequence per colour (like the quiet copy), hook the spawn command's execute
+      (gCEffectCommandSpawnEntity vtable) and, when the command object belongs to one of our copies, tint the
+      colour scale of the entity it just spawned (and its children) (gold / weapons / potions / quest...). Ways: a different
+      existing eff_* per category (find ones with distinct colours, test visually), or recolour our deep copy of
+      the sequence (find the colour fields of the particle commands). F10: on/off, maybe colour per category
+- [ ] Test: quest grain with QuickLoot (hold RMB), quest chest skipped -> open by hand, option on/off, delay measured
+
+## Stage 5.14 — "Slash and Craft" mode: attributes grow from combat (user's idea 2026-10-12, big, own sessions)
+Inspired by the "New Balance" mod for Gothic 2 Night of the Raven. Part of character growth comes from fighting:
+the attribute tied to the weapon / attack type grows with the damage dealt by it. Example: deal 100 damage with
+strength weapons -> +1 Strength; the next point needs more (step grows by a percentage, not a flat +100).
+Mapping (to confirm in recon): strength weapons (swords, axes, hammers?) -> Strength; dexterity weapons / bows /
+crossbows -> Dexterity; magic attacks (spells, scrolls?) -> mana / magic attribute (Risen has no Intelligence -
+find what fits: mana, magic circle?).
+Depends on 5.12 (own stats on the character screen) - start only after we know how to show our own values in
+the game's menus. Needs saving per-save progress too (same question as the theft counter in 5.11).
+- [ ] Study New Balance's Slash and Craft rules (formula, step growth, caps, which weapons count, whether it
+      replaces or adds to learning points / trainers) - web research, write notes/
+- [ ] Recon: damage event in Risen (where hits are calculated, attacker, weapon type, spell vs melee vs ranged),
+      Risen's attributes and weapon skills (Strength, Dexterity, mana, sword/axe/staff/bow/crossbow skills -
+      maybe weapon skills fit better than attributes), how to raise an attribute from code properly
+- [ ] Design with the user: what grows from what, formula and step growth, caps, balance against trainers / LP,
+      whether killing weak monsters can be farmed (anti-farm rule?)
+- [ ] Progress bars / counters on the character screen (via 5.12), F10 page: on/off, multipliers
+- [ ] Per-save storage of progress
+
 ## Stage 6 — Release
 - [ ] README with install/uninstall steps
 - [ ] Test full playthrough segments with saves (back up saves first)

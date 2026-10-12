@@ -1,4 +1,4 @@
-Risen AutoLoot 0.6
+Risen AutoLoot 0.7
 ==================
 
 Проще всего - установщиком: RisenModsInstaller.exe со страницы
@@ -10,8 +10,9 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
 Игровые файлы не изменяются, сохранения тоже. Бета-версия: делайте сохранение перед тестом.
 
   ПКМ  навестись на мёртвое тело, открытый сундук или предмет на земле (как для "использовать")
-       и нажать правую кнопку мыши: всё сразу в инвентарь, без окна лута.
+       и нажать правую кнопку мыши: всё сразу в инвентарь, без окна лута, квестовые предметы тоже.
        С достанным оружием не работает (в бою ПКМ - обычное действие игры).
+       Запертый ничей сундук, ключ от которого у вас есть, ПКМ откроет ключом и сразу облутает.
   F    включить / выключить автоподбор: предметы на земле в радиусе 3 м подбираются сами,
        в том числе в боевой стойке. Пока автоподбор включён, в левом верхнем углу горит рука.
        По желанию (в настройках) он же обыскивает трупы и ничьи открытые сундуки рядом.
@@ -20,15 +21,21 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
        разное - галки в F10. Летящие стрелы (свои и чужие) не подбираются.
        Трупы обыскиваются и с оружием в руках, и без наведения на них: мясо, шкуры, когти зверей
        и монстров игра создаёт сама, как при обычном наведении.
+       Квестовые предметы - только если включено "Подбирать и квестовые предметы".
+       Сундук, который вы отперли сами (ключом, отмычкой), автоподбор не трогает - он ваш.
   F10  окно настроек всех моих модов прямо в игре (RU / EN - кнопка с глобусом). Пока оно открыто,
        игра стоит на паузе. Закрыть: Esc, F10 или кнопка.
   Что подобрано - видно слева в обычных игровых строчках "+ предмет".
-  Там, где что-то залутано, вспыхивает маленькая искра (эффект самой игры, без звука) -
-  размер, звук или отключение - в F10, раздел "Эффект".
+  Там, где что-то залутано, вспыхивает маленькая искра (эффект самой игры, без звука), её цвет
+  говорит, что взято: золотая - квестовый предмет, красная - оружие и стрелы, голубая - броня,
+  фиолетовая - свитки и руны, зелёная - зелья, еда и растения, бело-голубая - всё остальное.
+  У сундуков и тел искра чуть крупнее и цвета самой важной вещи из них.
+  Размер, звук или отключение - в F10, раздел "Эффект".
+  Пустой сундук или труп видно сразу при наведении: к имени добавляется "(Пусто)" (отключается в F10).
 
   Никогда не берётся: чужие вещи (у которых есть владелец и которые никто не выбросил - иначе это
-  кража, как считает сама игра), квестовые предметы,
-  запертые сундуки, люди без сознания (их обыск - кража). Это остаётся для обычного взаимодействия.
+  кража, как считает сама игра), запертые сундуки без ключа, люди без сознания (их обыск - кража),
+  квестовые объекты, которые игра пока не даёт взять (черепа и т.п.). Это остаётся для обычного взаимодействия.
   Лут идёт через собственный скрипт игры, так что квесты на сбор предметов засчитываются как обычно.
 
 УСТАНОВКА
@@ -70,6 +77,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
       Chests=0           опустошать ничьи открытые сундуки в радиусе (1 = да)
       Cone=1             только впереди (0 = весь круг вокруг)
       ConeAngle=120      ширина конуса, градусы
+      QuestItems=0       брать и квестовые предметы (1 = да)
       [Filter]           что подбирать с земли (1 = да, 0 = нет):
       Gold=1  Ammo=1  Weapons=1  Armor=1  Consumables=1  Magic=1  Written=1  Misc=1  Other=1
       [Effect]
@@ -78,6 +86,9 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
       Height=0           подъём над предметом, см
       Size=0.15          размер (1 = как в игре)
       Sound=0            звук эффекта (1 = да)
+      [Empty]
+      Mark=1             метка "(Пусто)" у пустых сундуков и трупов
+      Text=              свой текст метки (пусто = "(Пусто)" / "(Empty)" по языку меню)
 
 ЕСЛИ ЧТО-ТО НЕ ТАК
   - Игра не запускается или вылетает - удалите version.dll (см. УДАЛЕНИЕ), игра станет как была,
@@ -89,24 +100,29 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
 
 -------------------------------------------------------------------------------
 
-Risen AutoLoot 0.6 (English, beta)
+Risen AutoLoot 0.7 (English, beta)
 
 Easiest: RisenModsInstaller.exe from https://github.com/LOTARLMEN/risen-mods/releases/latest - it finds the
 game, installs the mods you pick with the F10 settings menu and keeps them updated. Manual install is optional.
 
 Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no animation. No game files are changed.
-  Right mouse  on the focused dead body / open chest / ground item: everything goes straight into the inventory
-               (not with the weapon drawn).
+  Right mouse  on the focused dead body / open chest / ground item: everything goes straight into the inventory,
+               quest items too (not with the weapon drawn). A locked chest nobody owns whose key you carry
+               is opened with the key and looted.
   F            toggles AutoLoot: loose items within 3 m are picked up automatically (hand icon while on);
                optionally also nearby dead bodies and open chests nobody owns. By default only in front of
                you (120° cone around the camera view, things at your feet always), with per-category filters
                (gold, ammo, weapons, armour, consumables, magic, written, misc). Arrows in flight are ignored.
                Bodies are searched with the weapon drawn too, without focusing them: animal and monster
-               plunder (meat, skins, claws) is created the way the game does on focus.
+               plunder (meat, skins, claws) is created the way the game does on focus. Quest items only
+               when "Also quest items" is on. A chest you unlocked yourself (key, lockpick) is left to you.
   F10          in-game settings window for all my mods (game paused while open).
-Never taken: owned items (theft), quest items, locked chests, unconscious people. Uses the game's own loot
-script, so quests count the items as usual. A small silent sparkle (the game's own effect) marks each looted
-spot; size / sound / off in F10.
+Never taken: owned items (theft), locked chests, unconscious people, quest objects the game won't let you take
+yet (skulls and the like). Uses the game's own loot script, so quests count the items as usual.
+A small silent sparkle (the game's own effect) marks each looted spot, coloured by what was taken: gold = quest
+item, red = weapons and ammo, light blue = armour, violet = scrolls and runes, green = potions, food and plants,
+white-blue = anything else (chests and bodies: a bigger flash in the colour of the most important thing taken);
+size / sound / off in F10. Empty chests and bodies show "(Empty)" next to their name on focus.
 
 Install:   close the game, extract into the Risen folder -> Risen\bin\version.dll (mod loader)
            + Risen\bin\mods\autoloot.dll.
@@ -114,8 +130,9 @@ Install:   close the game, extract into the Risen folder -> Risen\bin\version.dl
            extracted the same way -> Risen\bin\mods\menu.dll.
 Uninstall: close the game, delete Risen\bin\version.dll and the Risen\bin\mods folder. Nothing else is changed.
 Settings:  F10 in game, or Risen\bin\mods\autoloot.ini ([QuickLoot] Key/GroundItems/Chests,
-           [AutoLoot] Active/ToggleKey/Radius/Bodies/Chests/Cone/ConeAngle, [Filter] Gold/Ammo/Weapons/
-           Armor/Consumables/Magic/Written/Misc/Other, [Effect] Enabled/Name/Height/Size/Sound).
+           [AutoLoot] Active/ToggleKey/Radius/Bodies/Chests/Cone/ConeAngle/QuestItems, [Filter] Gold/Ammo/
+           Weapons/Armor/Consumables/Magic/Written/Misc/Other, [Effect] Enabled/Name/Height/Size/Sound,
+           [Empty] Mark/Text).
 Requires Windows on drive C:.
 
 Uses Dear ImGui (https://github.com/ocornut/imgui), MIT license, Copyright (c) 2014-2026 Omar Cornut.

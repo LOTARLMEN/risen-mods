@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "common.h"
+#include "iat_patch.h"
 
 GameApi g_game;
 
@@ -72,6 +73,11 @@ bool GameApiInit()
     Resolve(script, "Script", g.cameraPose, "?GetCameraPose@Entity@@SA?AVbCMatrix@@XZ");
     Resolve(script, "Script", g.lockValid, "?IsValid@PSLock@@QEBA_NXZ");
     Resolve(script, "Script", g.lockStatus, "??BPropertyStatus@PSLock@@QEBA?BW4gELockStatus@@XZ");
+    Resolve(script, "Script", g.lockSetStatus, "??4PropertyStatus@PSLock@@QEAAAEAV01@AEBW4gELockStatus@@@Z");
+    Resolve(script, "Script", g.lockKey, "?GetKey@PSLock@@QEBA?AVTemplate@@XZ");
+    Resolve(script, "Script", g.invHasItems, "?HasItems@PSInventory@@QEBA_NAEBVTemplate@@H@Z");
+    Resolve(script, "Script", g.templateValid, "?IsValid@Template@@QEBA_NXZ");
+    Resolve(script, "Script", g.templateFree, "??1Template@@QEAA@XZ");
     Resolve(script, "Script", g.combatValid, "?IsValid@PSCombatSystem@@QEBA_NXZ");
     Resolve(script, "Script", g.combatMode, "?GetCombatMode@PSCombatSystem@@QEBA?AW4gECombatMode@@XZ");
     Resolve(script, "Script", g.gui2, "gui2");
@@ -173,6 +179,37 @@ int64_t LootContainer(Entity& receiver, Entity& container)
     return moved;
 }
 
+int64_t LootQuestStacks(Entity& receiver, Entity& container)
+{
+    int64_t moved = 0;
+    for (int i = g_game.invStackCount(&container) - 1; i >= 0; --i) {
+        if (g_game.invStackType(&container, i) != 0) // equipped and the like
+            continue;
+        Entity tpl;
+        g_game.invTemplateItem(&container, &tpl, i);
+        if (!tpl || !g_game.itemValid(&tpl) || !g_game.itemMission(&tpl))
+            continue;
+        int amount = g_game.invAmount(&container, i);
+        g_game.printItemLog(g_game.gui2, &tpl, amount);
+        if (g_game.invTransfer(&container, i, amount, &receiver))
+            ++moved;
+    }
+    return moved;
+}
+
+bool UnlockWithKey(Entity& player, Entity& chest)
+{
+    alignas(16) char key[64] = {}; // Template, size unknown: room to spare
+    g_game.lockKey(&chest, key);
+    bool has = g_game.templateValid(key) && g_game.invHasItems(&player, key, 1);
+    g_game.templateFree(key);
+    if (!has)
+        return false;
+    int open = 1;
+    g_game.lockSetStatus(&chest, &open);
+    return g_game.lockStatus(&chest) == 1;
+}
+
 Vec3 EntityPosition(const Entity& e)
 {
     Vec3 v{};
@@ -210,11 +247,16 @@ bool EffectExists(const char* name)
     return ok;
 }
 
-// Quiet copies of effects -------------------------------------------------------------------------------
+// Copies of effects (quiet / tinted) ------------------------------------------------------------------------
 // gCEffectSystem keeps the effect definitions (gCEffectCommandSequence2) in a hash map by lower-case name.
-// For a quiet effect we deep-copy the definition once, drop its PlaySound commands, and while starting the effect
-// swap the copy into the map node for the duration of the call (the started effect keeps a reference to the
-// sequence it was started from). The original, used by the game's own spells, is never changed.
+// For a quiet or tinted effect we deep-copy the definition once, drop its PlaySound commands if asked, and while
+// starting the effect swap the copy into the map node for the duration of the call (the started effect keeps a
+// reference to the sequence it was started from). The original, used by the game's own spells, is never changed.
+//
+// Tint: the copy's gCEffectCommandSpawnEntity commands are remembered. Their OnStart (vtable slot, shared by all
+// effects) is wrapped: while one of ours runs, the entity it spawns (gCEffectCommandEntity::Spawn ->
+// eCEntity::PatchWithTemplate, Game.dll's Engine import) gets its particle colour scale recoloured after it was
+// copied from the template. The template itself is not touched.
 namespace {
 
 struct EffectInternals {
@@ -227,18 +269,129 @@ struct EffectInternals {
     void* (*item)(const void* seq, int index);
     bool (*removeItem)(void* seq, int index);
     const void* playSoundVtable;
+    void** spawnVtable;
+    void* spawnOnStart;
     Effect* (*startEffectMatrix)(Effect* ret, const void* name, const float* matrix);
+    bool (*patchWithTemplate)(void* self, const void* tpl, bool);
+    void* (*propertySet)(const void* entity, int type);
+    void* (*firstChild)(void* node);
+    void* (*nextNeighbour)(void* node);
 };
 
 EffectInternals g_fx;
 int g_fxState; // 0 not tried, 1 ok, -1 missing
+bool g_tintHooks;
+
+// eCParticle_PS (Engine.dll, Rev. 2045): property set type, UseColorScale, eCColorScale {items, count}.
+constexpr int kParticlePs = 0x49;
+constexpr size_t kUseColorScale = 0x290, kColorScaleItems = 0x4A8 + 8, kColorScaleCount = 0x4A8 + 0x10;
+struct ColorKey {
+    float t, r, g, b, a;
+};
+
+struct EffectCopy {
+    char name[96];
+    void* original;
+    void* copy; // nullptr: could not be made, use the original
+    bool quiet;
+    float tint[3]; // 0 0 0: own colours
+    void* spawns[8]; // the copy's spawn commands (tinted copies only)
+};
+
+EffectCopy g_copies[16];
+const EffectCopy* g_spawning; // set while one of our spawn commands runs (game thread)
+
+void TintEntity(void* entity, const float* tint, int depth, int* tinted)
+{
+    if (!entity || depth > 8)
+        return;
+    if (char* ps = static_cast<char*>(g_fx.propertySet(entity, kParticlePs))) {
+        auto* keys = *reinterpret_cast<ColorKey**>(ps + kColorScaleItems);
+        int count = *reinterpret_cast<int*>(ps + kColorScaleCount);
+        static int logged;
+        if (logged < 6) {
+            ++logged;
+            Log("effect tint: particles use=%d keys=%d first=(%.2f %.2f %.2f %.2f)", ps[kUseColorScale], count,
+                count > 0 && keys ? keys[0].r : -1.0f, count > 0 && keys ? keys[0].g : -1.0f,
+                count > 0 && keys ? keys[0].b : -1.0f, count > 0 && keys ? keys[0].a : -1.0f);
+        }
+        for (int i = 0; keys && i < count && i < 64; ++i) {
+            ColorKey& k = keys[i];
+            float v = k.r > k.g ? (k.r > k.b ? k.r : k.b) : (k.g > k.b ? k.g : k.b); // brightness
+            k.r = tint[0] * v;
+            k.g = tint[1] * v;
+            k.b = tint[2] * v;
+        }
+        if (keys && count > 0)
+            ++*tinted;
+    }
+    for (void* child = g_fx.firstChild(entity); child; child = g_fx.nextNeighbour(child))
+        TintEntity(child, tint, depth + 1, tinted);
+}
+
+bool HookedPatchWithTemplate(void* self, const void* tpl, bool flag)
+{
+    bool ok = g_fx.patchWithTemplate(self, tpl, flag);
+    if (ok && g_spawning) {
+        int tinted = 0;
+        TintEntity(self, g_spawning->tint, 0, &tinted);
+        static int logged;
+        if (logged < 6 || !tinted) {
+            ++logged;
+            Log("effect tint: %s (%.2f %.2f %.2f) -> %d particle sets", g_spawning->name, g_spawning->tint[0],
+                g_spawning->tint[1], g_spawning->tint[2], tinted);
+        }
+    }
+    return ok;
+}
+
+using OnStartFn = void (*)(const void* self, void* instance);
+
+void HookedSpawnOnStart(const void* self, void* instance)
+{
+    const EffectCopy* mine = nullptr;
+    for (const EffectCopy& c : g_copies)
+        for (void* s : c.spawns)
+            if (s && s == self)
+                mine = &c;
+    const EffectCopy* outer = g_spawning;
+    g_spawning = mine;
+    reinterpret_cast<OnStartFn>(g_fx.spawnOnStart)(self, instance);
+    g_spawning = outer;
+}
+
+// Engine.dll's PatchWithTemplate import in Game.dll + the OnStart slot of gCEffectCommandSpawnEntity's vtable.
+bool InstallTintHooks()
+{
+    HMODULE game = GetModuleHandleA("Game.dll");
+    void** vt = g_fx.spawnVtable;
+    int slot = -1;
+    for (int i = 0; i < 64 && slot < 0; ++i)
+        if (vt[i] == g_fx.spawnOnStart)
+            slot = i;
+    if (slot < 0) {
+        Log("effect: spawn OnStart not in the vtable, no colours");
+        return false;
+    }
+    if (!PatchImport(game, "Engine.dll", "?PatchWithTemplate@eCEntity@@QEAA_NAEBVeCTemplateEntity@@_N@Z",
+                     reinterpret_cast<void*>(&HookedPatchWithTemplate))) {
+        Log("effect: PatchWithTemplate import not found, no colours");
+        return false;
+    }
+    DWORD old;
+    VirtualProtect(&vt[slot], sizeof(void*), PAGE_READWRITE, &old);
+    vt[slot] = reinterpret_cast<void*>(&HookedSpawnOnStart);
+    VirtualProtect(&vt[slot], sizeof(void*), old, &old);
+    Log("effect: colour hooks installed (OnStart slot %d)", slot);
+    return true;
+}
 
 bool FxInit()
 {
     if (g_fxState)
         return g_fxState > 0;
     HMODULE game = GetModuleHandleA("Game.dll"), script = GetModuleHandleA("Script.dll");
-    HMODULE base = GetModuleHandleA("SharedBase.dll");
+    HMODULE base = GetModuleHandleA("SharedBase.dll"), engine = GetModuleHandleA("Engine.dll");
     g_missing = false;
     EffectInternals& f = g_fx;
     Resolve(game, "Game", f.moduleInstance, "?GetInstance@gCEffectModule@@SAAEAV1@XZ");
@@ -254,9 +407,21 @@ bool FxInit()
     Resolve(script, "Script", f.startEffectMatrix,
             "?StartEffect@EffectSystem@@SA?AVEffect@@AEBVbCString@@AEBVbCMatrix@@@Z");
     g_fxState = g_missing ? -1 : 1;
-    if (g_fxState < 0)
+    if (g_fxState < 0) {
         Log("effect: quiet / scaled effects unavailable, plain effects only");
-    return g_fxState > 0;
+        return false;
+    }
+    // Colours are optional: without them effects keep their own.
+    g_missing = false;
+    Resolve(game, "Game", f.spawnVtable, "??_7gCEffectCommandSpawnEntity@@6B@");
+    Resolve(game, "Game", f.spawnOnStart, "?OnStart@gCEffectCommandSpawnEntity@@UEBAXAEAUgSEffectCommandInstance@@@Z");
+    Resolve(engine, "Engine", f.patchWithTemplate, "?PatchWithTemplate@eCEntity@@QEAA_NAEBVeCTemplateEntity@@_N@Z");
+    Resolve(engine, "Engine", f.propertySet,
+            "?GetPropertySet@eCEntity@@QEBAPEBVeCEntityPropertySet@@W4eEPropertySetType@@@Z");
+    Resolve(engine, "Engine", f.firstChild, "?GetFirstChild@eCNode@@QEAAPEAV1@XZ");
+    Resolve(engine, "Engine", f.nextNeighbour, "?GetNextNeighbour@eCNode@@QEAAPEAV1@XZ");
+    g_tintHooks = !g_missing && InstallTintHooks();
+    return true;
 }
 
 // Map node: { bCString key; gCEffectCommandSequence2* value; ...; node* next at +0x18 }
@@ -277,69 +442,79 @@ void** FindSequenceSlot(const char* name)
     return nullptr;
 }
 
-struct QuietCopy {
-    char name[96];
-    void* original;
-    void* copy; // nullptr: could not be made, use the original
-};
-
-QuietCopy g_quiet[4];
-
-// The quiet copy of the named effect, made on first use. nullptr when there is nothing to swap.
-QuietCopy* Quiet(const char* name, void** slot)
+bool SameTint(const float* a, const float* b)
 {
-    for (QuietCopy& q : g_quiet)
-        if (q.name[0] && _stricmp(q.name, name) == 0 && q.original == *slot)
-            return q.copy ? &q : nullptr;
-    QuietCopy* q = &g_quiet[0];
-    for (QuietCopy& c : g_quiet)
-        if (!c.name[0]) {
-            q = &c;
+    return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+}
+
+// The copy of the named effect for these settings, made on first use. nullptr when there is nothing to swap.
+EffectCopy* Copy(const char* name, void** slot, bool quiet, const float* tint)
+{
+    for (EffectCopy& c : g_copies)
+        if (c.name[0] && _stricmp(c.name, name) == 0 && c.original == *slot && c.quiet == quiet &&
+            SameTint(c.tint, tint))
+            return c.copy ? &c : nullptr;
+    EffectCopy* c = &g_copies[0];
+    for (EffectCopy& free : g_copies)
+        if (!free.name[0]) {
+            c = &free;
             break;
         }
-    snprintf(q->name, sizeof(q->name), "%s", name);
-    q->original = *slot;
-    q->copy = g_fx.sequenceCreate(); // kept forever (one reference is ours)
-    if (!q->copy) {
+    *c = EffectCopy{}; // all taken (the ini was edited many times): the first is reused, its old copy leaked
+    snprintf(c->name, sizeof(c->name), "%s", name);
+    c->original = *slot;
+    c->quiet = quiet;
+    memcpy(c->tint, tint, sizeof(c->tint));
+    c->copy = g_fx.sequenceCreate(); // kept forever (one reference is ours)
+    if (!c->copy) {
         Log("effect: could not copy %s", name);
         return nullptr;
     }
-    g_fx.copyFrom(q->copy, q->original, false);
-    int n = g_fx.itemCount(q->copy), removed = 0, shared = 0;
+    g_fx.copyFrom(c->copy, c->original, false);
+    int n = g_fx.itemCount(c->copy), removed = 0, shared = 0, spawns = 0;
     for (int i = 0; i < n; ++i)
-        if (g_fx.item(q->copy, i) == g_fx.item(q->original, i))
+        if (g_fx.item(c->copy, i) == g_fx.item(c->original, i))
             ++shared;
     if (shared) { // a shallow copy: removing commands would touch the original's objects
-        Log("effect: copy of %s shares %d commands, keeping the sound", name, shared);
-        q->copy = nullptr;
+        Log("effect: copy of %s shares %d commands, using the original", name, shared);
+        c->copy = nullptr;
         return nullptr;
     }
+    bool tinted = tint[0] || tint[1] || tint[2];
     for (int i = n - 1; i >= 0; --i) {
-        void* cmd = g_fx.item(q->copy, i);
-        if (cmd && *static_cast<void**>(cmd) == g_fx.playSoundVtable && g_fx.removeItem(q->copy, i))
+        void* cmd = g_fx.item(c->copy, i);
+        if (!cmd)
+            continue;
+        void* vt = *static_cast<void**>(cmd);
+        if (quiet && vt == g_fx.playSoundVtable && g_fx.removeItem(c->copy, i))
             ++removed;
+        else if (tinted && vt == g_fx.spawnVtable && spawns < 8)
+            c->spawns[spawns++] = cmd;
     }
-    Log("effect: quiet copy of %s: %d commands, %d sounds removed", name, n, removed);
-    return q;
+    Log("effect: copy of %s: %d commands, %d sounds removed, %d spawn commands, tint (%.2f %.2f %.2f)", name, n,
+        removed, spawns, tint[0], tint[1], tint[2]);
+    return c;
 }
 
 } // namespace
 
-bool PlayEffect(const char* name, const Vec3& position, float scale, bool quiet)
+bool PlayEffect(const char* name, const Vec3& position, float scale, bool quiet, const float* tint)
 {
+    static const float kOwn[3] = {};
     alignas(8) char str[16] = {};
     g_game.stringNew(str, name);
     Effect fx;
     if (FxInit()) {
         // bCMatrix: 4x4 rows, translation in the last row
         float m[16] = {scale, 0, 0, 0, 0, scale, 0, 0, 0, 0, scale, 0, position.x, position.y, position.z, 1};
-        void** slot = quiet ? FindSequenceSlot(name) : nullptr;
-        QuietCopy* q = slot ? Quiet(name, slot) : nullptr;
-        if (q)
-            *slot = q->copy;
+        bool tinted = g_tintHooks && tint && (tint[0] || tint[1] || tint[2]);
+        void** slot = quiet || tinted ? FindSequenceSlot(name) : nullptr;
+        EffectCopy* c = slot ? Copy(name, slot, quiet, tinted ? tint : kOwn) : nullptr;
+        if (c)
+            *slot = c->copy;
         g_fx.startEffectMatrix(&fx, str, m);
-        if (q)
-            *slot = q->original;
+        if (c)
+            *slot = c->original;
     } else {
         g_game.startEffect(&fx, str, &position);
     }

@@ -11,6 +11,7 @@
 
 #include "common.h"
 #include "game.h"
+#include "focus_name.h"
 #include "hub_client.h"
 
 static const char kDefaultIni[] =
@@ -22,7 +23,7 @@ static const char kDefaultIni[] =
     "\r\n"
     "[QuickLoot]\r\n"
     "; The key loots what you are looking at (the game's focus) at once, without the loot window:\r\n"
-    "; dead bodies, open chests that belong to nobody, loose items. Not while the weapon is drawn.\r\n"
+    "; dead bodies, open chests that belong to nobody, loose items, quest items too. Not while the weapon is drawn.\r\n"
     "Enabled=1\r\n"
     "Key=MOUSE2\r\n"
     "; Also items on the ground / chests (0 = only dead bodies)\r\n"
@@ -43,6 +44,8 @@ static const char kDefaultIni[] =
     "; are always taken). 0 = the whole circle around you\r\n"
     "Cone=1\r\n"
     "ConeAngle=120\r\n"
+    "; Also quest items (on the ground, in bodies and chests). Chests you unlocked yourself are always left to you.\r\n"
+    "QuestItems=0\r\n"
     "\r\n"
     "[Filter]\r\n"
     "; What AutoLoot picks up from the ground (QuickLoot always takes what you look at; bodies and chests are\r\n"
@@ -68,6 +71,12 @@ static const char kDefaultIni[] =
     "Size=0.15\r\n"
     "Sound=0\r\n"
     "\r\n"
+    "[Empty]\r\n"
+    "; Adds a mark to the name of an empty chest or dead body you look at, so it needn't be opened\r\n"
+    "Mark=1\r\n"
+    "; The mark; empty = (Пусто) / (Empty) by the menu's language\r\n"
+    "Text=\r\n"
+    "\r\n"
     "[Debug]\r\n"
     "; Writes everything around the player to autoloot.log\r\n"
     "DumpKey=\r\n"
@@ -88,6 +97,7 @@ struct Config {
     bool autoChests = false;
     bool autoCone = true;
     float coneAngle = 120.0f;
+    bool autoQuest = false;
     bool takeGold = true, takeAmmo = true, takeWeapons = true, takeArmor = true, takeConsumables = true,
          takeMagic = true, takeWritten = true, takeMisc = true, takeOther = true;
     bool effect = true;
@@ -98,6 +108,8 @@ struct Config {
     int dumpKey = 0;
     float dumpRadius = 1500.0f;
     int effectTestKey = 0;
+    bool emptyMark = true;
+    wchar_t emptyText[48] = {};
 };
 
 static Config g_config;
@@ -131,6 +143,7 @@ static void ConfigLoad(bool first)
     c.autoChests = IniInt("AutoLoot", "Chests", 0) != 0;
     c.autoCone = IniInt("AutoLoot", "Cone", 1) != 0;
     c.coneAngle = Clamp(IniFloat("AutoLoot", "ConeAngle", 120.0f), 30.0f, 360.0f);
+    c.autoQuest = IniInt("AutoLoot", "QuestItems", 0) != 0;
     c.takeGold = IniInt("Filter", "Gold", 1) != 0;
     c.takeAmmo = IniInt("Filter", "Ammo", 1) != 0;
     c.takeWeapons = IniInt("Filter", "Weapons", 1) != 0;
@@ -146,16 +159,29 @@ static void ConfigLoad(bool first)
     c.effectSize = Clamp(IniFloat("Effect", "Size", 0.15f), 0.1f, 3.0f);
     c.effectSound = IniInt("Effect", "Sound", 0) != 0;
     c.effectTestKey = IniKey("Debug", "EffectTestKey", 0);
+    c.emptyMark = IniInt("Empty", "Mark", 1) != 0;
+    char text[96];
+    IniString("Empty", "Text", "", text, sizeof(text));
+    if (!text[0]) { // the menu's language, from menu.ini next to ours
+        char menuIni[MAX_PATH], lang[8];
+        snprintf(menuIni, sizeof(menuIni), "%s", IniPath());
+        if (char* slash = strrchr(menuIni, '\\'))
+            snprintf(slash + 1, sizeof(menuIni) - (slash + 1 - menuIni), "menu.ini");
+        GetPrivateProfileStringA("Menu", "Language", "EN", lang, sizeof(lang), menuIni);
+        snprintf(text, sizeof(text), "%s", _stricmp(lang, "RU") == 0 ? "(Пусто)" : "(Empty)");
+    }
+    c.emptyText[0] = L' ';
+    MultiByteToWideChar(CP_UTF8, 0, text, -1, c.emptyText + 1, 47);
     c.dumpKey = IniKey("Debug", "DumpKey", 0);
     c.dumpRadius = Clamp(IniFloat("Debug", "DumpRadius", 1500.0f), 100.0f, 100000.0f);
     g_config = c;
     if (first)
         g_autoActive = c.autoActive;
     Log("config: quick=%d key=0x%02X ground=%d chests=%d | auto=%d active=%d key=0x%02X r=%.0f bodies=%d chests=%d | "
-        "cone=%d %.0f | take gold=%d ammo=%d weap=%d armor=%d cons=%d magic=%d written=%d misc=%d other=%d | "
+        "cone=%d %.0f quest=%d | take gold=%d ammo=%d weap=%d armor=%d cons=%d magic=%d written=%d misc=%d other=%d | "
         "effect=%d %s h=%.0f size=%.2f sound=%d | dump=0x%02X r=%.0f fxtest=0x%02X",
         c.quickLoot, c.quickKey, c.quickGround, c.quickChests, c.autoLoot, g_autoActive, c.autoKey, c.autoRadius,
-        c.autoBodies, c.autoChests, c.autoCone, c.coneAngle, c.takeGold, c.takeAmmo, c.takeWeapons, c.takeArmor,
+        c.autoBodies, c.autoChests, c.autoCone, c.coneAngle, c.autoQuest, c.takeGold, c.takeAmmo, c.takeWeapons, c.takeArmor,
         c.takeConsumables, c.takeMagic, c.takeWritten, c.takeMisc, c.takeOther, c.effect, c.effectName, c.effectHeight, c.effectSize, c.effectSound, c.dumpKey, c.dumpRadius, c.effectTestKey);
 }
 
@@ -212,12 +238,39 @@ static bool WouldBeTheft(const Entity& e)
     return HasOwner(e) && !(g_game.itemValid(&e) && g_game.itemDropped(&e));
 }
 
-// Loose item that may be taken: not theft, not a quest item, not hanging in a slot (torches in holders etc.),
-// not an arrow in flight.
+// Loose item that may be taken: not theft, not hanging in a slot (torches in holders etc.), not an arrow in flight.
+// Quest items are checked separately (QuestItemOk).
 static bool IsFreeGroundItem(Entity e)
 {
-    return g_game.isItem(&e) && g_game.itemValid(&e) && !g_game.itemMission(&e) && !g_game.attachedToSlot(&e) &&
-           !IsFlying(e) && !WouldBeTheft(e);
+    return g_game.isItem(&e) && g_game.itemValid(&e) && !g_game.attachedToSlot(&e) && !IsFlying(e) &&
+           !WouldBeTheft(e);
+}
+
+// A quest item is taken only when the game says the player may take it now (special quest objects like the skulls
+// have their own CanInteract scripts that decide this).
+static bool QuestItemOk(Entity& player, Entity e)
+{
+    if (!g_game.itemMission(&e))
+        return true;
+    Entity other = e;
+    if (g_game.canInteractWith(&player, &other))
+        return true;
+    char name[96];
+    Log("quest item %s: the game does not let it be taken now", EntityName(e, name, sizeof(name)));
+    return false;
+}
+
+// Why QuickLoot did not take the focus, for the log.
+static const char* WhyNot(const Entity& e, char* buf, size_t size)
+{
+    bool item = g_game.isItem(&e), ps = item && g_game.itemValid(&e), inv = g_game.invValid(&e);
+    bool lock = g_game.lockValid(&e), npc = g_game.isNpc(&e);
+    snprintf(buf, size, "item=%d itemPS=%d mission=%d slot=%d flying=%d owner=%d dropped=%d npc=%d dead=%d inv=%d "
+             "stacks=%d lock=%d status=%d", item, ps, ps && g_game.itemMission(&e),
+             item && g_game.attachedToSlot(const_cast<Entity*>(&e)), IsFlying(e), HasOwner(e),
+             ps && g_game.itemDropped(&e), npc, npc && g_game.isDead(&e), inv, inv ? g_game.invStackCount(&e) : -1,
+             lock, lock ? g_game.lockStatus(&e) : -1);
+    return buf;
 }
 
 // Within the view cone (or the cone is off). Things right at the player's feet always count.
@@ -240,6 +293,22 @@ static bool NameStarts(const char* name, const char* prefix)
     return _strnicmp(name, prefix, strlen(prefix)) == 0;
 }
 
+// Sparkle colours by what was picked up (RGB 0..1; black = the effect's own colours). Ordered by importance: a
+// chest or body sparkles in the colour of the most important thing taken from it.
+enum SparkleKind { SparkleOwn, SparkleConsumable, SparkleMagic, SparkleArmor, SparkleWeapon, SparkleQuest, SparkleKinds };
+static const float kSparkleColors[SparkleKinds][3] = {
+    {0, 0, 0},          // own: gold coins, written, misc, everything else
+    {0.3f, 1.0f, 0.3f}, // potions, food, plants
+    {0.8f, 0.3f, 1.0f}, // scrolls, runes
+    {0.5f, 0.7f, 1.0f}, // armor
+    {1.0f, 0.3f, 0.2f}, // weapons, ammo
+    {1.0f, 0.8f, 0.2f}, // quest items
+};
+static const char* const kSparkleNames[SparkleKinds] = {"own", "consumable", "magic", "armor", "weapon", "quest"};
+constexpr float kContainerSparkleSize = 1.25f; // chests and bodies: a bigger flash
+
+static SparkleKind ItemSparkle(const Entity& e);
+
 // The [Filter] switches, for radius pickup only.
 static bool Wanted(const Entity& e)
 {
@@ -258,6 +327,42 @@ static bool Wanted(const Entity& e)
     case ItemCatMisc: return g_config.takeMisc;
     default: return g_config.takeOther;
     }
+}
+
+static SparkleKind ItemSparkle(const Entity& e)
+{
+    char name[96];
+    EntityName(e, name, sizeof(name));
+    if (g_game.itemMission(&e))
+        return SparkleQuest;
+    if (NameStarts(name, "It_Arrow") || NameStarts(name, "It_Bolt"))
+        return SparkleWeapon;
+    switch (g_game.itemCategory(&e)) {
+    case ItemCatWeapon: return SparkleWeapon;
+    case ItemCatArmor: return SparkleArmor;
+    case ItemCatConsumable: return SparkleConsumable;
+    case ItemCatMagic: return SparkleMagic;
+    default: return SparkleOwn;
+    }
+}
+
+// The most important of what the loot will take from a container (call before looting it).
+static SparkleKind ContainerSparkle(Entity& c, bool quest)
+{
+    SparkleKind best = SparkleOwn;
+    for (int i = 0, n = g_game.invStackCount(&c); i < n && best < SparkleQuest; ++i) {
+        Entity tpl;
+        g_game.invTemplateItem(&c, &tpl, i);
+        if (!tpl || !g_game.itemValid(&tpl))
+            continue;
+        bool mission = g_game.invStackType(&c, i) == 0 && g_game.itemMission(&tpl);
+        if (mission ? !quest : ScriptCall("InvFilter_Loot", c.e, nullptr, i) <= 0)
+            continue;
+        SparkleKind kind = ItemSparkle(tpl);
+        if (kind > best)
+            best = kind;
+    }
+    return best;
 }
 
 static void Dump()
@@ -306,28 +411,21 @@ static void Dump()
     }
 }
 
-// Debug: plays the candidates one after another at the focus target (or the player) to pick a loot effect.
+// Debug: plays the loot effect in each colour, one after another, at the focus target (or the player).
 static void EffectTest()
 {
-    static const char* const kCandidates[] = {
-        "eff_magic_telekinesis_target_once_01", "eff_magic_magicopen_chest_01", "eff_magic_light_end_01",
-        "eff_magic_illusion_target_end_01", "eff_magic_summoned_end_01", "eff_magic_teleport_end_01",
-        "eff_magic_heal_target_small_01", "eff_magic_protect_end_01", "eff_magic_speed_end_01",
-        "eff_script_itemgiven_01", "eff_script_goldgiven_01", "eff_ui_trade_01",
-    };
     static int next;
     Entity player;
     if (!GameReady(&player))
         return;
     Entity target;
     g_game.worldFocus(g_game.world, &target);
-    const char* name = kCandidates[next++ % (sizeof(kCandidates) / sizeof(kCandidates[0]))];
+    int kind = next++ % SparkleKinds;
     Vec3 at = EntityPosition(target ? target : player);
-    bool exists = EffectExists(name), started = exists && PlayEffect(name, at, g_config.effectSize, !g_config.effectSound);
-    Log("effect test: %s at %s (%.0f %.0f %.0f) exists=%d started=%d", name, target ? "focus" : "player", at.x, at.y,
-        at.z, exists, started);
+    bool started = PlayEffect(g_config.effectName, at, g_config.effectSize, !g_config.effectSound, kSparkleColors[kind]);
+    Log("effect test: %s %s at %s (%.0f %.0f %.0f) started=%d", g_config.effectName, kSparkleNames[kind],
+        target ? "focus" : "player", at.x, at.y, at.z, started);
 }
-
 
 // Dead NPC or monster with something on it. Knocked-out people are left alone (looting them is theft).
 static bool IsDeadBody(const Entity& e)
@@ -335,8 +433,17 @@ static bool IsDeadBody(const Entity& e)
     return g_game.isNpc(&e) && g_game.isDead(&e) && g_game.invValid(&e) && g_game.invStackCount(&e) > 0;
 }
 
+// Chests seen locked. Once the player unlocks one (key, lockpick), it is theirs to open: AutoLoot used to empty
+// it the moment the lock opened, right under the open loot window.
+static std::unordered_map<void*, bool> g_wasLocked;
+
+static bool IsLocked(const Entity& e)
+{
+    return g_game.lockValid(&e) && g_game.lockStatus(&e) != 1;
+}
+
 // Container that isn't an NPC or item, has stacks, belongs to nobody and is not locked.
-// Guess until checked in game: PSLock status 1 = open.
+// PSLock status 1 = open (checked in game).
 static bool IsOpenChest(const Entity& e)
 {
     if (g_game.isNpc(&e) || g_game.isItem(&e) || !g_game.invValid(&e) || g_game.invStackCount(&e) <= 0 || HasOwner(e))
@@ -344,13 +451,39 @@ static bool IsOpenChest(const Entity& e)
     return !g_game.lockValid(&e) || g_game.lockStatus(&e) == 1;
 }
 
+// Something the loot would take: what the game's loot filter passes, or a quest stack.
+static bool HasLoot(Entity& e)
+{
+    for (int i = 0, n = g_game.invStackCount(&e); i < n; ++i) {
+        if (ScriptCall("InvFilter_Loot", e.e, nullptr, i) > 0)
+            return true;
+        Entity tpl;
+        g_game.invTemplateItem(&e, &tpl, i);
+        if (g_game.invStackType(&e, i) == 0 && tpl && g_game.itemValid(&tpl) && g_game.itemMission(&tpl))
+            return true;
+    }
+    return false;
+}
+
+// Focus name suffix: " (Empty)" for a chest or dead body with nothing to take.
+static const wchar_t* EmptySuffix()
+{
+    if (!g_config.emptyMark || !GameApiInit())
+        return nullptr;
+    Entity e;
+    g_game.worldFocus(g_game.world, &e);
+    if (!e || g_game.isItem(&e) || !g_game.invValid(&e) || (g_game.isNpc(&e) && !g_game.isDead(&e)))
+        return nullptr;
+    return HasLoot(e) ? nullptr : g_config.emptyText;
+}
+
 // The configured effect at a looted spot (for items the position is taken before they leave the world).
-static void Sparkle(Vec3 at)
+static void Sparkle(Vec3 at, SparkleKind kind = SparkleOwn, float size = 1.0f)
 {
     if (!g_config.effect || !g_config.effectName[0])
         return;
     at.y += g_config.effectHeight; // the engine is Y-up
-    if (!PlayEffect(g_config.effectName, at, g_config.effectSize, !g_config.effectSound))
+    if (!PlayEffect(g_config.effectName, at, g_config.effectSize * size, !g_config.effectSound, kSparkleColors[kind]))
         Log("effect: %s did not start", g_config.effectName);
 }
 
@@ -364,8 +497,9 @@ static void PickUp(Entity& player, Entity e, const char* who)
     Entity copy = e;
     g_game.printItemLog(g_game.gui2, &copy, static_cast<int>(amount));
     Vec3 at = EntityPosition(e);
+    SparkleKind kind = ItemSparkle(e);
     int slot = g_game.invInsertStack(&player, &e); // the world item is gone after this
-    Sparkle(at);
+    Sparkle(at, kind);
     Log("%s: %s x%lu (category %d) -> stack %d", who, name, amount, category, slot);
 }
 
@@ -382,22 +516,31 @@ static void QuickLoot()
         Log("quickloot: skipped, combat mode %d", mode);
         return;
     }
-    char name[96];
+    char name[96], why[256];
     EntityName(target, name, sizeof(name));
     if (IsFreeGroundItem(target)) {
-        if (g_config.quickGround)
+        if (!g_config.quickGround)
+            return;
+        if (QuestItemOk(player, target))
             PickUp(player, target, "quickloot");
         return;
     }
     bool body = IsDeadBody(target), chest = !body && g_config.quickChests && IsOpenChest(target);
+    // A locked chest nobody owns, and the player has its key: open it with the key, like the game would.
+    if (!body && !chest && g_config.quickChests && IsLocked(target) && !g_game.isNpc(&target) && !HasOwner(target) &&
+        g_game.invValid(&target) && UnlockWithKey(player, target)) {
+        Log("quickloot: %s unlocked with the key", name);
+        chest = IsOpenChest(target);
+    }
     if (!body && !chest) {
-        Log("quickloot: focus %s is not lootable", name);
+        Log("quickloot: focus %s is not lootable (%s)", name, WhyNot(target, why, sizeof(why)));
         return;
     }
-    int64_t moved = ScriptAutoLoot(player, target);
-    if (moved > 0)
-        Sparkle(EntityPosition(target));
-    Log("quickloot: %s %s -> %lld stacks", body ? "body" : "chest", name, moved);
+    SparkleKind kind = ContainerSparkle(target, true);
+    int64_t moved = ScriptAutoLoot(player, target), quest = LootQuestStacks(player, target);
+    if (moved + quest > 0)
+        Sparkle(EntityPosition(target), kind, kContainerSparkleSize);
+    Log("quickloot: %s %s -> %lld stacks, %lld quest", body ? "body" : "chest", name, moved, quest);
 }
 
 // Items are only taken once they lie still: seen at the same spot on two ticks in a row (~0.25 s). Catches anything
@@ -427,9 +570,11 @@ static bool Resting(const Entity& e, DWORD now)
 // call it again four times a second.
 struct LootTry {
     bool done = false;
-    bool generated = false; // GeneratePlunder asked
+    bool plunder = false; // GeneratePlunder added stacks
+    int plunderTries = 0; // GeneratePlunder asked (a few times until it gives something)
     int tries = 0;
     DWORD next = 0;
+    DWORD firstDead = 0; // when it was first seen dead, for the delay in the log
 };
 static std::unordered_map<void*, LootTry> g_looted;
 
@@ -442,30 +587,40 @@ static void AutoLootTick()
     bool combat = CombatMode(player) != 0;
     if (g_looted.size() > 1000)
         g_looted.clear();
+    if (g_wasLocked.size() > 5000)
+        g_wasLocked.clear();
     for (const Nearby& n : CollectNearby(player, g_config.autoRadius)) {
+        if (IsLocked(n.e) && !g_game.isNpc(&n.e))
+            g_wasLocked[n.e.e] = true; // remembered even outside the cone: the player may turn to it later
         if (!InFront(player, n.e, n.distance))
             continue;
         if (IsFreeGroundItem(n.e)) {
-            if (Wanted(n.e) && Resting(n.e, now))
+            if (g_game.itemMission(&n.e) && !g_config.autoQuest)
+                continue;
+            if (Wanted(n.e) && Resting(n.e, now) && QuestItemOk(player, n.e))
                 PickUp(player, n.e, "autoloot");
             continue;
         }
         Entity container = n.e;
         // Animals and monsters get their plunder (meat, skins...) only when first focused: ask the game the same
-        // question the focus asks, once per body.
+        // question the focus asks, a few times until it gives something (it may not be ready right away). Bodies
+        // already carry stacks before that (claws, natural weapons), so the stack count says nothing.
         if (g_config.autoBodies && g_game.isNpc(&container) && g_game.isDead(&container) &&
             g_game.invValid(&container)) {
             LootTry& t = g_looted[container.e];
-            if (!t.generated) {
-                t.generated = true;
-                if (GeneratePlunder(player, container)) {
+            if (!t.firstDead)
+                t.firstDead = now;
+            if (!t.plunder && t.plunderTries < 5) {
+                ++t.plunderTries;
+                if ((t.plunder = GeneratePlunder(player, container))) {
                     char name[96];
-                    Log("autoloot: plunder created for %s", EntityName(container, name, sizeof(name)));
+                    Log("autoloot: plunder created for %s (ask %d, %lu ms after it was seen dead)",
+                        EntityName(container, name, sizeof(name)), t.plunderTries, now - t.firstDead);
                 }
             }
         }
         bool body = g_config.autoBodies && IsDeadBody(n.e);
-        bool chest = !body && g_config.autoChests && IsOpenChest(n.e);
+        bool chest = !body && g_config.autoChests && !g_wasLocked.count(n.e.e) && IsOpenChest(n.e);
         if (!body && !chest)
             continue;
         LootTry& t = g_looted[n.e.e];
@@ -475,19 +630,22 @@ static void AutoLootTick()
         EntityName(n.e, name, sizeof(name));
         // Not sure yet whether the game's AutoLoot script gives anything while the player's weapon is drawn: when
         // it doesn't, the same steps are done by hand.
+        SparkleKind kind = ContainerSparkle(container, g_config.autoQuest);
         int64_t moved = ScriptAutoLoot(player, container);
         const char* how = "script";
         if (moved <= 0 && combat) {
             moved = LootContainer(player, container);
             how = "by hand, weapon drawn";
         }
+        if (g_config.autoQuest)
+            moved += LootQuestStacks(player, container);
         if (moved > 0)
-            Sparkle(EntityPosition(n.e));
+            Sparkle(EntityPosition(n.e), kind, kContainerSparkleSize);
         // Nothing taken: try again in a second, a few times, then leave what the game won't give.
         t.done = moved > 0 || ++t.tries >= 8;
         t.next = now + 1000;
-        Log("autoloot: %s %s -> %lld stacks (%s, try %d)", body ? "body" : "chest", name, moved,
-            how, t.tries + (moved > 0));
+        Log("autoloot: %s %s -> %lld stacks (%s, try %d, %lu ms after it was seen dead)", body ? "body" : "chest",
+            name, moved, how, t.tries + (moved > 0), body && t.firstDead ? now - t.firstDead : 0);
     }
 }
 
@@ -524,27 +682,34 @@ static const HubItem kItems[] = {
              "A cone around where the camera looks; off = the whole circle. Things at your feet are always taken.",
              "Конус по направлению камеры; выключено = весь круг. То, что прямо под ногами, берётся всегда."},
     /*13 */ {HubSlider, "AutoLoot", "ConeAngle", "Cone width", "Ширина конуса", 120, 30, 360, 5, 0, "%.0f°", 12},
-    /*14 */ {HubHeader, nullptr, nullptr, "What AutoLoot picks up", "Что подбирает автолут"},
-    /*15 */ {HubNote, nullptr, nullptr, "Items on the ground. QuickLoot always takes what you look at.",
+    /*14 */ {HubCheckbox, "AutoLoot", "QuestItems", "Also quest items", "Подбирать и квестовые предметы", 0, 0, 0, 0,
+             0, nullptr, 6, "On the ground, in bodies and chests. Chests you unlocked yourself are left to you.",
+             "С земли, из трупов и сундуков. Сундуки, которые ты отпер сам, автолут не трогает."},
+    /*15 */ {HubHeader, nullptr, nullptr, "What AutoLoot picks up", "Что подбирает автолут"},
+    /*16 */ {HubNote, nullptr, nullptr, "Items on the ground. QuickLoot always takes what you look at.",
              "Предметы на земле. Быстрый лут всегда берёт то, на что смотришь."},
-    /*16 */ {HubCheckbox, "Filter", "Gold", "Gold", "Золото", 1, 0, 0, 0, 0, nullptr, 6},
-    /*17 */ {HubCheckbox, "Filter", "Ammo", "Arrows and bolts", "Стрелы и болты", 1, 0, 0, 0, 0, nullptr, 6},
-    /*18 */ {HubCheckbox, "Filter", "Weapons", "Weapons", "Оружие", 1, 0, 0, 0, 0, nullptr, 6},
-    /*19 */ {HubCheckbox, "Filter", "Armor", "Armour", "Броня", 1, 0, 0, 0, 0, nullptr, 6},
-    /*20 */ {HubCheckbox, "Filter", "Consumables", "Potions, food, plants", "Зелья, еда, растения", 1, 0, 0, 0, 0,
+    /*17 */ {HubCheckbox, "Filter", "Gold", "Gold", "Золото", 1, 0, 0, 0, 0, nullptr, 6},
+    /*18 */ {HubCheckbox, "Filter", "Ammo", "Arrows and bolts", "Стрелы и болты", 1, 0, 0, 0, 0, nullptr, 6},
+    /*19 */ {HubCheckbox, "Filter", "Weapons", "Weapons", "Оружие", 1, 0, 0, 0, 0, nullptr, 6},
+    /*20 */ {HubCheckbox, "Filter", "Armor", "Armour", "Броня", 1, 0, 0, 0, 0, nullptr, 6},
+    /*21 */ {HubCheckbox, "Filter", "Consumables", "Potions, food, plants", "Зелья, еда, растения", 1, 0, 0, 0, 0,
              nullptr, 6},
-    /*21 */ {HubCheckbox, "Filter", "Magic", "Scrolls and runes", "Свитки и руны", 1, 0, 0, 0, 0, nullptr, 6},
-    /*22 */ {HubCheckbox, "Filter", "Written", "Letters, books, maps", "Письма, книги, карты", 1, 0, 0, 0, 0,
+    /*22 */ {HubCheckbox, "Filter", "Magic", "Scrolls and runes", "Свитки и руны", 1, 0, 0, 0, 0, nullptr, 6},
+    /*23 */ {HubCheckbox, "Filter", "Written", "Letters, books, maps", "Письма, книги, карты", 1, 0, 0, 0, 0,
              nullptr, 6},
-    /*23 */ {HubCheckbox, "Filter", "Misc", "Misc (trophies, ore, tools...)", "Разное (трофеи, руда, инструменты...)",
+    /*24 */ {HubCheckbox, "Filter", "Misc", "Misc (trophies, ore, tools...)", "Разное (трофеи, руда, инструменты...)",
              1, 0, 0, 0, 0, nullptr, 6},
-    /*24 */ {HubCheckbox, "Filter", "Other", "Everything else", "Всё остальное", 1, 0, 0, 0, 0, nullptr, 6},
-    /*25 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
-    /*26 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
+    /*25 */ {HubCheckbox, "Filter", "Other", "Everything else", "Всё остальное", 1, 0, 0, 0, 0, nullptr, 6},
+    /*26 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
+    /*27 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
              1, 0, 0, 0, 0, nullptr, -1, "A short game effect at the item, body or chest",
              "Короткий игровой эффект у предмета, трупа или сундука"},
-    /*27 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 26},
-    /*28 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 26},
+    /*28 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 27},
+    /*29 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 27},
+    /*30 */ {HubHeader, nullptr, nullptr, "Empty", "Пустые"},
+    /*31 */ {HubCheckbox, "Empty", "Mark", "Mark empty chests and bodies", "Помечать пустые сундуки и трупы", 1, 0,
+             0, 0, 0, nullptr, -1, "\"(Empty)\" after the name of what you look at, when there is nothing to take",
+             "\"(Пусто)\" после названия того, на что смотришь, если там нечего брать"},
 };
 
 static void OnMenuChanged()
@@ -607,6 +772,7 @@ static DWORD WINAPI Worker(LPVOID)
 {
     HWND hwnd = WaitForGameWindow();
     g_origProc = SubclassWindow(hwnd, HookedWndProc);
+    InstallFocusNameHook(EmptySuffix); // still in the main menu: no focus name is being built
     if (const HubApi* hub = HubGet()) {
         hub->registerPage(&g_page);
         hub->registerStatus(&kStatus);
@@ -639,7 +805,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "autoloot");
-        Log("AutoLoot 0.6");
+        Log("AutoLoot 0.7");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad(true);
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

@@ -75,7 +75,12 @@ struct GameApi {
     float* (*cameraPose)(float* retMatrix); // static, bCMatrix 4x4 rows
     // PSLock
     bool (*lockValid)(const Entity*);
-    int (*lockStatus)(const Entity*); // PSLock::PropertyStatus -> gELockStatus (guess: called on the entity view)
+    int (*lockStatus)(const Entity*); // PSLock::PropertyStatus -> gELockStatus, 1 = unlocked (checked in game)
+    void* (*lockSetStatus)(Entity* self, const int* status); // PropertyStatus::operator=, fires OnLockStatusChanged
+    void* (*lockKey)(const Entity* self, void* retTemplate);  // PSLock::GetKey -> Template by value
+    bool (*invHasItems)(const Entity* self, const void* tpl, int amount);
+    bool (*templateValid)(const void* tpl);
+    void (*templateFree)(void* tpl);
     // GUI2 (global "gui2"): the game's "+ item" log on screen. Entity is passed by value = pointer to a copy.
     void* gui2;
     // World (global "world"): the entity under the player's focus (what the "use" key would act on)
@@ -113,12 +118,18 @@ int64_t ScriptAutoLoot(const Entity& receiver, const Entity& container);
 bool GeneratePlunder(Entity& player, Entity& body);
 // The same done by hand, for when the script gives nothing (player's weapon drawn). Returns stacks moved.
 int64_t LootContainer(Entity& receiver, Entity& container);
+// Quest (mission) stacks of a container, which the game's loot filter leaves behind. Returns stacks moved.
+int64_t LootQuestStacks(Entity& receiver, Entity& container);
+// Locked chest whose key the player carries: unlocks it (as opening it with the key would). True when unlocked.
+bool UnlockWithKey(Entity& player, Entity& chest);
 // Any game script by name (Script_Game's exported scripts: "InvFilter_Loot", ...). Up to 4 different names.
 int64_t ScriptCall(const char* script, void* self, void* other, int64_t param);
 Vec3 EntityPosition(const Entity& e);
 // Horizontal (x, z) view direction, unit length: the camera's, else the player's facing. False when neither is known.
 bool ViewDirection(const Entity& player, float* x, float* z);
 bool EffectExists(const char* name);
-// Starts a one-shot effect at a world position, scaled; quiet = without its sounds (the game's own uses of the
-// effect keep them). False when the effect system is not there or the name is unknown.
-bool PlayEffect(const char* name, const Vec3& position, float scale = 1.0f, bool quiet = false);
+// Starts a one-shot effect at a world position, scaled; quiet = without its sounds, tint = RGB 0..1 for its particles
+// (nullptr or black: own colours). The game's own uses of the effect stay as they are. False when the effect system
+// is not there or the name is unknown.
+bool PlayEffect(const char* name, const Vec3& position, float scale = 1.0f, bool quiet = false,
+                const float* tint = nullptr);
