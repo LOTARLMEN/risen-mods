@@ -5,4 +5,7 @@ pub mod bin_io;
 pub mod lrent;
 pub mod pak;
 pub mod props;
+pub mod resource;
+pub mod spawn;
+pub mod strs;
 pub mod tple;

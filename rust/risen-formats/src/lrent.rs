@@ -205,7 +205,7 @@ impl DynamicEntity {
         })
     }
 
-    fn write(&self, w: &mut Writer) {
+    pub(crate) fn write(&self, w: &mut Writer) {
         w.u16(self.version);
         if let Some(v) = self.version2 {
             w.u16(v);
@@ -569,62 +569,141 @@ impl DynamicContext {
             return Err(format!("entity {i} is not a direct child of the layer root (not supported yet)"));
         }
         let tree = self.subtree(i);
+        let mut group: Vec<DynamicEntity> = tree.iter().map(|&j| self.entities[j].clone()).collect();
+        renew_guids(&mut group);
+        let pairs = group_pairs(self, &tree);
+        Ok(self.append_group(group, &pairs))
+    }
+
+    /// Appends a copied group (subtree order, root first) as a new child of the layer root;
+    /// `pairs` = the group's inner (parent, child) pairs as positions in the group. Returns the
+    /// index of the group root.
+    pub(crate) fn append_group(&mut self, group: Vec<DynamicEntity>, pairs: &[(usize, usize)]) -> usize {
         let base = self.entities.len();
-        let new_index = |old: usize| base + tree.iter().position(|&t| t == old).unwrap();
-        let mut pairs = vec![(0, base as i32)];
-        for &(p, c) in &self.hierarchy {
-            if p >= 0 && tree.contains(&(p as usize)) {
-                pairs.push((new_index(p as usize) as i32, new_index(c as usize) as i32));
-            }
-        }
-        let guids: Vec<([u8; 16], [u8; 16])> = tree.iter().map(|&j| (self.entities[j].id.guid, new_guid())).collect();
-        for (&j, (_, new)) in tree.iter().zip(&guids) {
-            let mut e = self.entities[j].clone();
-            e.id.guid = *new;
-            // References between members of the copied group must point to the copies.
-            for ps in &mut e.property_sets {
-                for (old, new) in &guids {
-                    ps.object.replace_guid(old, new);
-                }
-            }
-            self.entities.push(e);
-        }
+        let mut new_pairs = vec![(0, base as i32)];
+        new_pairs.extend(pairs.iter().map(|&(p, c)| ((base + p) as i32, (base + c) as i32)));
+        self.entities.extend(group);
         let end = self.hierarchy.iter().position(|&p| p == (-1, -1)).unwrap_or(self.hierarchy.len());
-        self.hierarchy.splice(end..end, pairs);
-        Ok(base)
+        self.hierarchy.splice(end..end, new_pairs);
+        base
     }
 }
 
+/// Inner (parent, child) pairs of the subtree `tree` of `c`, as positions in `tree`.
+pub(crate) fn group_pairs(c: &DynamicContext, tree: &[usize]) -> Vec<(usize, usize)> {
+    let pos = |x: i32| tree.iter().position(|&t| t as i32 == x);
+    c.hierarchy.iter().filter_map(|&(p, ch)| Some((pos(p)?, pos(ch)?))).collect()
+}
+
+/// Gives every entity of a copied group a new GUID; references between members of the group
+/// (inside their property sets) are pointed to the copies. Returns (old, new) GUIDs.
+pub(crate) fn renew_guids(group: &mut [DynamicEntity]) -> Vec<([u8; 16], [u8; 16])> {
+    let guids: Vec<([u8; 16], [u8; 16])> = group.iter().map(|e| (e.id.guid, new_guid())).collect();
+    for (e, (_, new)) in group.iter_mut().zip(&guids) {
+        e.id.guid = *new;
+        for ps in &mut e.property_sets {
+            for (old, new) in &guids {
+                ps.object.replace_guid(old, new);
+            }
+        }
+    }
+    guids
+}
+
 impl Lrent {
-    /// Moves entity `i` by `d` (see [`DynamicContext::translate`]) and keeps the NPC navigation data
-    /// in step: gCNavigation_PS.LastUseableNavigationPosition (= entity position in every shipped
-    /// layer) is moved too, LastUseableNavigationZoneProxy is cleared (the zone belongs to the old place).
+    /// Moves entity `i` by `d` (see [`DynamicContext::translate`]) and keeps the pose copies in the
+    /// property sets in step (see [`DynamicEntity::sync_pose`]).
     pub fn translate(&mut self, i: usize, d: [f32; 3]) -> std::result::Result<(), String> {
         let strings = self.archive.strings.clone();
         let c = self.context_mut().ok_or("layer has no entity context")?;
         c.translate(i, d)?;
         for j in c.subtree(i) {
-            let pos = c.entities[j].position();
-            for ps in &mut c.entities[j].property_sets {
-                if ps.object.class(&strings) != "gCNavigation_PS" {
-                    continue;
-                }
-                let Some(body) = ps.object.body.as_mut() else { continue };
-                for p in &mut body.props.list {
-                    match strings.get(p.name.0 as usize).map(String::as_str) {
-                        Some("LastUseableNavigationPosition") if p.value.len() == 12 => {
-                            p.value = pos.iter().flat_map(|v| v.to_le_bytes()).collect();
-                        }
-                        Some("LastUseableNavigationZoneProxy") if p.value.len() >= 3 => {
-                            p.value = vec![p.value[0], p.value[1], 0];
-                        }
-                        _ => {}
-                    }
-                }
-            }
+            c.entities[j].sync_pose(&strings, None);
         }
         Ok(())
     }
+}
+
+impl DynamicEntity {
+    /// Copies of the entity pose inside its property sets, set from the world matrix:
+    /// gCNavigation_PS.LastUseableNavigationPosition (= entity position in every shipped layer;
+    /// LastUseableNavigationZoneProxy is cleared, the zone belongs to the old place) and the two
+    /// eCRigidBody_PS motions (= position + rotation quaternion in all 4915 shipped rigid bodies).
+    /// The motion rotation is only set when `rotation` is given.
+    pub fn sync_pose(&mut self, strings: &[String], rotation: Option<[f32; 4]>) {
+        let pos = self.position();
+        for ps in &mut self.property_sets {
+            let class = ps.object.class(strings);
+            let Some(body) = ps.object.body.as_mut() else { continue };
+            match class {
+                "gCNavigation_PS" => {
+                    for p in &mut body.props.list {
+                        match strings.get(p.name.0 as usize).map(String::as_str) {
+                            Some("LastUseableNavigationPosition") if p.value.len() == 12 => {
+                                p.value = pos.iter().flat_map(|v| v.to_le_bytes()).collect();
+                            }
+                            Some("LastUseableNavigationZoneProxy") if p.value.len() >= 3 => {
+                                p.value = vec![p.value[0], p.value[1], 0];
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                "eCRigidBody_PS" => {
+                    let ClassData::Raw(d) = &mut body.data else { continue };
+                    let Some(at) = rigid_body_motions(d) else { continue };
+                    for m in [at, at + 28] {
+                        put_f32s(&mut d[m..m + 12], &pos);
+                        if let Some(q) = rotation {
+                            put_f32s(&mut d[m + 12..m + 28], &q);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Offset of the two `bCMotion` (position xyz + quaternion xyzw, 28 bytes each) in eCRigidBody_PS
+/// class data: u16 version, 2 bools (>= 40), bool (>= 41), 2 vectors (>= 51), motions (>= 55), bool (>= 65).
+fn rigid_body_motions(d: &[u8]) -> Option<usize> {
+    let v = u16::from_le_bytes([*d.first()?, *d.get(1)?]);
+    let at = 2 + if v >= 40 { 2 } else { 0 } + if v >= 41 { 1 } else { 0 } + if v >= 51 { 24 } else { 0 };
+    (v >= 55 && d.len() >= at + 56).then_some(at)
+}
+
+fn put_f32s(dst: &mut [u8], v: &[f32]) {
+    for (k, x) in v.iter().enumerate() {
+        dst[4 * k..4 * k + 4].copy_from_slice(&x.to_le_bytes());
+    }
+}
+
+/// DirectX-style world matrix (row vectors, translation in m[12..15]) from a rotation quaternion
+/// (x y z w, as in templates and rigid body motions) and a position.
+pub fn quat_matrix(q: [f32; 4], pos: [f32; 3]) -> [f32; 16] {
+    let [x, y, z, w] = q;
+    [
+        1. - 2. * (y * y + z * z), 2. * (x * y + z * w), 2. * (x * z - y * w), 0.,
+        2. * (x * y - z * w), 1. - 2. * (x * x + z * z), 2. * (y * z + x * w), 0.,
+        2. * (x * z + y * w), 2. * (y * z - x * w), 1. - 2. * (x * x + y * y), 0.,
+        pos[0], pos[1], pos[2], 1.,
+    ]
+}
+
+/// Axis-aligned box around a local box transformed by a world matrix (stored world boxes are
+/// exactly this for all 49409 world entities with a creator).
+pub fn transform_box(b: [f32; 6], m: &[f32; 16]) -> [f32; 6] {
+    let mut out = EMPTY_BOX;
+    for corner in 0..8 {
+        let p = [b[if corner & 1 == 0 { 0 } else { 3 }], b[if corner & 2 == 0 { 1 } else { 4 }], b[if corner & 4 == 0 { 2 } else { 5 }]];
+        for k in 0..3 {
+            let v = p[0] * m[k] + p[1] * m[4 + k] + p[2] * m[8 + k] + m[12 + k];
+            out[k] = out[k].min(v);
+            out[3 + k] = out[3 + k].max(v);
+        }
+    }
+    out
 }
 
 impl DynamicContext {

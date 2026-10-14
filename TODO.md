@@ -72,6 +72,10 @@ main-thread stack samples every 50 ms, FFCore file I/O stats). Findings:
 - [x] Separate mods for friends: `dist/RisenFastStart-1.1.zip`, `RisenWindow-1.0.zip`, `RisenSpeed-1.0.zip` (loader + one mod each)
 - [x] User test after the split: F4 speed toggle, borderless, Alt+Tab (automated run only checked startup 9.2 s + logs)
 - [ ] Fast Start: get feedback from friends (other PCs, GOG version?)
+- [ ] Load timing log (user's idea 2026-10-14): phase timestamps in RisenMods.log for BOTH paths - new game
+      (world from .lrent) and savegame load (world + save state): start -> menu -> new game / load clicked ->
+      world loaded -> player controllable. Goal: see which phase is worth speeding up. Needs RE of the world
+      load begin/end (likely in Fast Start's hooks). Also useful for 5.21f (do loose-layer edits survive a save load)
 
 ## Stage 0 — Setup
 - [x] Create project folder `Risen\risen-mods` (inside the game folder)
@@ -771,7 +775,7 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       410 layers in ~1 s. Position = world matrix translation (m[12..15]); entity 0 "DRE" = layer root;
       creator = template GUID (name lookup needs templates.pak - next).
 - [ ] .sec / .wrl round trip (small files, same archive + property objects; gCSector lists its layers)
-- [ ] First real edit: `risen move <layer> <guid|index> --to x y z | --by dx dy dz [--out f] [--dry-run]` DONE
+- [x] First real edit: `risen move <layer> <guid|index> --to x y z | --by dx dy dz [--out f] [--dry-run]` DONE
       2026-10-14 (lrent.rs DynamicContext::translate + update_root_bounds). Writes loose file
       data\common\projects\<layer path>; an existing loose file is edited further. Moves world+local translation,
       world/geo box, world/geo sphere of the entity and its descendants (only direct children of the root for now).
@@ -831,7 +835,134 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       (Game_Start_Dyn #1126), Beach_Seaman_Dead corpse (Game_Start_NPC_01 #7), copied Wolf_Gamestart #108
       (-> 3 wolves remain at Sara). IN-GAME TEST PASSED 2026-10-14 (new game): corpse gone, barrel gone,
       3 wolves, no crash. Loose test files still in data\common\projects (5 layers).
-- [ ] Then: spawn into any layer (string remapping / class parsers), strings (.tab)
+- Spawn into ANY layer (copy between layers, spawn from a template) - breakdown 2026-10-14. Moving a property
+  object to another file = remap every string index (u16 into the file's string table) to the target table.
+  Census of all 410 layers + 2679 templates (scratch crate, risen-formats API):
+  * Indices outside values (easy): entity name, set class, property name + type, object class.
+  * Property value types with strings: bCString (101k), eCScriptProxyScript (125k), *ResourceString (image,
+    material, speedtree, mesh), eCLocString, gCBookLocString, gCLetterLocString, gCScriptProxyAIState,
+    eCGuiBitmapProxy2, bTObjArray<bCString>; structured arrays to check: gCInteractionSlot, gCSkillValue,
+    gCModifySkill, gCSkillRange, gSRoutine, gSTrailElement, gSVisitedNavCluster, gCCraftIngredient, gCMapEntry,
+    bCMotion, gCWaterSubZone_PS (nested objects), bTRefPropertyArray<gCStateGraphEventFilter*>,
+    bTRefPtrArray<gCStateGraphState*>, gCFlightPath*. 75 enum container types = no strings (u16 + u32).
+  * Raw class data: ~45 classes are just 2-3 bytes (version) or fixed small structs (mesh 5, item 7, nav 10,
+    lock 34, skills 138, lights 14). With strings / nested property objects (C# LRENT_Base.cs): gCInventory_PS,
+    gCInteraction_PS, eCMover_PS (accessor list + entity property set), gCStateGraph_PS (states, transitions
+    with bCString, actions, filters), eCCollisionShape_PS (shapes with mesh name + bCObjectRefBase),
+    gCParty_PS, gCMap_PS, gCSectorPersistence_PS, eCVegetation_PS. Large level-only classes (eCPortalRoom_PS
+    up to 2.4 MB, eCOccluder_PS, eCVegetation_PS, eCSpeedTreeBBMesh_PS, sector persistence) - not needed for
+    spawning: refuse "class X can't be moved between layers" instead of parsing.
+  Steps (one session each unless noted):
+- [x] 5.21a Oracle + skeleton 2026-10-14: risen-formats strs.rs - StrWalk visits every string index (entity /
+      template name, set class, object class, property name + type, values of known types; type/class names
+      looked up BEFORE f is called, so f may remap), `Lrent::walk_strs` / `Tple::walk_strs(f) -> Vec<Unknown>`;
+      unknown value types / non-empty class data / unexpected value sizes are reported, never guessed.
+      Known now: primitives, vectors, matrix, guid, box, ranges, colors, entity proxies, eCGuiBitmapProxy2,
+      enum containers (6 bytes), bCString + its subclasses (resource / loc strings, 2 bytes).
+      FINDING: the game writes every string table in exact first-use order with no unused entries (1265 files
+      already match although most are only partly walked) -> strict completeness oracle: a fully walked file
+      must have ALL entries reached and first uses in table order, else a site is missed / misplaced.
+      `risen strings-check [--files]`: 3089 files (410 lrent + 2679 tple), 5.37M refs, 66 fully walked, all 66
+      exact; remap test (reverse the table, re-read, compare resolved strings, reverse back = original bytes)
+      3089 ok. Remaining unknowns, top: eCScriptProxyScript value (147k sites), class data eCIlluminated /
+      eCMesh / eCCollisionShape, bTValArray / bTObjArray of vectors, floats, proxies, gCInteractionSlot,
+      gCScriptProxyAIState; also a non-enum `bTPropertyContainer<bool>` (8). 93 kinds total, list via the command
+- [x] 5.21b Property value parsers 2026-10-14 (strs.rs value_sites: sites collected first, f applied only when
+      the whole value read exactly -> a value that doesn't read is never half-remapped). Layouts:
+      arrays bTObjArray/bTValArray = u8 flag (0 or empty value = empty; C# editor: `if (b == 0) return`),
+      u32 count, elements (enum elements = u32); script/AI proxies + eCEntityStringProxy = u16 version, u8 has,
+      [u16 str]; entity proxies = u16, u8 valid, [20-byte id]; gSRoutine = u16 version, str, 3 proxies;
+      bCObjectBase (gCInteractionSlot, gCSkillValue, gCModifySkill, gCSkillRange, gCCraftIngredient,
+      gCMapEntry, gCFlightPath*) = u16 version, u32 size, nested property list (names/types are sites too),
+      no class data seen; gCWaterSubZone_PS (v>=2) = vec3, ValArray<vec3>, float, vec3, vec4; fixed: bCMotion 28,
+      gSTrailElement 33, gSVisitedNavCluster 16. Every value in all 3089 files now reads exactly except
+      bTRefPropertyArray<gCStateGraphEventFilter*> (1468) + bTRefPtrArray<gCStateGraphState*> (736) - C# reads
+      `*` arrays as raw BUFFER; their elements are the state graph classes -> do them in 5.21c with
+      gCStateGraph_PS. Refs walked 5.37M -> 5.42M; remap test + lrent/tple round trips still all OK.
+      Fully walked files still 66: what's left is class data (75 classes)
+- [x] 5.21c Class data parsers 2026-10-14 (strs.rs class_sites, sites-only like values: nothing is half-remapped;
+      nested bCAccessorPropertyObject in class data = object_sites, same header as PropertyObject). Census first
+      (scratch crate: sizes/versions per class): 40 classes are a bare u16 version (VERSION_ONLY list, incl. nested
+      gCInteraction, eCMoverAnimation*, state graph event filters); fixed structs per C# (mesh/speedtree = version
+      + eCEntityPropertySet ref (u16, u8 if v>1), nav/collision circles u16+u64, item 7, lock 34, skills 138,
+      rigid body by version, static lights, eCIlluminated by size per version 8/10/12 - floats only, the v12
+      bytes are uninitialized engine memory that looks like string text, not indices). With strings / nested:
+      gCParty_PS (v3: u16, bCString, u8, entity proxy; v1: no u8), eCCollisionShape_PS -> eCCollisionShape
+      objects (ShapeType property picks the layout; trimesh/convex = mesh name string + u16), gCInteraction_PS,
+      eCMover_PS (animation objects + matrix + set), gCStateGraph_PS -> gCStateGraphState (rect, action
+      objects, transitions u16 + bCString) -> gCStateGraphAction* (version + filter objects), gCInventory_PS
+      (stacks = bCObjectBase; slots: Version4 == 2 -> u8 has, u32 count, objects WITHOUT slot keys; else u32
+      count, (i32, object) as in C#), eCParticle_PS curves. Values fixed on the way: eCGuiBitmapProxy2 IS a
+      string index (2 bytes; was wrongly "plain"), bTRefPropertyArray/bTRefPtrArray = u32 count + accessor
+      objects (or no bytes), bTInterpolatorLinear/Bezier = u8, u32 n, n keys (vector/quaternion; linear = time
+      + value + 2 bytes, bezier = time + 5 values), bCObjectBase may end with its own 2-byte version.
+      strings-check: 3048 of 3089 files fully walked, 6.55M refs, all 3048 in exact first-use order, remap
+      test 3089 ok, lrent/tple round trips unchanged. Left unknown ON PURPOSE (level-only, never moved; a
+      layer copy must refuse an entity with them): eCPortalRoom_PS, eCOccluder_PS, eCVegetation_PS,
+      gCSectorPersistence_PS, eCLightStreaks_PS, eCSpeedTreeBBMesh_PS; plus one eCParticle_PS v2 whose
+      trailer doesn't match C# (1 entity). For 5.21d: walk ONE entity (StrWalk::entity), refuse if unknown.
+      Gotcha: no rustfmt.toml and the code is hand-formatted at ~120 columns - don't run `cargo fmt` (it
+      reformats every file; a config of max_width 120 + use_small_heuristics Max is close but not identical)
+- [x] 5.21d Cross-layer copy 2026-10-14: strs.rs `Lrent::check_movable(i)` (walks the subtree, refuses with the
+      unknown sites) + `Lrent::import(src, roots)`: clone subtree, StrWalk remap = intern into the target table
+      (src index -> target index cache, missing strings appended in walk order -> a first-use-ordered table
+      stays exact), new GUIDs + in-group GUID refs (lrent.rs renew_guids / group_pairs / append_group, shared
+      with `duplicate`), root bounds refreshed, `outside_refs` = source-layer entities outside the group the
+      copy still points to (nav path -> its 2 Nav_Zone_Pos; printed as NOTE). Entity versions are per entity, so
+      mixing v212..216 entities in one context is format-wise fine. CLI: `risen copy <layer> <entity> --into
+      <layer2> [--to|--by]` (no --to/--by = same position; nav fix via translate), `spawn --layer L` = TARGET
+      layer now (source instance from L if it has one, else from the layer with most instances).
+      `risen copy-check [--into L] [--verbose]` (~20 s): every top-level entity of all 410 layers imported into
+      Game_Start_Item in memory, written, re-read, compared via strs::resolved_entity (entity bytes with string
+      indices zeroed + resolved strings in walk order, GUIDs mapped back): 49955 entities in 49053 groups all
+      identical, target table in exact first-use order for all 334 layers. Refused 401 top-level entities, all
+      level-only (341 eCPortalRoom_PS, 39 eCOccluder_PS, 15 eCVegetation_PS, 5 sector persistence / BB mesh) + the
+      1 eCParticle_PS v2. lrent-check / strings-check unchanged. Scratch run: Wolf_Black from Wild_Outdoor ->
+      Game_Start_NPC_01 at Sara, re-read fine. In-game test written: loose Game_Start_NPC_01 + [11] Wolf_Black
+      (from Wild_Outdoor_Monster_01 #16) at (-36650, 200, -4800) + [12] Nav_Path_Low (Harbour_Town_Nav #71, refs
+      2 zones left there) at (-36650, 200, -5600); backup D:\RisenModding\backup\Game_Start_NPC_01-before-5.21f.lrent.
+      IN-GAME TEST PASSED 2026-10-14 (new game): Wolf_Black from the far layer stands at Sara, no crash, no
+      errors in RisenMods.log -> an entity moved into another layer (other string table) loads fine.
+      Gotcha: `entities <name>` / `find` read the PAK copy, not the loose file (pass the .lrent path) - fix later
+- [x] 5.21e Spawn straight from a .tple 2026-10-14. Recon (scratch crate, all
+      49409 world entities with a known creator vs their template): property sets = template sets (same order
+      in 49327; instance-only diffs are state: NPC fight/nav fields, inventories filled in the level, lights,
+      nav zones), class versions differ both ways (gCNPC_PS 79 <-> 80) -> engine reads both, sets are copied
+      as is. Header: name / render alpha+view range / insert type / date = template's; versions 214/214/217/210,
+      cache-in-range 0, creator proxy v1; template flag bytes (v215+) = enabled, rendering, ?, picking,
+      collision, 0x200, ?, SaveGameRelevant; world SGR also set for every item + NPC (+ inventories, locks,
+      movers, state graphs); unknown_b3 = 1 with mesh / animation / collision shape, 0 for lights/VFX/SFX.
+      Bounds: world box = local box x world matrix (all 49409), spheres = around the world box; local box is
+      NOT in the template: it is the mesh's `Boundary` property - ._xmsh (meshes.pak, "GR01MS02",
+      eCMeshResource2, property object with INLINE strings) for ~25000 of ~26600 eCMesh_PS entities, ._xmac
+      (animations.pak, "GR01MA02", eCMotionActorResource2) for 1856 of 2830 eCAnimation_PS ones (skeletons /
+      monsters differ: body parts). MeshFileName may lack the extension ("It_Wpn_Axe_Ogerhammer").
+      FINDING: eCRigidBody_PS class data (v>=55) holds the pose twice (bCMotion = position + quaternion,
+      D3DX convention) = entity position + rotation in all 4915 shipped rigid bodies; templates have a zero
+      pose, our earlier move/copy left it stale (wolves were fine) -> DynamicEntity::sync_pose (rigid body
+      position + nav fix) now runs on every translate.
+      Code: risen-formats resource.rs (boundary, compiled_name), spawn.rs (`Lrent::spawn_template(t, pos,
+      local_box)`: template rotation, sets remapped via strs::Remap - extracted from import, refuses unknown
+      sites / multi-templates), lrent.rs quat_matrix / transform_box / sync_pose. CLI: `spawn` builds from the
+      template when the world has no instance (or `--from-template`), needs `--layer`; local box from the mesh,
+      else a 1 m cube (printed). `risen spawn-check` (~5 s): every template with a world instance built into
+      Game_Start_Item in memory vs its first instance: 1591 built, 0 refused, reads back; same: name 1569,
+      versions/alpha/cache 1556 (rest = v212/213 test entities), flags 1591, b3 1456, SGR 1517 (rest =
+      level-designer choices on event objects), local box 1122 (rest = VFX/SFX/trees/monsters/strip weapons).
+      lrent/tple/strings/copy checks unchanged. Test 5.21f written: It_Axe_Ogre + It_Helmet_Leather (never
+      placed) spawned into loose Game_Start_Item at (-37450 / -37300, 200, -5100) (the moved mushroom lies
+      at y 120 -> they should drop ~1 m), near Sara; backup D:\RisenModding\backup\Game_Start_Item-before-5.21e.lrent
+      IN-GAME TEST PASSED 2026-10-14 (new game): both items lie next to Sara; save + load: the items and the
+      copied wolves are all still there.
+- [x] 5.21f In-game test PASSED 2026-10-14 (template items + far-layer copies load and survive save/load;
+      the spawned items are picked up fine, by our AutoLoot too): far-layer monster copied into Game_Start (DONE 2026-10-14, see 5.21d), a never-placed
+      item from its template, save + load (do copies survive a savegame? SaveGameRelevant flag)
+- [ ] Strings (.tab): read/write the localized string tables (new names / dialog text for spawned things)
+- [ ] Fix: `entities <name>` / `find` read the PAK copy, not the loose file (needs the VFS; pass a .lrent path for now)
+- [ ] `translate` / move: only direct children of the layer root are supported - nested entities later
+- [ ] Optional `--yaw` rotation for `spawn` (now always the template rotation)
+- [ ] Local box is approximate for strip weapons, VFX/SFX and monsters (spawn-check: 1122 of 1591 match)
+- [ ] Release of world edits: the installer must patch [Root] NoPhysical=false in mountlist_packed.ini and undo it
 - [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
       pipe, JSON commands) so any agent or our editor can find / move / spawn / delete entities in the running game
       while the user watches. Same verbs as risen-cli (find, show, move, spawn), resolve entities by GUID every
