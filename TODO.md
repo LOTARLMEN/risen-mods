@@ -957,8 +957,28 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
 - [x] 5.21f In-game test PASSED 2026-10-14 (template items + far-layer copies load and survive save/load;
       the spawned items are picked up fine, by our AutoLoot too): far-layer monster copied into Game_Start (DONE 2026-10-14, see 5.21d), a never-placed
       item from its template, save + load (do copies survive a savegame? SaveGameRelevant flag)
-- [ ] Strings (.tab): read/write the localized string tables (new names / dialog text for spawned things)
+- [x] Strings (.tab): read/write the localized string tables (new names / dialog text for spawned things).
+      Code DONE 2026-10-14 (risen-formats tab.rs): "TAB0", u16 version 1, u16 format 1, u64 FILETIME, u32
+      columns; column = u8 1, u16 1, name, u32 rows, rows; string = u16 UTF-16 unit count + UTF-16LE. Column 0 =
+      key ("ID" / "Key"), text = "<Language>_Text" (tutorial / achievements spell some "_text"). compiled has 8
+      columns (+ Polish, Russian), common 6; svms / infos also StageDir / WaveFile / Voice / ... columns. The
+      game mounts only data/compiled/strings (mountlist [Packed]; data/common/strings is not listed) -> edits go
+      to loose data\compiled\strings\<table>.tab. Lookup: item name = focus.tab FO_<template>, description =
+      items.tab ITEMDESC_<template>. `risen tab-check`: all 17 + 17 tables byte-identical. CLI: `risen tab`
+      (list tables), `tab <table> [filter] [--lang ru,en | --all] [--json]`, `tab-set <table> <key> <text>
+      [--lang ..] [--out] [--dry-run]` (missing key = row added, other cells empty), `tab-delete`.
+      In-game test written: FO_It_Axe_Ogre = "Дубина огра [мод]" / "Ogre club [mod]", ITEMDESC_It_Axe_Ogre =
+      "Описание изменено через risen tab-set." (the club spawned at Sara in 5.21f). Rollback: delete
+      data\compiled\strings. IN-GAME TEST PASSED 2026-10-14: the club shows "Дубина огра [мод]" in focus and inventory,
+      inventory tooltip shows the new ITEMDESC text (user's screenshot) -> the game
+      reads loose data\compiled\strings\*.tab (NoPhysical=false). Loose focus.tab + items.tab left in place.
+- [ ] New key test: a NEW template (copy of a .tple under a new name) + FO_/ITEMDESC_ rows for it, spawned in game
 - [ ] Fix: `entities <name>` / `find` read the PAK copy, not the loose file (needs the VFS; pass a .lrent path for now)
+- [ ] Fix: `delete` reference warning scans the edited layer's OLD file on disk -> false "still referenced in
+      <same layer>" (seen 2026-10-14 deleting Wolf_Black from Game_Start_NPC_01; the written file has 0 refs).
+      Search the edited layer in memory instead. (Test wolves removed 2026-10-14 on user's request: Harbour /
+      Wild_Outdoor loose layers deleted, Wolf_Black out of Game_Start_NPC_01; backup
+      D:\RisenModding\backup\wolves-removed-20261014)
 - [ ] `translate` / move: only direct children of the layer root are supported - nested entities later
 - [ ] Optional `--yaw` rotation for `spawn` (now always the template rotation)
 - [ ] Local box is approximate for strip weapons, VFX/SFX and monsters (spawn-check: 1122 of 1591 match)

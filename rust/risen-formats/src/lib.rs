@@ -8,4 +8,5 @@ pub mod props;
 pub mod resource;
 pub mod spawn;
 pub mod strs;
+pub mod tab;
 pub mod tple;

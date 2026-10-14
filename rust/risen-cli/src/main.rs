@@ -9,6 +9,7 @@ use risen_formats::lrent::{DynamicEntity, Lrent};
 use risen_formats::pak::Pak;
 use risen_formats::props::{PropertyObject, format_value};
 use risen_formats::strs::Unknown;
+use risen_formats::tab::Tab;
 use risen_formats::tple::Tple;
 use serde::Serialize;
 
@@ -189,6 +190,49 @@ enum Cmd {
         #[arg(long)]
         verbose: bool,
     },
+    /// Localized strings (data\compiled\strings.pak, the loose data\compiled\strings\<table>.tab wins):
+    /// no table = list the tables; else rows whose key or text contains the filter
+    Tab {
+        /// Table name (focus, items, infos, ...)
+        table: Option<String>,
+        /// Only rows whose key or shown text contains this (case-insensitive)
+        filter: Option<String>,
+        /// Columns to show: language codes (de en fr it es pl ru) or column names; default en + ru
+        #[arg(long = "lang", value_delimiter = ',')]
+        langs: Vec<String>,
+        /// Every column
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Set the text of a key (the row is added when missing) and write the loose table
+    /// data\compiled\strings\<table>.tab. Item names: focus FO_<template>, descriptions: items ITEMDESC_<template>
+    TabSet {
+        table: String,
+        key: String,
+        text: String,
+        /// Columns to set: language codes or column names (default: every <Language>_Text column)
+        #[arg(long = "lang", value_delimiter = ',')]
+        langs: Vec<String>,
+        /// Write here instead of the loose game file
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Only print what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Remove a key's row from a table (writes the loose table like `tab-set`)
+    TabDelete {
+        table: String,
+        key: String,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Read + write every .tab of data\compiled\strings.pak and data\common\strings.pak, compare bytes
+    TabCheck,
     /// Walk every string index of every layer + template (what moving entities between files needs):
     /// unknown value types / class data, unreached table entries, table order, remap test
     StringsCheck {
@@ -281,6 +325,54 @@ impl MeshPaks {
             }
         }
         Ok(([-50.0, -50.0, -50.0, 50.0, 50.0, 50.0], "default 1 m cube (no mesh bounds found)".into()))
+    }
+}
+
+/// The string tables the game mounts (mountlist_packed.ini lists data/compiled/strings, not data/common/strings;
+/// only the compiled copies have Polish + Russian).
+fn strings_pak(game: &Path) -> PathBuf {
+    game.join("data").join("compiled").join("strings.pak")
+}
+
+/// A string table opened for editing: the loose data\compiled\strings\<table>.tab if one exists, else the pak copy.
+struct EditTab {
+    src: String,
+    loose: PathBuf,
+    tab: Tab,
+}
+
+fn open_tab_for_edit(game: &Path, table: &str) -> Result<EditTab, Box<dyn std::error::Error>> {
+    let pak = Pak::open(strings_pak(game))?;
+    let name = if table.to_lowercase().ends_with(".tab") { table.to_string() } else { format!("{table}.tab") };
+    let pe = pak.find(&name).ok_or_else(|| format!("{name}: not in strings.pak (see `risen tab`)"))?;
+    let loose = pe.path.split('\\').fold(game.join("data").join("compiled").join("strings"), |p, part| p.join(part));
+    let (src, data) = if loose.is_file() {
+        (loose.display().to_string(), std::fs::read(&loose)?)
+    } else {
+        (format!("strings.pak:{}", pe.path), pak.read(pe)?)
+    };
+    let tab = Tab::read(&data).map_err(|e| format!("{src}: {e}"))?;
+    Ok(EditTab { src, loose, tab })
+}
+
+impl EditTab {
+    fn column(&self, spec: &str) -> Result<usize, String> {
+        self.tab.column(spec).filter(|&c| c > 0).ok_or_else(|| {
+            let names: Vec<_> = self.tab.columns.iter().skip(1).map(|c| c.name.as_str()).collect();
+            format!("{spec}: no such column (de en fr it es pl ru or {})", names.join(", "))
+        })
+    }
+
+    fn save(&self, out: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+        let bytes = self.tab.write();
+        Tab::read(&bytes).map_err(|e| format!("written table does not read back: {e}"))?;
+        let dest = out.unwrap_or_else(|| self.loose.clone());
+        if let Some(dir) = dest.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(&dest, &bytes)?;
+        println!("wrote {} ({} bytes)", dest.display(), bytes.len());
+        Ok(())
     }
 }
 
@@ -787,6 +879,91 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         Cmd::SpawnCheck { into, verbose } => {
             let game = game_dir(cli.game)?;
             spawn_check(&game, &into, verbose)?;
+        }
+        Cmd::Tab { table: None, .. } => {
+            let pak = Pak::open(strings_pak(&game_dir(cli.game)?))?;
+            for e in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".tab")) {
+                let t = Tab::read(&pak.read(e)?).map_err(|err| format!("{}: {err}", e.path))?;
+                let cols: Vec<_> = t.columns.iter().map(|c| c.name.as_str()).collect();
+                println!("{:14} {:6} rows  {}", e.path.trim_end_matches(".tab"), t.rows(), cols.join(" "));
+            }
+        }
+        Cmd::Tab { table: Some(table), filter, langs, all, json } => {
+            let t = open_tab_for_edit(&game_dir(cli.game)?, &table)?;
+            let cols: Vec<usize> = if all {
+                (1..t.tab.columns.len()).collect()
+            } else {
+                let langs = if langs.is_empty() { vec!["en".to_string(), "ru".to_string()] } else { langs };
+                langs.iter().map(|l| t.column(l)).collect::<Result<_, _>>()?
+            };
+            let want = filter.map(|f| f.to_lowercase());
+            let keys = &t.tab.columns[0].rows;
+            let rows: Vec<usize> = (0..t.tab.rows())
+                .filter(|&i| {
+                    want.as_ref().is_none_or(|w| {
+                        keys[i].to_lowercase().contains(w)
+                            || cols.iter().any(|&c| t.tab.columns[c].rows[i].to_lowercase().contains(w))
+                    })
+                })
+                .collect();
+            if json {
+                let out: Vec<BTreeMap<&str, &str>> = rows
+                    .iter()
+                    .map(|&i| {
+                        std::iter::once(0)
+                            .chain(cols.iter().copied())
+                            .map(|c| (t.tab.columns[c].name.as_str(), t.tab.columns[c].rows[i].as_str()))
+                            .collect()
+                    })
+                    .collect();
+                println!("{}", serde_json::to_string_pretty(&out)?);
+            } else {
+                println!("{}", t.src);
+                for &i in &rows {
+                    println!("{}", keys[i]);
+                    for &c in &cols {
+                        println!("  {:16} {}", t.tab.columns[c].name, t.tab.columns[c].rows[i]);
+                    }
+                }
+                println!("{} of {} rows", rows.len(), t.tab.rows());
+            }
+        }
+        Cmd::TabSet { table, key, text, langs, out, dry_run } => {
+            let mut t = open_tab_for_edit(&game_dir(cli.game)?, &table)?;
+            let cols: Vec<usize> = if langs.is_empty() {
+                t.tab.text_columns()
+            } else {
+                langs.iter().map(|l| t.column(l)).collect::<Result<_, _>>()?
+            };
+            println!("{}", t.src);
+            let (row, added) = t.tab.row_or_add(&key);
+            println!("{} {}", if added { "add" } else { "set" }, t.tab.columns[0].rows[row]);
+            for c in cols {
+                let col = &mut t.tab.columns[c];
+                println!("  {:16} {:?} -> {:?}", col.name, col.rows[row], text);
+                col.rows[row] = text.clone();
+            }
+            if !dry_run {
+                t.save(out)?;
+            }
+        }
+        Cmd::TabDelete { table, key, out, dry_run } => {
+            let mut t = open_tab_for_edit(&game_dir(cli.game)?, &table)?;
+            println!("{}", t.src);
+            if !t.tab.remove(&key) {
+                return Err(format!("{key}: no such key in {table}").into());
+            }
+            println!("removed {key}");
+            if !dry_run {
+                t.save(out)?;
+            }
+        }
+        Cmd::TabCheck => {
+            let game = game_dir(cli.game)?;
+            for pak in [strings_pak(&game), game.join("data").join("common").join("strings.pak")] {
+                println!("{}", pak.display());
+                round_trip_check(&pak, ".tab", |d| Tab::read(d).map(|t| (t.write(), t.rows())))?;
+            }
         }
         Cmd::StringsCheck { files } => {
             let game = game_dir(cli.game)?;
