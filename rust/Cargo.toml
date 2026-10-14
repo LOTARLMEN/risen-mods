@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["risen-formats", "risen-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/LOTARLMEN/risen-mods"
+
+[workspace.dependencies]
+risen-formats = { path = "risen-formats" }
+binrw = "0.15"

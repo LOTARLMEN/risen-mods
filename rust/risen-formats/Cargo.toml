@@ -1,0 +1,12 @@
+[package]
+name = "risen-formats"
+description = "Readers/writers for Risen (Genome engine) data files: pak, lrent, tple, ..."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+binrw.workspace = true
+flate2 = "1.1.10"
+thiserror = "2.0.21"

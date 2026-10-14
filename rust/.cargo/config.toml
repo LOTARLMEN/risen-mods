@@ -1,0 +1,6 @@
+# GNU host toolchain (no MSVC): windows-sys (raw-dylib) makes rustc build import libraries with dlltool.
+# rustup's self-contained GNU dlltool needs an assembler (as.exe) that rustup doesn't ship, so use LLVM's:
+# D:\Rust\tools\llvm-dlltool.exe = a copy of llvm-ar.exe from `rustup component add llvm-tools`
+# (one LLVM binary, the mode is picked by the exe name). See TODO Stage 5.21.
+[target.x86_64-pc-windows-gnu]
+rustflags = ["-Cdlltool=D:/Rust/tools/llvm-dlltool.exe"]

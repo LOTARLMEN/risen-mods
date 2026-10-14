@@ -105,6 +105,12 @@ Engine has no borderless option (`<Window FullScreen=... Left/Top/Right/Bottom>`
 - [x] `.ini`: `Borderless=1`
 - [x] Hide Windows cursor over the game window (windowed mode shows OS cursor + game cursor), clip cursor to window while focused
 - [x] Investigate slow startup: D3D11/D3D12 probing comes from DxDiag run by Engine.dll — stubbed (see top)
+- [ ] Bug (user 2026-10-13): game resolution below the monitor's (1600x900 on 1920x1080) + Borderless=1 -> the GUI is
+      drawn enlarged and shifted right/down, the bottom (options tab row) is cut off. EnforceBorderless stretches the
+      window to the monitor every 250 ms while the game renders 1600x900; the GUI seems to map by the client size.
+      Fix idea: remember the size the game itself asks for (WM_WINDOWPOSCHANGING not caused by us) and size the
+      borderless window to that (centred), or full monitor only when it matches; or stretch via the backbuffer.
+      Workaround: keep the game resolution = monitor resolution.
 
 ## Stage 3 — Speed Hack mod
 Implemented in `src/main.cpp` (F4 toggles `eCTimer::SetTimeScaling`), verified in game 2026-10-11.
@@ -219,8 +225,65 @@ Goal: remove the caps, nothing else. Ultra simple, page in the F10 menu with an 
       clamp with it), teach cost = fixed gCInfo::LearnPointCost per dialog option (no table to overflow). Mod writes
       MaxValue (ini/F10 slider 200-2000, ini up to 9999, default 1000) into entries 7/8 [+4], 200 back when off;
       table values checked first. In game: log shows max 1000 written + patch on.
-- [ ] User test No Limits 0.2: teacher past 200, character screen shows > 200, potion of strength past 200, save /
+- [x] (2026-10-14, 0.3 with debug keys: screen 330/310, ring past 200, teacher past 200, damage) User test No Limits 0.2: teacher past 200, character screen shows > 200, potion of strength past 200, save /
       load keeps the value; J (DumpKey) logs base/total/max of the player
+- [ ] **Bug (user 2026-10-13, Наблюдения.md #6): a friend (streamer) says No Limits doesn't work, stuck at 200.**
+      0.2 was never user-tested. First get facts: his RisenMods.log ("[no-limits]" lines: version, "max 1000
+      written", "patch on" or "skip: unexpected bytes"), installed version, which attribute (only strength /
+      dexterity are covered!), teacher or potion, does the teach option disappear or does the value stay at 200.
+      Suspects: other attribute; the teach command / gCSkillValue clamps again after IsSatisfied; GOG/other build
+      More facts (user 2026-10-13, seen on the stream): dexterity never shows above 200, he put on dexterity rings to
+      one-shot an enemy - damage didn't grow. Code check: every total in the game (Game.dll GetSkillValue /
+      SetSkillModifyValue, Script.dll PSSkills::GetTotal / GetMaximum) = base + modifier clamped to
+      ms_arrSkillInfos max, which 0.2 sets to 1000 - so with 0.2 applied, rings must go past 200. The symptom
+      matches No Limits 0.1 exactly (released v2026.10.11 .. v2026.10.12.3; 0.1 kept the 200 maximum, only
+      opened teachers). Most likely he has 0.1 (installer not re-run) or 0.2 didn't apply (log: "not the expected
+      version"). Ask: installer -> No Limits version, or his RisenMods.log
+      - [x] (0.3) Log watch: every ~3 s the player's strength / dexterity (trained, total, items +N, maximum) is
+        logged when it changes - his log will show it without debug keys
+      - User: friend updated everything before the stream -> he had 0.2.1, not 0.1. User's own log: after a load
+        the table holds 1000 for 7/8, patch on - the game doesn't reset it.
+      - Damage: Script_Game DoSwordDamage (+0xd90c0) = (damage amount + PSSkills::GetTotal(skill)) * multiplier, no
+        200 clamp there; SetSkillBaseValue clamps only to the table max. Unchecked: DoPhysicalDamage / AssessDamage
+        (protection, caps), character screen text. Note a +5/+10 ring changes damage by only that much.
+      - [ ] (0.3 debug, REMOVE after the test) [Debug] BoostKey=END / BoostAmount=100 in the user's ini: END adds 100
+        to trained strength + dexterity (PSSkills::SetBase modifier 0 = add). Test: press until > 200, character
+        screen, log "player Strength: trained / total", hit the same enemy before/after. Don't save (or press with
+        BoostAmount=-100 back)
+      - [x] Test done (user 2026-10-13, 19:51): END x3 -> strength 330 / dexterity 310 on the character screen,
+        log "maximum 1000", wolves one-shot -> past 200 works (screen + damage). So the friend's case is his setup
+        or the TEACHER path (training past 200 at a teacher is still untested!). Next: test a teacher past 200
+        ourselves (needs base ~200 + learning points: END to ~195, then train), and ask for his RisenMods.log
+        (0.3 logs "player Dexterity: trained / total / maximum" + "patch:" lines)
+      - [x] (user 2026-10-14) No max choice: MaxValue slider / ini key removed, fixed kMaxValue 9999 ("no limit"; not
+        bigger: 4 digits on screen, PSSkills::SetBase modifier 3 scales with the maximum)
+      - [x] (user 2026-10-14: works) Ring test (user 2026-10-14): [Debug] SetKey=HOME / SetValue=200 sets trained str+dex to 200 (SetBase
+        modifier 2), then put on a ring -> does the screen show 200 + bonus?
+      - [x] (user 2026-10-14: all works) Teacher test at 200 - HOME (str/dex = 200), learning points needed, a strength /
+        dexterity teacher must still offer training and it must go to 201+
+      - [x] (removed from code and ini 2026-10-14) Remove BoostKey/BoostAmount/SetKey/SetValue from the user's no_limits.ini after the teacher test (code may stay as a
+        hidden debug key, it's off without the ini line)
+- [x] (No Limits 0.3, built 2026-10-13, needs game test) **Bonuses don't count for teachers (user 2026-10-13, Наблюдения.md #8)**: rings / amulets / potions must not
+      use up the teacher's range; trained and bonus values are separate and only add up in the total. Confirmed in
+      code: IsSatisfied (+0x8a16fa) checks base [+0x20] + modifier [+0xA8] against teacher.max - so a +10 ring
+      makes a "max 100" teacher stop at 90. Fix = in our cave compare only the base (which of +0x20/+0xA8 is the
+      base - check with DumpKey wearing a ring). Same patch site as No Limits -> option in this mod ("Teachers
+      ignore item bonuses", default on), for every skill, not only 7/8. Check permanent potions (do they raise base
+      or modifier?) - the user counts them as bonuses too. Size: small
+      Done: +0x20 = base (GetSkillBaseValue), +0xA8 = modifier (GetSkillModifyValue, ApplySkillModifyValues =
+      equipment). Cave is rewritten by Apply: IgnoreBonus -> first 13 bytes = mov ecx,[r15+rbp*4+20h] + nop8;
+      Enabled off -> ja (cave+65) becomes jmp (all skills keep teacher max). Site jump on while either option is on.
+      [ ] Test: ring on, teacher whose max = base + ring bonus still offers training; DumpKey base/total;
+      permanent potion -> base or modifier? (if base, potions still count - tell the user)
+- [ ] **Character screen: total with a breakdown (user 2026-10-14)**: e.g. "240 (200 + 40)" = trained + item / other
+      bonuses, at least for strength / dexterity (maybe every stat with a bonus). Recon (own session, ties into 5.12):
+      the value is drawn by gCSkillPicbox (ViewMode=5, Character=PC_Hero, SkillType=N; notes/ui-recon.md section 3) -
+      class NOT exported, only RTTI (.?AVgCSkillPicbox@@ -> vftable -> the draw / text update method). Find where it
+      formats the number (call to gCSkills_PS::GetSkillValue Game.dll +0x978070 or PSSkills::GetTotal, then a
+      "%d" / "%d/%d" format) and hook it to append " (base + bonus)" when bonus != 0 (GetSkillBaseValue +0x977b50,
+      GetSkillModifyValue +0x977550). Check the width: the value field is ~135x16 in the 328 px attributes panel -
+      maybe shorter "240 (+40)", or the breakdown in the tooltip (gCHintStatic POP_SKILLDESC) instead. Note:
+      permanent potions raise the base (they'd be counted as "trained") - check
 - [ ] Maybe: intelligence and other attributes too (user said "в целом ограничения прокачки") - ask
 - [x] (0.1/0.2) Recon: where the cap lives - teacher dialog scripts in Script_Game.dll (CON_teach & co), template/.pak data
       (per-teacher max level), or a hard max in the attribute code (PSSkills / gCSkillValue?)
@@ -315,7 +378,65 @@ Menu, all mod pages and the installer in EN / RU / DE / PL.
 - [ ] READMEs: keep RU + EN (DE/PL optional)
 
 ## Maybe later
-- [ ] (unlikely) Native "Mods" tab in the game's own options menu (`GUI2.dll` + `gui2.pak`; few exported symbols → heavy RE, fragile across game updates)
+- [ ] **Native "Mods" page (user's decision 2026-10-13: the full native variant, not just a button opening F10).**
+      A "Моды" entry in the game's own menu opens a page drawn by the game itself (its buttons / spin buttons /
+      trackbars / labels, like OPTIONS_SETTINGS) with the list of our mods and their settings. Data source = the
+      menu.dll registry (HubPage / HubItem): no mod changes. F10 ImGui window stays as the fallback. Steps:
+  - [x] M1. (2026-10-13, notes/ui-recon.md section 8 + notes/ui-tree-rev2045.txt) Dev mod `mods/ui-lab` (no README -> not packaged): [Debug] DumpKey logs every loaded page (FindPage 0..29)
+        as a tree (RTTI class, name, ID, pos, size, text); checks gCHudPage2* == eCGuiWindow2*. SaveKey ->
+        SaveWindowAsClass of pages 13/18/22 (XML format of the layout, how spin buttons are described)
+        Result: pages are eCGuiWindow2 (no offset), buttons = eCScriptRadioButton (SetOnClick exported), settings rows
+        = label + 3 gCSpinButton (exported: SpinType / SpinBuddy / OnSpin). SaveWindowAsClass failed with a relative path
+  - [x] M2. (2026-10-13) `scripts/risenmods` -> build\bin\scripts\Script_RisenMods.dll (build.bat builds + deploys it).
+        Game.dll loads it, ScriptInit registers RM_Test / RM_OnClick_Mods / RM_OnSpin / RM_OnClick (descriptor:
+        4 arrays {data,count,cap} of {bCString name; bCString second; fn}, scripts at +0x30; all counts 0 -> the
+        game's message box). Each RM_* forwards to the `RisenScriptEvent` export of menu.dll (ui_lab.dll for now).
+        ScriptCall("RM_Test") from ui-lab returned 42. Log via new ModInitIn(instance, name, "..\\mods").
+        Installer must put this DLL into bin\scripts (and remove it with the last mod) - later, M8
+  - [x] M3. (2026-10-13, user saw it) "Моды" = 6th tab in DLG_MENU_OPTIONS (user's choice: options row, main menu
+        untouched; if a main menu button is wanted later, recentre 6 x 153 px from x=211). ui-lab clones the
+        "Производительность" tab (eCGuiWindow2::Clone(page) -> eCScriptRadioButton), SetText, SetOnClick(proxy
+        "RM_OnClick_Mods"), relayouts the row. Vanilla tab OnClick: OnClick_Menu_Video/Audio/Input/Settings/System
+        (Settings = gui2.Open(22)). Click -> RM_OnClick_Mods -> gui2.Open(22) opened the settings sub-page: works.
+        143 px tabs cut "Производительность" -> now 164 px tabs on a background widened 896 -> 1072 (built +
+        deployed 07:17, NOT seen yet). Open: does the radio highlight follow our tab; game exit at 07:16:52 logged
+        Game.dll+0x970cdb + SharedBase+0x7caa9 - the same pair was in the 2026-10-12 22:48 log without ui-lab,
+        so probably the known exit-time exception (ask the user whether the game was quit then)
+  - [x] M4-M6 (2026-10-13, user-tested in game, mods/menu/native_page.cpp; ui-lab keeps only the dumps). The tab
+        lives in menu.dll. Click -> gui2.Open(22) + "mods mode": page 22's own controls hidden (all but the panel and
+        textless pictures), our clones shown, restored when page 22 is hidden or via the "Параметры игры" tab (its
+        OnClick wrapped: RM_OnClick_Settings -> Leave + OnClick_Menu_Settings). Layout (user's design): a LIST of
+        mod buttons (clones of "Apply", 420x44, step 52, "menu" page left out - F10 only) -> a MOD view (title
+        "Моды · <mod>", up to 14 rows label + ‹spin›, mouse wheel scrolls long mods by 2 rows, no page spin),
+        "Назад" bottom-left (298,606 200x28) or Esc (WM_KEYDOWN swallowed in menu's WndProc) = back to the list.
+        Facts: gCSpinButton +0xF0 buddy (arrows point at the value control's ID), +0xF8 OnSpin; the value control
+        owns the script; OnSpin args = {int action; bCUnicodeString text}: 0 left arrow, 2 right, 3 text query - the
+        script writes the shown text. Clones are created UNDER their siblings (parchment covers them) ->
+        FFC.dll CFXWnd::BringToFront([wnd+0xA0]); a text set while hidden isn't drawn until repaint -> set again on
+        show. A button hidden inside its own OnClick redraws itself pressed -> view switches are deferred to the next
+        tick and hidden buttons are moved off-screen. Back ignored < 500 ms after a switch (suspected radio-group
+        echo, watch the log line "Back right after a switch ignored"). Values: shared MenuValues / MenuWriteValue
+        with the F10 window (ini + onChanged). Script names: RM_OnSpin_00..15, RM_OnClick_Item_00..13, _Back, _Mods,
+        _Settings (34). AutoLoot got its own hand icon switch [Indicator] Show (item 15, Effect parents -> 28).
+        Spin action 1 = click on the value itself (starts a rebind on key rows). Rebind: RMB is "back" in the
+        game's menus -> InputCaptureSet(on) while waiting (after LMB is up) and until the bound key is released
+        (user-tested 2026-10-13: MOUSE2 binds on the first try, page stays open). Capture off on the native page
+        uses InputCaptureSet(..., restoreCursor=false): the cursor no longer jumps back to the clicked value.
+        Open: texts follow menu.ini Language, not the game language; slider = spin steps (no trackbar); exit-time
+        exception once at Engine.dll+0x6b1b04 (2026-10-13 07:53, stack lost to log rotation) besides the usual
+        Game.dll+0x970cdb pair - watch it
+  - [ ] M7. Robustness: language / resolution change, main menu from a running game, gamepad (_C layouts), save/load
+        Resolution: the GUI virtual width depends on the aspect (data/ini/ConfigDefault.xml GUI.Aspect*: 16:9 = 1365,
+        4:3 / 5:4 / 10:9 = 1024, vanilla layout 170 px further left). The game has no fullscreen option (ConfigLocal.xml
+        FullScreen="false"); a 1600x900 window cuts the bottom even in vanilla. native_page.cpp: g_dx =
+        (page width - 1365) / 2 is applied in Place() and template matching; on 1024 the tab row is 4 px gaps + 6 px
+        margins (1016 px). Checked at 16:9 only (dx 0, 2026-10-13 08:19); 4:3 untested (try a 1280x960 window). A
+        runtime size change only logs "native: screen A -> B" with vanilla/our x - see whether the game moves controls.
+        User is now playing with the 08:19 build to catch crashes / bugs (will bring the log).
+  - [ ] M8. shared/game_ui.h for 5.11 / 5.14, README Menu, release
+- [ ] Native "Mods" tab in the game's own options menu. Was "unlikely"; 5.12 recon (notes/ui-recon.md) found exported
+      routes: clone a button in DLG_MENU_OPTIONS (gEHudPage 18, tab row y=710) + own click handler via a
+      bin\scripts\Script_*.dll ScriptInit. Depends on the 5.12 experiments
 
 ## Stage 5.9 — Quick lockpick (user's idea 2026-10-12; own mod `mods/quick-lockpick`, grows out of QuickLoot)
 User's design (2026-10-12): a separate mod. Look at a locked chest, press a key (player picks it in F10): one lockpick
@@ -369,17 +490,58 @@ thefts, the lower the chance (NPCs get wary). Failure = caught, the game's own t
 - [ ] Theft counter stored where? Saves can't get our data easily - a per-save side file or an existing game
       variable (recon)
 - [ ] F10 page: key, base chance, penalty per theft; feedback on screen (success / caught)
+- [ ] User's design notes (2026-10-13, Наблюдения.md #4), to merge with the above:
+      - chance shown in the focus name like the chest " (Пусто)" mark (same eCLocString hook), e.g. " (Кража 65%)"
+      - chance from player's pickpocket skill + dexterity vs the NPC: nameless commoners (Harbor Town slums) easy,
+        guards / named NPCs hard; NPC side from its attributes (dexterity?), level, faction - recon what NPCs have
+      - only from behind, RMB (conflicts with QuickLoot RMB only on bodies - living NPC = pickpocket)
+      - loot (user's decision 2026-10-13): NOT taken from the NPC's real inventory - generated "stealable" things
+        that aren't in its pockets: simple plants, food, gold; wealthier NPC -> more gold. Our own loot tables per
+        NPC kind (we analyse NPCs and write the tables)
+      - XP proportional to difficulty, min 10
+      - (user 2026-10-13) ONE theft per NPC, never again (after success; what failure does - design)
+      - (user 2026-10-13) knocked-out NPC = 100%, sleeping NPC = 100%, dead NPC = no pickpocket at all.
+        Knocked-out: pickpocket (generated loot) is separate from looting its inventory (Stage 5.13 RMB fix) -
+        define which key does what on a downed NPC
+      - later: "NPCs robbed: N" and own chance on the character screen (5.12)
+      - Claude's notes: per-NPC "robbed" state needs per-save storage (biggest open question); check vanilla
+        pickpocket first (dialog-based, skill-gated?) so the two don't double-dip
+      - Future idea (user 2026-10-13): steal special quest items (like the Golden Goblets) and thereby change
+        quests - needs quest recon (how quests check for the items, which NPCs/places hold them); after the base
+        pickpocket works
+- [ ] User's notes part 2 (2026-10-13, Наблюдения.md #4.1-4.3):
+      - 4.1 Pickpocket teachers teach ONE level only (the rest cut from their dialogs); after that the chance grows
+        by practice: each successful theft +N% (e.g. +1% per theft, 5 thefts = +5%), cap to design. Needs: recon of
+        the teach dialogs (Script_Game teach conditions / info templates per teacher) + per-save counter (same
+        storage question). Feasible; cutting dialog options = hook gCInfoConditionCanTeachSkill like No Limits
+      - 4.2 Vanilla already lets you steal some items from some NPCs (sometimes quest-important), others never
+        (e.g. an artifact you must buy). User wants those stealable too "if it doesn't break quests". Conflicts with
+        "generated loot only" above -> design: generated loot + a chance for a real item from the inventory?
+        Recon: how vanilla marks stealable items (item flag / NPC flag / quest script), which quests check that
+        the item was bought (dialog flag) - each quest item needs a manual check. Medium-hard, do last
+      - 4.3 Chance bonuses from equipment: some rings / amulets add +X% (table by item template name, our own
+        list; possibly a magic/permanent bonus shown in the item text later). Sneaking (crouch) behind the NPC adds
+        a bonus (player's sneak state - recon the movement mode). New items in the game = new templates in .pak:
+        hard and not distributable as game assets - instead give existing rare rings/amulets the bonus
+
 
 ## Stage 5.12 — Own stats in the character screen (user's idea 2026-10-12, research first)
 Can mods add their own lines to the game's character / attributes screen (e.g. "Thefts: 12", pickpocket chance)?
-- [ ] Recon: how GUI2.dll builds the character screen (layout from gui2.pak? script-filled list?), whether a line
-      can be added through exported calls; fallback - our own ImGui panel drawn next to the game's screen while it
-      is open (menu.dll overlay, detect the screen is open)
-      Leads from 2026-10-12 (Press START skip): game screens are gCHudPage2 pages with a gEHudPage id (start screen
-      0x1A/0x1B, main menu 0x0D); scripts open/close them with GUI2::Open / Close / IsVisible (Script.dll exports,
-      global `gui2`); each page has a PageControl script (eCScriptProxyScript) with handlers in Script_Game such as
-      OnX360Paint_Start / OnX360GameMsg_Menu_Load; gCHudSystem2::FindPage(gEHudPage); page layouts are loaded with
-      gCHudPage2::LoadBinary/LoadRaw (from gui2.pak?). Same route for the main menu / options ("Mods" item, line 318)
+- [x] (static recon 2026-10-12 -> notes/ui-recon.md, tools/pak_list.py + tools/gui_windows.py) Recon: how the
+      character screen is built. GUI2.dll is only a widget lib; layouts = data/compiled/library.pak ->
+      compiled_windows.bin (GENOMFLE, 84 xwnd). PAGE_GAME_CHARACTER (gEHudPage 3) is pure data binding: unexported
+      Game.dll controls gCSkillPicbox / gCSkillProgressBar with Character="PC_Hero" + SkillType (gESkill, 28 =
+      Pickpocket) + ViewMode, all ID 0xFFFF - no code fills it, so vanilla controls can't show our values.
+      Exported building blocks: gCHudModule2::GetSystem -> gCHudSystem2::FindPage/IsVisible/HandlePageChange;
+      Engine eCGuiWindow2 tree (GetFirstChild/GetNextSibling, Get/SetText, Set/GetPosition, SetVisible,
+      Clone(parent), LoadWindowA/SaveWindowAsClass XML). Big find: Game.dll loads every bin\scripts\*script_*.dll and
+      calls its ScriptInit -> our own Script_RisenMods.dll can register new GUI handlers (OnClick/OnPaint) by name.
+      Page id table, main menu / options button rows and ranked routes in the note
+- [ ] Experiments in game (notes/ui-recon.md section 7): FindPage(3) tree dump (check gCHudPage2* == eCGuiWindow2*),
+      Clone a label + SetText on the character page (survives close/open, load, resize, language?),
+      SaveWindowAsClass dump, minimal Script_RisenMods.dll with ScriptInit, "Mods" button cloned into DLG_MENU_OPTIONS
+- [ ] Pick the route with the user after the experiments (runtime clone / own script DLL / layout data mod / ImGui
+      fallback), then a shared helper in shared/ (game_ui.h) for 5.11 / 5.14 / the "Mods" menu item
 
 ## Stage 5.13 — AutoLoot / QuickLoot fixes (user's report 2026-10-12)
 - [x] Bug (0.7, user-tested OK): QuickLoot skips quest items (e.g. grain for a quest - every stalk needs a click). QuickLoot must take
@@ -428,8 +590,21 @@ Can mods add their own lines to the game's character / attributes screen (e.g. "
       existing eff_* per category (find ones with distinct colours, test visually), or recolour our deep copy of
       the sequence (find the colour fields of the particle commands). F10: on/off, maybe colour per category
 - [x] Test (user 2026-10-12): quest grain is collected, no AutoLoot delay
-- [ ] (low priority, user 2026-10-12) Holding RMB for QuickLoot "doesn't quite work as it should" - ask what exactly
+- [x] (2026-10-14, built, needs game test: user said held RMB took one item only - it was press-edge only; now repeats every 250 ms while held, silent log on repeats, emptied containers skipped) (low priority, user 2026-10-12) Holding RMB for QuickLoot "doesn't quite work as it should" - ask what exactly
 - [ ] Re-check after 0.8 (user asked): arrows / bolts in flight are not picked up - shoot with F on, read the log
+- [x] (built 2026-10-13, needs game test) (user 2026-10-13, Наблюдения.md #1) RMB QuickLoot does nothing on an NPC knocked out in a non-lethal fight -
+      the player has to LMB and loot by hand. Cause: by design since 0.1 - IsDeadBody() needs isDead, README says
+      "never taken: unconscious people" (Sara at the start). Plan: RMB accepts isDown NPCs too, but only when the
+      game itself allows looting (CanInteract_Player_Loot / the same script path as LMB), so theft / reactions stay
+      vanilla; radius AutoLoot (F) keeps skipping them. Check: does vanilla count it as theft, does the NPC react
+      on waking up. Update README RU/EN
+      Done: IsDownBody = npc && !dead && isDown && inv stacks && PSInteraction::CanInteractWith(player, npc); QuickLoot
+      treats it as a body (game's AutoLoot script + quest stacks), log "quickloot: knocked-out ...". README updated.
+      (user 2026-10-14) AutoLoot (F) takes them too: [AutoLoot] KnockedOut=1 (default on, F10 checkbox under
+      "bodies", needs Bodies=1), same IsDownBody check. Built, needs game test.
+      [ ] Test: knock out in a duel -> RMB takes; F with bodies on takes; no reaction / theft when watched? NPC waking up; CanInteractWith
+      false -> log "not lootable"
+
 
 ## Stage 5.14 — "Slash and Craft" mode: attributes grow from combat (user's idea 2026-10-12, big, own sessions)
 Inspired by the "New Balance" mod for Gothic 2 Night of the Raven. Part of character growth comes from fighting:
@@ -478,6 +653,194 @@ quick_lockpick description, AutoLoot description updated for theft rules; Cleanu
 - [x] User checked the installer (links line, links, descriptions)
 - [x] Menu 1.1.2 (palette only), deployed, repackaged
 - [x] Released v2026.10.12.9 (installer 1.3, menu 1.1.2; other mods unchanged)
+
+## Stage 5.17 — Russian voice-over issues (user 2026-10-13, Наблюдения.md #2-3; not our mods, research first)
+- [ ] Some characters are too quiet in the Russian voice-over (user: +50% would fit). Web search found no ready
+      fix. Options: (a) check which files / speakers (speech pak, compare peak/LUFS per speaker with a script);
+      (b) runtime per-speaker gain in a mod (hook the speech playback, table speaker/file -> gain); (c) normalized
+      repack of the speech pak - can't be distributed (game assets), only a local tool. Low priority
+- [ ] Subtitles don't match the Russian speech. Steam forum: the Steam release's voice (Sara, the Harbor Town gate
+      guard, ...) differs from the Novy Disk text; one player rewrote Sara's lines by hand, no public file found.
+      Options: search for a fixed strings pak / old Novy Disk text; or a local tool: speech-to-text (Whisper) over
+      the Russian speech files -> list of mismatching lines -> corrected strings (text is distributable only as
+      our own patch). Size: several sessions; first measure how many lines differ
+- Sources: https://steamcommunity.com/app/40300/discussions/0/3758851615160881458 ,
+  https://steamcommunity.com/app/40300/discussions/0/46476690965296705
+
+## Stage 5.20 — Damage numbers (user's idea 2026-10-13)
+Floating damage numbers over the target on every hit (like in many RPGs). Feasible: the damage scripts in
+Script_Game (DoDamage / DoSwordDamage / AssessDamage ...) know attacker, target and amount; hook one common point
+(where the final amount is subtracted from the HP - or watch target HP changes per frame, simpler and safer),
+project the target's head position to the screen (camera matrix, already read by AutoLoot) and draw the numbers in
+the menu.dll overlay (ImGui, game font), rising and fading. F10: on/off, only player's hits / also incoming,
+colours (crit, fire...). Size: 1-2 sessions.
+- [ ] Recon: the final damage point (AssessDamage -> HP change), attacker = player check, projection to screen
+- [ ] Prototype: HP-delta watcher for NPCs near the player + overlay numbers; then decide whether to hook damage
+
+## Stage 5.18 — Quick mining (user 2026-10-13, Наблюдения.md #5; QuickLoot family, like quick-lockpick)
+RMB on an ore vein: if the player has learned mining and carries a pickaxe -> the ore is mined at once (no animation),
+otherwise the vanilla behaviour / hero line. Same pattern as quick-lockpick (game script decides, we skip the action).
+- [ ] Recon: ore vein entity (focus name, interaction type), Script_Game CanUse / mining script (skill check,
+      pickaxe check, how many nuggets, does the vein deplete), what the vanilla animation end gives (XP? item log)
+- [ ] mods/quick-mining or part of quick-lockpick (rename to quick-actions?) - ask the user
+- [ ] Test: without skill, without pickaxe, depleted vein, save/load. Size: ~1 session
+
+## Stage 5.19 — Draw distance (user 2026-10-13, Наблюдения.md #7)
+data\ini\ConfigDefault.xml / ConfigPerformance*.xml already have ViewDistance (level 1-3) with ViewRange per level
+(2500 / 4000 / 7500, one 6000) and ScreenObjectDistanceCulling="0.008" (small objects culled by screen size).
+- [ ] Check what the game's own options menu changes (is there a view distance slider, which value it writes)
+- [ ] Experiment: higher ViewRange / lower culling in ConfigLocal.xml (backup first) - visible difference, FPS, fog
+      or LOD pop-in (far terrain / LOD meshes may be the real limit)
+- [ ] If it helps: F10 slider in the Window mod (or own small mod) writing the value at runtime (find the engine
+      setter) or into ConfigLocal.xml with "restart needed". Size: 1 session, result not guaranteed (LOD limits)
+
+## Stage 5.21 — World editing: old Risen Editor recon -> own Rust tools (user's idea 2026-10-14; next: spawn/copy/delete entities)
+Goal: get the community world editor (Risen Editor by Galrath 434, ~2013, place/copy/delete NPCs, monsters, items)
+working with the 2023 64-bit re-release; later an AI-friendly CLI over the world/template data and maybe a nicer
+world-editing wrapper. Old 32-bit DLL mods (Elusively Patched Unit, Baltram's Script_Extensions) are known broken on
+64-bit. Savegames are compatible between the old and new SKU -> data formats probably unchanged (unverified).
+Prior art: Baltram's rmtools (github.com/Baltram/rmtools, open source: Rimy3D for ._xmsh/._xmac/._xcom, other converters),
+total conversion "Neuland"/DTC (worldofrisen.de/download_89.htm). WoP forum blocks bots - download links may need the user.
+- [x] Recon 2026-10-14: Risen Editor = standalone C# (.NET 4, x86, SlimDX/DX11) OFFLINE file editor, never touches
+      the game process -> 32/64-bit of the game doesn't matter. Source: github.com/hhergeth/RisenEditor (= galrath434;
+      3 forks are identical copies) - does NOT build: author's GameLibrary.dll missing. Working binaries from the WoP
+      thread (upload.worldofplayers.de/files9/tA98Wm2x5Risen_Editor.rar = newest 2013-08-01, Yfq8...Risen_Editor.rar
+      = 2013-07-30, RisenEditor_master.zip = source) - host stalls behind the user's corporate VPN, fine without it.
+      Installed outside the game/repo: D:\RisenModding\ed_new\Risen Editor (ed_old, ed_src next to it).
+      Game path: registry HKLM\SOFTWARE\WOW6432Node\Deep Silver\Risen\install_dir (present, wins over Settings.ini).
+      Pak format unchanged (G3V0, offsets at +24); world = data\common\projects.pak (410 .lrent).
+- [x] Fix: editor threw in RisenPak..ctor on file names present in two paks (64-bit build has 19: 17 .tab in
+      common\strings.pak + compiled\strings.pak, 2 fonts in gui2.pak + gui2_back.pak). Patched 1 byte in
+      RisenEditor.exe: RisenPak..ctor IL `ldarg.3` (DoOverwrite) -> `ldc.i4.1` (file offset 0x42E7C, 05 -> 17), so the
+      later pak wins (compiled strings). Original kept as RisenEditor.exe.orig. Editor starts (user saw the main window).
+      Overwriting the exe in place failed (Errno 22, likely AV) - write a copy and rename.
+- [x] User test: World.wrl loads (slow, ~700 MB, everything at once), meshes + textures render, Properties work.
+      Navigation (from source): double-click an entity in the Scene tab or Ctrl+G = camera jumps to it; opening one
+      .lrent jumps to its first object. Camera (GameLibrary.Camera.Update): WASD, E/Q up/down, RMB look, wheel =
+      speed; movement is per frame (no delta time) -> slow at low FPS. Open single layers, not World.wrl.
+- [x] Patched GameLibrary.dll (orig = GameLibrary.dll.orig): Camera Speed 30 -> 150 (both ctors, ldc.r4 at file
+      0x1FE1A / 0x2074F), wheel factor 0.93/1.07 -> 0.77/1.3 (0x1FEB6 / 0x1FEBD). RisenEditor.exe: LargeAddressAware
+      flag (4 GB instead of 2). IL tools: pip dnfile + dncil, scripts il_find/il_type/il_dis (session scratchpad;
+      move to risen-mods/tools if we keep patching)
+- [x] Save test 2026-10-14: FAILED. Save wrote data\common\projects\World\SysDyn_{C3960F11-...}.lrent (same size
+      18218, differs from the pak copy from byte 1815), then an unhandled EndOfStreamException ("Попытка чтения после
+      конца потока"); the user pressed Continue, nothing more was written. Stack trace not captured (next time:
+      "Сведения" button). Not the stream compare (GameLibrary EXT_Stream.StreamsContentsAreEqual checks lengths) -
+      likely a BinaryReader re-reading some structure. Rolled back: file moved to
+      D:\RisenModding\backup\data-before-save-20261014-162830\sysdyn_written_by_editor.lrent, data\ == snapshot
+      (filelist.tsv there). Editor saves = loose files at <game>\data\common\projects\<layer path> (pak path minus .pak).
+Decision 2026-10-14 (user): the old editor is a dead end for daily work (slow single-threaded load, hangs, save
+crashes, closed GameLibrary.dll). Rewrite in Rust instead: one format library + CLI now, own editor later.
+Layout (new repo or risen-mods/rust/, decide at setup):
+    risen-formats  (lib crate: pak G3V0, lrent/sec/wrl/wrldatasc, tple, later xmsh/ximg/xmat)  <- shared core
+    risen-cli      (bin: list / find / show / edit, --json output for AI agents)
+    risen-editor   (later: GUI on egui + wgpu or Bevy, multithreaded loading, on top of risen-formats)
+Reference implementation to port from: D:\RisenModding\ed_src\RisenEditor-master (C#): Code\Risen FileSystem\
+LRENT_Base.cs + GENOME_Base.cs (property-set serialization), TpleFile.cs, tabFile.cs, Loader\RisenPakFile.cs;
+our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer / for cross-checking.
+- [x] Rust toolchain on D: 2026-10-14: rustc 1.99 stable, host x86_64-pc-windows-gnu (no MSVC), profile minimal +
+      clippy, rustfmt, rust-analyzer; RUSTUP_HOME=D:\Rust\rustup, CARGO_HOME=D:\Rust\cargo (user env vars),
+      D:\Rust\cargo\bin on user PATH (already-open shells need the vars set by hand). Workspace risen-mods\rust\
+      (risen-formats lib + risen-cli bin `risen`, binrw 0.15 for declarative read+write), rust/target/ gitignored.
+      Agent tooling researched: only the official rust-analyzer-lsp Claude Code plugin is worth it (installed, works);
+      Orca keeps its old env (main process lives for weeks) -> RUSTUP_HOME/CARGO_HOME also set in ~/.claude/
+      settings.json "env", otherwise the rustup proxy has no default toolchain and rust-analyzer exits 1;
+      no ready Genome pak/lrent parsers exist, no useful C#->Rust converters.
+- [x] risen-formats: pak reader 2026-10-14 (rust/risen-formats/src/pak.rs; real directory tree from the C# reader,
+      not the Python heuristic scan; only the directory is read on open, data on demand; names Latin-1 = lossless).
+      CLI: `risen pak-list <pak> [filter]`, `risen pak-extract <pak> <name|path> <out>`. Verified: all 25 paks
+      (161951 files) == tools/pak_list.py (name, stored size, enc+comp, order); extract == independent Python zlib
+      read for plain + zlib entries (strings, projects, animations). Header +16 = default compression (0/1/2).
+      Build gotcha: GNU host + windows-sys needs dlltool; rustup's GNU dlltool wants as.exe (missing) ->
+      rust/.cargo/config.toml -Cdlltool=D:/Rust/tools/llvm-dlltool.exe (copy of llvm-ar.exe from llvm-tools;
+      re-copy after a toolchain update if builds break). Std 1.99 has its own read_le -> don't call binrw's
+      read_le on primitives (ambiguity warning), use BinRead::read for structs.
+- [ ] Game VFS over all paks + loose data\ files (the 19 duplicate names: later pak wins like the patched editor;
+      loose files override paks - check the game's real order when we first need it)
+- [x] .lrent read + write 2026-10-14 (risen-formats: archive.rs GENOMFLE + string table, props.rs property
+      objects, lrent.rs layer/context/entities, bin_io.rs). Format: "GENOMFLE", u16 1, u32 table offset; body =
+      u32 0xD0DEFADE + gCDynamicLayer object; its class data = "GENOMEDL" + u16 + eCEntityDynamicContext object
+      whose class data = entities + (parent, child) pairs ending (-1,-1); string table u32 0xDEADBEEF, u8 1, count,
+      (u16 len, bytes). Property values + unknown PS class data kept raw (sized), string table kept as read ->
+      `risen lrent-check`: ALL 410 .lrent in projects.pak byte-identical after read -> write.
+      Risen Editor bugs found (eCGeometryEntity): RenderAlpha+ViewRange exist from v212 (editor: 213),
+      CacheInRange from v213 (editor: 214) -> v212/213 entities (OutMain_Nav, Levelmesh_Water_Rivermesh, 2 test
+      levels) were misread by it. Its save also rebuilt the string table in first-use order.
+      CLI: `risen layers [filter]`, `risen entities <layer|file> [--props] [--json]` (Harbour_Town_NPC_01 -> 80
+      entities, Ingvar -2240 493 -20187 with gCNPC_PS etc.), `risen find <name|guid> [--props] [--json]` over all
+      410 layers in ~1 s. Position = world matrix translation (m[12..15]); entity 0 "DRE" = layer root;
+      creator = template GUID (name lookup needs templates.pak - next).
+- [ ] .sec / .wrl round trip (small files, same archive + property objects; gCSector lists its layers)
+- [ ] First real edit: `risen move <layer> <guid|index> --to x y z | --by dx dy dz [--out f] [--dry-run]` DONE
+      2026-10-14 (lrent.rs DynamicContext::translate + update_root_bounds). Writes loose file
+      data\common\projects\<layer path>; an existing loose file is edited further. Moves world+local translation,
+      world/geo box, world/geo sphere of the entity and its descendants (only direct children of the root for now).
+      Verified on all 410 layers: root DRE matrix = identity (local == world for top-level entities), root geo box =
+      union of entity geo boxes, context_box = the same box, root sphere = box center + half diagonal (stored
+      spheres differ in float rounding -> only recomputed when the box changes). Hierarchy = (0, i) pairs.
+      `risen entities <layer> --geometry` prints matrices/boxes.
+      IN-GAME TEST PASSED 2026-10-14: It_Plant_Mushroom #37 {E2121F9E-...} moved from (-38525, 283, 800) to
+      (-37450, 120, -5300) appeared next to Sara in a NEW game (loose file
+      data\common\projects\World\Outdoor\Game_Start\Game_Start_Item.lrent; rollback = delete data\common\projects).
+      First try: the game IGNORED the loose file. Cause: Risen.exe starts the engine with
+      `-mnt=mountlist_packed.ini`; bin\mountlist_packed.ini (plain ASCII) has [Root] NoPhysical=true -> only paks,
+      loose files under the [Packed] dirs (data/common/projects, data/compiled/..., data/raw/...) are not mounted.
+      Fix: NoPhysical=false (original in risen-mods\backup\bin-original\mountlist_packed.ini). No crash, no conflict
+      dialog. Note: this also makes the 14 loose .fx/.fxh in data\compiled\effects\shadermaterial (shipped with the
+      2023 build) visible - watch for shader differences. Engine strings: eCVirtualFileSystem::ProcessMountList /
+      Mount [PAK]/[DIR], NoWatch, NoPacked, NoPhysical, RootPath, DisplayCacheConflicts (ge3dialogs.dll).
+      For release: world-edit mods need NoPhysical=false -> the installer must patch mountlist_packed.ini (and undo it)
+- [x] Templates (.tple) read + write 2026-10-14 (risen-formats tple.rs): GENOMFLE body = "GENOMETP", u16 version
+      (219), u32 count, template entities, hierarchy pairs ending (-1,-1). Entity = u16 version, PropertyId,
+      flag bytes (7 + (v<215) + (v>=214)), u8 has-ref + PropertyId, render alpha, view range, u16 insert type,
+      name str, position, quaternion, FILETIME, version-dependent bytes (TpleFile.cs), u32 set count, sets =
+      (u16 id, str class, u32 size, property object, u32 0xDEADC0DE). Entity with a ref template (instance of
+      another template) has NO set count/sets. Entity 0 = file root ("X.tple"), entity 1 = the template, its GUID
+      = creator GUID of world entities. 13 multi-templates (Objects\_MultiTemplates, prefabs of ref instances),
+      no world entity uses them. `risen tple-check`: all 2679 .tple byte-identical. CLI: `risen templates
+      [filter|guid] [--props] [--json]`; `entities` / `find` now print the creator template name (JSON "template").
+      Whole world: 50766 entities, 49500 with creator, 49409 resolved; the other 91 (82 GUIDs) point to templates
+      that no longer exist (test levels, a few VFX / Goblin / Levelmesh water meshes).
+- [x] Spawn / copy 2026-10-14: moving property sets between files needs string index
+      remapping, and string indices also sit inside raw class data (would need full class parsers like the
+      C# GENOME_Base). The old editor never spawned from templates either (only cloned within a loaded layer).
+      So: copy an existing instance INSIDE ITS OWN LAYER (same string table, bytes reused as is).
+      lrent.rs: DynamicContext::duplicate (subtree, new v4 GUIDs, hierarchy pairs before the terminator),
+      Lrent::translate = context translate + gCNavigation_PS fix: LastUseableNavigationPosition (== entity
+      position in 2251/2254 world NPCs) set to the new position, LastUseableNavigationZoneProxy -> none (112
+      world NPCs already have none). No entity has its own GUID in its properties. CLI: `risen copy <layer>
+      <entity> --to|--by [--count]`, `risen spawn <template> --to x y z [--layer L] [--count N --spread R]`
+      (takes the layer with most top-level instances). Scratch check: old entities unchanged, GUIDs unique.
+      Test written: 2x Wolf_Gamestart (Harbour_Outdoor_Monster_01) at (-36650, 200, -5300) and 2x Wolf from the
+      far Wild_Outdoor_Monster_01 at (-36650, 200, -4300) near Sara -> also tells whether far layers load.
+      Rollback: delete data\common\projects\World\Outdoor\{Harbour_Outdoor,Wild_Outdoor}.
+      IN-GAME TEST PASSED 2026-10-14 (new game): all 4 wolves at Sara (2 Wolf_Gamestart = "hungry", 2 Wolf),
+      no crash -> a far area's layer (Wild_Outdoor) is loaded at the start too: spawning into any instance's
+      layer works anywhere. Loose files left in place (Game_Start mushroom, 2 wolf layers).
+- [x] Delete 2026-10-14: DynamicContext::remove (subtree, hierarchy renumbered, root
+      bounds refreshed). `risen delete <layer|file> <entity> [--out] [--dry-run]` warns when a removed GUID is
+      still referenced (byte search of the 16 GUID bytes in this layer + every other layer, loose first).
+      References between entities exist: gCNavPath_PS.ZoneA/BEntityProxy (1203), gCNavHelper_PS.LinkedTo (111),
+      gCNPC_PS.GuardPoint (9), event groups (trigger + children, BD_Don_Events) reference each other in raw
+      class data. NPCs (Ingvar) have no GUID references - scripts use names. Fix found on the way: `copy` of a
+      group now replaces the group's old GUIDs inside the copied property values + raw class data
+      (PropertyObject::replace_guid), else the copy drove the original. Checks: copy + delete of the copy =
+      original bytes (wolf; 16-entity event group), deleting the original then leaves no refs in the layer.
+      `entities` / `find` print the parent index (JSON "parent") for nested entities (902 in the world).
+      Edit commands also take a .lrent file path. In-game test written: deleted Obj_Dec_Barrel_Broken
+      (Game_Start_Dyn #1126), Beach_Seaman_Dead corpse (Game_Start_NPC_01 #7), copied Wolf_Gamestart #108
+      (-> 3 wolves remain at Sara). IN-GAME TEST PASSED 2026-10-14 (new game): corpse gone, barrel gone,
+      3 wolves, no crash. Loose test files still in data\common\projects (5 layers).
+- [ ] Then: spawn into any layer (string remapping / class parsers), strings (.tab)
+- [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
+      pipe, JSON commands) so any agent or our editor can find / move / spawn / delete entities in the running game
+      while the user watches. Same verbs as risen-cli (find, show, move, spawn), resolve entities by GUID every
+      command (never keep entity pointers across frames). Needs RE: entity lookup by GUID, set world matrix +
+      physics sync, spawn from template. Optional "bake": write the live change into the .lrent via risen-formats
+- [ ] Later: risen-editor GUI (viewer first: meshes/textures from xmsh/ximg - Baltram's rmtools has format code)
+- [ ] Optional / low priority: editor-trace profiler for the OLD RisenEditor.exe (C# + ClrMD, csc.exe) - only if we
+      still use the old editor; symptoms: World.wrl load minutes, double-click picking freeze, exit hangs minutes.
+      Untextured white/grey meshes in the old editor = materials it can't parse.
 
 ## Stage 6 — Release
 - [x] README with install/uninstall steps (every mod, RU + EN)
