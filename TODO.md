@@ -698,7 +698,8 @@ data\ini\ConfigDefault.xml / ConfigPerformance*.xml already have ViewDistance (l
 - [ ] If it helps: F10 slider in the Window mod (or own small mod) writing the value at runtime (find the engine
       setter) or into ConfigLocal.xml with "restart needed". Size: 1 session, result not guaranteed (LOD limits)
 
-## Stage 5.21 — World editing: old Risen Editor recon -> own Rust tools (user's idea 2026-10-14; next: spawn/copy/delete entities)
+## Stage 5.21 — World editing: old Risen Editor recon -> own Rust tools (user's idea 2026-10-14; PAUSED 2026-10-14 by the user after .tab strings;
+next when resumed: "New key test" (new template + FO_/ITEMDESC_ rows), then Game VFS)
 Goal: get the community world editor (Risen Editor by Galrath 434, ~2013, place/copy/delete NPCs, monsters, items)
 working with the 2023 64-bit re-release; later an AI-friendly CLI over the world/template data and maybe a nicer
 world-editing wrapper. Old 32-bit DLL mods (Elusively Patched Unit, Baltram's Script_Extensions) are known broken on
