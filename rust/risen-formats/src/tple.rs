@@ -6,8 +6,9 @@
 
 use crate::archive::{Archive, StrRef};
 use crate::bin_io::{ParseError, Reader, Result, Writer};
-use crate::lrent::{PropertyId, read_hierarchy};
+use crate::lrent::{PropertyId, new_guid, read_hierarchy};
 use crate::props::PropertyObject;
+use crate::strs::Remap;
 
 pub const MAGIC: &[u8; 8] = b"GENOMETP";
 
@@ -210,5 +211,48 @@ impl Tple {
 
     pub fn name(&self, e: &TemplateEntity) -> &str {
         self.archive.str(e.name)
+    }
+
+    /// Independent copy with a new internal name and new root/template GUIDs. Meshes, scripts and
+    /// other external references keep their names; only references to the copied entities change.
+    /// Rebuilds the string table in first-use order, refusing data we can't remap safely.
+    pub fn copy_named(&self, name: &str) -> std::result::Result<Self, String> {
+        if name.is_empty() || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+            return Err("template name must contain only ASCII letters, digits and underscores".into());
+        }
+        if name.len() > 250 {
+            return Err("template name is too long (maximum 250 ASCII characters)".into());
+        }
+        let te = self.template().ok_or("multi-template: copying is not supported")?;
+        if self.name(te).eq_ignore_ascii_case(name) {
+            return Err("the copy needs a different template name".into());
+        }
+        // intern() uses u16 indices; reserve space for both new names before calling it.
+        if self.strings().len() > (1 << 16) - 2 {
+            return Err("template string table has no room for the new names".into());
+        }
+        let mut t = self.clone();
+        t.entities[0].name = t.archive.intern(&format!("{name}.tple"));
+        t.entities[1].name = t.archive.intern(name);
+        let guids: Vec<_> = t.entities.iter().map(|e| (e.id.guid, new_guid())).collect();
+        for (e, (_, guid)) in t.entities.iter_mut().zip(&guids) {
+            e.id.guid = *guid;
+            for s in &mut e.sets {
+                for (old, new) in &guids {
+                    s.object.replace_guid(old, new);
+                }
+            }
+        }
+        let strings = t.archive.strings.clone();
+        let mut rm = Remap::new(&[], &strings);
+        let mut unknown = t.walk_strs(&mut |s| rm.remap(s));
+        if !unknown.is_empty() {
+            unknown.sort();
+            unknown.dedup();
+            let list: Vec<_> = unknown.iter().map(|u| u.to_string()).collect();
+            return Err(format!("template can't be copied safely, unreadable: {}", list.join("; ")));
+        }
+        t.archive.strings = rm.finish()?;
+        Ok(t)
     }
 }

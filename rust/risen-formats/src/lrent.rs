@@ -448,26 +448,24 @@ impl DynamicContext {
         self.hierarchy.iter().find(|&&(p, c)| c == i as i32 && p >= 0).map(|&(p, _)| p as usize)
     }
 
-    /// Moves entity `i` (a direct child of the layer root) by `d` in world space, together with its
-    /// descendants, then refreshes the root bounds. Rotation and local boxes stay unchanged.
+    /// Checked hierarchy traversal for editor operations on untrusted layers.
+    pub fn checked_subtree(&self, i: usize) -> std::result::Result<Vec<usize>, String> {
+        self.transform_tree(i).map(|(_, tree)| tree)
+    }
+
+    /// Moves a subtree by `d` in world space. Only its root's local translation changes:
+    /// the offset is transformed through the inverse parent basis (including scale).
+    /// Descendant local matrices and all local boxes stay unchanged.
     pub fn translate(&mut self, i: usize, d: [f32; 3]) -> std::result::Result<(), String> {
-        if i == 0 || i >= self.entities.len() {
-            return Err(format!("entity index {i} out of range 1..{}", self.entities.len()));
-        }
-        if self.parent(i) != Some(0) {
-            return Err(format!("entity {i} is not a direct child of the layer root (not supported yet)"));
-        }
-        // Root matrix is identity in every layer, so local translation moves like world translation.
-        let root = &self.entities[0];
-        if root.world_matrix != IDENTITY {
-            return Err("layer root matrix is not identity (not supported)".into());
-        }
-        for (m, dk) in self.entities[i].local_matrix[12..15].iter_mut().zip(d) {
+        if !d.iter().all(|v| v.is_finite()) { return Err("translation must be finite".into()); }
+        let (parent, tree) = self.transform_tree(i)?;
+        let inverse = inverse_affine(&self.entities[parent].world_matrix)?;
+        let local_d = transform_vector(d, &inverse);
+        let mut group: Vec<_> = tree.iter().map(|&j| self.entities[j].clone()).collect();
+        for (m, dk) in group[0].local_matrix[12..15].iter_mut().zip(local_d) {
             *m += dk;
         }
-        let mut stack = vec![i];
-        while let Some(j) = stack.pop() {
-            let e = &mut self.entities[j];
+        for e in &mut group {
             for (k, &dk) in d.iter().enumerate() {
                 e.world_matrix[12 + k] += dk;
                 e.world_box[k] += dk;
@@ -477,9 +475,93 @@ impl DynamicContext {
                 e.world_sphere[1 + k] += dk;
                 e.geo_sphere[1 + k] += dk;
             }
-            stack.extend(self.children(j));
+        }
+        if !group.iter().all(finite_geometry) { return Err("translation overflows entity geometry".into()); }
+        self.commit_transform(&tree, group, parent, false)
+    }
+
+    /// Validate the affected hierarchy before editing; malformed data must not loop or partially edit.
+    fn transform_tree(&self, i: usize) -> std::result::Result<(usize, Vec<usize>), String> {
+        let n = self.entities.len();
+        if i == 0 || i >= n { return Err(format!("entity index {i} out of range 1..{n}")); }
+        let mut parents = vec![None; n];
+        let mut children = vec![Vec::new(); n];
+        if self.hierarchy.last() != Some(&(-1, -1)) { return Err("missing hierarchy terminator".into()); }
+        for &(p, c) in &self.hierarchy[..self.hierarchy.len() - 1] {
+            if p < 0 || c <= 0 || p as usize >= n || c as usize >= n {
+                return Err(format!("invalid hierarchy pair ({p}, {c})"));
+            }
+            if parents[c as usize].replace(p as usize).is_some() {
+                return Err(format!("entity {c} has multiple parents"));
+            }
+            children[p as usize].push(c as usize);
+        }
+        let mut seen = vec![false; n];
+        let mut j = i;
+        while j != 0 {
+            if seen[j] { return Err("cycle in entity hierarchy".into()); }
+            seen[j] = true;
+            j = parents[j].ok_or_else(|| format!("entity {j} is disconnected from layer root"))?;
+        }
+        let mut tree = Vec::new();
+        let mut stack = vec![i];
+        while let Some(j) = stack.pop() {
+            tree.push(j);
+            stack.extend(children[j].iter().rev());
+        }
+        Ok((parents[i].unwrap(), tree))
+    }
+
+    /// A non-root node's geometry includes its own world box and its children's geometry.
+    /// Its world box/local box describe its own shape. Preserve stored sphere rounding if unchanged.
+    fn node_bounds(&self, i: usize) -> [f32; 6] {
+        self.children(i).iter().fold(self.entities[i].world_box,
+            |b, &j| box_union(b, self.entities[j].geo_box))
+    }
+
+    fn update_node_bounds(&mut self, i: usize, extra: Option<[f32; 6]>) {
+        let b = self.node_bounds(i);
+        let b = extra.map_or(b, |extra| box_union(b, extra));
+        if self.entities[i].geo_box != b {
+            self.entities[i].geo_box = b;
+            self.entities[i].geo_sphere = box_sphere(b);
+        }
+    }
+
+    fn update_ancestor_bounds(&mut self, mut i: usize, extras: &std::collections::HashMap<usize, [f32; 6]>) {
+        while i != 0 {
+            self.update_node_bounds(i, extras.get(&i).copied());
+            i = self.parent(i).unwrap(); // hierarchy was checked by transform_tree
         }
         self.update_root_bounds();
+    }
+
+    /// Commit geometry together with ancestor bounds; even finite inputs can overflow the
+    /// enclosing sphere. Retain only the affected entities for rollback in that case.
+    fn commit_transform(&mut self, tree: &[usize], group: Vec<DynamicEntity>, parent: usize, rebuild: bool)
+        -> std::result::Result<(), String>
+    {
+        let mut affected = tree.to_vec();
+        let mut j = parent;
+        loop {
+            affected.push(j);
+            if j == 0 { break; }
+            j = self.parent(j).unwrap();
+        }
+        let before: Vec<_> = affected.iter().map(|&j| (j, self.entities[j].clone())).collect();
+        // A few shipped nodes have authored/cached geometry outside the hierarchy union.
+        // Keep those volumes conservatively, rather than silently deleting unknown geometry.
+        let unusual: Vec<_> = affected.iter().copied().filter(|&j| j != 0 && self.entities[j].geo_box != self.node_bounds(j)).collect();
+        let context_box = self.context_box;
+        for (&j, e) in tree.iter().zip(group) { self.entities[j] = e; }
+        let extras: std::collections::HashMap<_, _> = unusual.iter().map(|&j| (j, self.entities[j].geo_box)).collect();
+        if rebuild { for &j in tree.iter().rev() { self.update_node_bounds(j, extras.get(&j).copied()); } }
+        self.update_ancestor_bounds(parent, &extras);
+        if affected.iter().any(|&j| !finite_geometry(&self.entities[j])) {
+            for (j, e) in before { self.entities[j] = e; }
+            self.context_box = context_box;
+            return Err("transform overflows entity or enclosing bounds".into());
+        }
         Ok(())
     }
 
@@ -513,6 +595,52 @@ pub(crate) fn read_hierarchy(r: &mut Reader) -> Result<Vec<(i32, i32)>> {
 
 pub const IDENTITY: [f32; 16] = [1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.];
 
+fn finite_geometry(e: &DynamicEntity) -> bool {
+    e.local_matrix.iter().chain(&e.world_matrix).chain(&e.world_box).chain(&e.geo_box)
+        .chain(&e.world_sphere).chain(&e.geo_sphere).all(|v| v.is_finite())
+}
+
+pub fn transform_vector(v: [f32; 3], m: &[f32; 16]) -> [f32; 3] {
+    std::array::from_fn(|k| v[0] * m[k] + v[1] * m[4 + k] + v[2] * m[8 + k])
+}
+
+pub fn matrix_product(a: &[f32; 16], b: &[f32; 16]) -> [f32; 16] {
+    std::array::from_fn(|k| (0..4).map(|j| a[(k / 4) * 4 + j] * b[j * 4 + k % 4]).sum())
+}
+
+/// Inverts an affine row-vector matrix, using f64 elimination for scaled/rotated parents.
+fn inverse_affine(m: &[f32; 16]) -> std::result::Result<[f32; 16], String> {
+    // Shipped door matrices have a slightly rounded homogeneous element (e.g. 0.9999944).
+    // Keep it rather than normalizing the matrix and changing the stored transform.
+    if !m.iter().all(|v| v.is_finite()) || [m[3], m[7], m[11]] != [0., 0., 0.] || m[15] == 0. {
+        return Err("parent matrix must be finite and affine".into());
+    }
+    let mut a = [[0.0f64; 6]; 3];
+    for r in 0..3 {
+        for c in 0..3 { a[r][c] = m[r * 4 + c] as f64; }
+        a[r][3 + r] = 1.;
+    }
+    for c in 0..3 {
+        let pivot = (c..3).max_by(|&x, &y| a[x][c].abs().total_cmp(&a[y][c].abs())).unwrap();
+        if a[pivot][c] == 0. { return Err("parent matrix is singular".into()); }
+        a.swap(c, pivot);
+        let d = a[c][c];
+        for k in 0..6 { a[c][k] /= d; }
+        for r in 0..3 {
+            if r == c { continue; }
+            let d = a[r][c];
+            for k in 0..6 { a[r][k] -= d * a[c][k]; }
+        }
+    }
+    let mut out = IDENTITY;
+    for r in 0..3 { for c in 0..3 { out[r * 4 + c] = a[r][3 + c] as f32; } }
+    let t = transform_vector([m[12], m[13], m[14]], &out);
+    out[15] = 1. / m[15];
+    for k in 0..3 { out[12 + k] = -t[k] / m[15]; }
+    if !out.iter().all(|v| v.is_finite()) { return Err("inverse parent matrix overflows".into()); }
+    Ok(out)
+}
+
 impl Lrent {
     pub fn context_mut(&mut self) -> Option<&mut DynamicContext> {
         let ClassData::DynamicLayer(layer) = &mut self.root.body.as_mut()?.data else { return None };
@@ -526,6 +654,33 @@ impl Lrent {
     pub fn find_guid(&self, guid: &str) -> Option<usize> {
         let g = guid.trim_matches(['{', '}']).to_uppercase();
         self.entities().iter().position(|e| e.id.text().trim_matches(['{', '}']) == g)
+    }
+
+    /// New empty layer using this game's layer/context header versions. Only a plain DRE root
+    /// is accepted; no world entities, references or unused strings are carried into the new file.
+    pub fn empty_like(&self) -> std::result::Result<Self, String> {
+        use crate::strs::Remap;
+        let root = self.entities().first().ok_or("donor layer has no root")?;
+        if self.archive.str(root.name) != "DRE" || !root.property_sets.is_empty()
+            || root.local_matrix != IDENTITY || root.world_matrix != IDENTITY
+            || !matches!(&root.creator, Creator::Proxy(EntityProxy { id: None, .. }) | Creator::Old { id: None, .. })
+        {
+            return Err("donor needs a plain DRE root with identity matrices and no creator".into());
+        }
+        let mut out = self.clone();
+        let c = out.context_mut().ok_or("donor has no dynamic context")?;
+        c.entities.truncate(1);
+        c.entities[0].id.guid = new_guid();
+        c.entities[0].geo_box = EMPTY_BOX;
+        c.entities[0].geo_sphere = [-f32::MAX, 0.0, 0.0, 0.0];
+        if c.context_box.is_some() { c.context_box = Some(EMPTY_BOX); }
+        c.hierarchy = vec![(-1, -1)];
+        let strings = out.archive.strings.clone();
+        let mut rm = Remap::new(&[], &strings);
+        let unknown = out.walk_strs(&mut |s| rm.remap(s));
+        if !unknown.is_empty() { return Err(format!("unreadable donor header: {unknown:?}")); }
+        out.archive.strings = rm.finish()?;
+        Ok(out)
     }
 }
 
@@ -622,6 +777,126 @@ impl Lrent {
         }
         Ok(())
     }
+
+    /// Replace a selected node's world pose, preserving descendant local transforms.
+    /// Updates bounds and embedded physics/navigation poses atomically. The layer root cannot move.
+    pub fn set_world_matrix(&mut self, i: usize, world: [f32; 16]) -> std::result::Result<(), String> {
+        inverse_affine(&world)?;
+        let strings = self.archive.strings.clone();
+        let c = self.context_mut().ok_or("layer has no entity context")?;
+        let (parent, tree) = c.transform_tree(i)?;
+        let inverse_parent = inverse_affine(&c.entities[parent].world_matrix)?;
+        let delta = matrix_product(&inverse_affine(&c.entities[i].world_matrix)?, &world);
+        let mut group: Vec<_> = tree.iter().map(|&j| c.entities[j].clone()).collect();
+        let group_index: std::collections::HashMap<_, _> = tree.iter().enumerate().map(|(k, &j)| (j, k)).collect();
+        for (k, &j) in tree.iter().enumerate() {
+            let new_world = if k == 0 { world } else {
+                let p = group_index[&c.parent(j).unwrap()];
+                matrix_product(&group[k].local_matrix, &group[p].world_matrix)
+            };
+            let e = &mut group[k];
+            e.world_matrix = new_world;
+            e.world_box = transform_box(e.local_box, &e.world_matrix);
+            e.geo_box = if e.geo_box != c.node_bounds(j) {
+                box_union(e.world_box, transform_box(e.geo_box, &delta))
+            } else { e.world_box };
+            e.world_sphere = box_sphere(e.world_box);
+            e.geo_sphere = if e.geo_box == e.world_box { e.world_sphere } else { box_sphere(e.geo_box) };
+            let rigid = e.property_sets.iter().any(|s| s.object.class(&strings) == "eCRigidBody_PS"
+                && s.object.body.as_ref().is_some_and(|b| matches!(&b.data, ClassData::Raw(d) if rigid_body_motions(d).is_some())));
+            let rotation = if rigid { Some(matrix_rotation(&e.world_matrix)?) } else { None };
+            e.sync_pose(&strings, rotation);
+        }
+        group[0].local_matrix = matrix_product(&world, &inverse_parent);
+        if !group.iter().all(finite_geometry) { return Err("world pose overflows entity geometry".into()); }
+        c.commit_transform(&tree, group, parent, true)
+    }
+
+    /// Absolute world heading in degrees around +Y: 0 faces +Z, +90 faces +X.
+    /// Keeps pitch, roll and scale; turns descendants about the selected entity's position.
+    /// Matrices, bounds and rigid-body rotations are validated before committing the edit.
+    pub fn set_yaw(&mut self, i: usize, degrees: f32) -> std::result::Result<(), String> {
+        if !degrees.is_finite() { return Err("yaw must be finite".into()); }
+        let strings = self.archive.strings.clone();
+        let c = self.context_mut().ok_or("layer has no entity context")?;
+        let (parent, tree) = c.transform_tree(i)?;
+        let inverse = inverse_affine(&c.entities[parent].world_matrix)?;
+        let m = &c.entities[i].world_matrix;
+        let heading = if m[8].hypot(m[10]) > 1e-6 {
+            m[8].atan2(m[10])
+        } else if m[0].hypot(m[2]) > 1e-6 {
+            (-m[2]).atan2(m[0])
+        } else { return Err("entity has no horizontal heading".into()); };
+        let delta = (degrees.rem_euclid(360.).to_radians() - heading) / 2.;
+        let mut turn = quat_matrix([0., delta.sin(), 0., delta.cos()], [0.; 3]);
+        let pivot = c.entities[i].position();
+        let rotated = transform_vector(pivot, &turn);
+        for k in 0..3 { turn[12 + k] = pivot[k] - rotated[k]; }
+        let mut group: Vec<_> = tree.iter().map(|&j| c.entities[j].clone()).collect();
+        let group_index: std::collections::HashMap<_, _> = tree.iter().enumerate().map(|(k, &j)| (j, k)).collect();
+        for (k, &j) in tree.iter().enumerate() {
+            let child_world = if k == 0 { None } else {
+                let p = group_index[&c.parent(j).unwrap()];
+                Some(matrix_product(&group[k].local_matrix, &group[p].world_matrix))
+            };
+            let e = &mut group[k];
+            // Rotate the basis and positions about the group root, without changing child locals.
+            let pos = e.position();
+            let offset = std::array::from_fn(|k| pos[k] - pivot[k]);
+            let offset = transform_vector(offset, &turn);
+            e.world_matrix = matrix_product(&e.world_matrix, &turn);
+            for k in 0..3 { e.world_matrix[12 + k] = pivot[k] + offset[k]; }
+            // Rebuild descendants from their unchanged locals. This also retains the shipped
+            // rounded homogeneous elements without accumulating pivot-dependent position errors.
+            if let Some(world) = child_world { e.world_matrix = world; }
+            e.world_box = transform_box(e.local_box, &e.world_matrix);
+            e.geo_box = if e.geo_box != c.node_bounds(j) {
+                box_union(e.world_box, transform_box(e.geo_box, &turn))
+            } else { e.world_box };
+            e.world_sphere = box_sphere(e.world_box);
+            e.geo_sphere = if e.geo_box == e.world_box { e.world_sphere } else { box_sphere(e.geo_box) };
+            let rigid = e.property_sets.iter().any(|s| s.object.class(&strings) == "eCRigidBody_PS"
+                && s.object.body.as_ref().is_some_and(|b| matches!(&b.data, ClassData::Raw(d) if rigid_body_motions(d).is_some())));
+            let rotation = if rigid { Some(matrix_rotation(&e.world_matrix)?) } else { None };
+            e.sync_pose(&strings, rotation);
+        }
+        group[0].local_matrix = matrix_product(&group[0].world_matrix, &inverse);
+        if !group.iter().all(finite_geometry) { return Err("yaw overflows entity geometry".into()); }
+        c.commit_transform(&tree, group, parent, true)
+    }
+}
+
+/// Rotation quaternion from an affine matrix with positive scale and no shear (DirectX rows).
+fn matrix_rotation(m: &[f32; 16]) -> std::result::Result<[f32; 4], String> {
+    let mut r = [[0.; 3]; 3];
+    for k in 0..3 {
+        let length = m[4 * k].hypot(m[4 * k + 1]).hypot(m[4 * k + 2]);
+        if !length.is_finite() || length == 0. { return Err("rigid-body matrix has invalid scale".into()); }
+        for j in 0..3 { r[k][j] = m[4 * k + j] / length; }
+    }
+    let dot = |a: usize, b: usize| (0..3).map(|j| r[a][j] * r[b][j]).sum::<f32>();
+    let det = r[0][0] * (r[1][1] * r[2][2] - r[1][2] * r[2][1])
+        - r[0][1] * (r[1][0] * r[2][2] - r[1][2] * r[2][0])
+        + r[0][2] * (r[1][0] * r[2][1] - r[1][1] * r[2][0]);
+    if dot(0, 1).abs() > 1e-4 || dot(0, 2).abs() > 1e-4 || dot(1, 2).abs() > 1e-4 || det < 0.9999 {
+        return Err("rigid-body matrix has shear or reflected scale".into());
+    }
+    let trace = r[0][0] + r[1][1] + r[2][2];
+    let q = if trace > 0. {
+        let s = (trace + 1.).sqrt() * 2.;
+        [(r[1][2] - r[2][1]) / s, (r[2][0] - r[0][2]) / s, (r[0][1] - r[1][0]) / s, s / 4.]
+    } else {
+        let a = (0..3).max_by(|&a, &b| r[a][a].total_cmp(&r[b][b])).unwrap();
+        let b = (a + 1) % 3;
+        let c = (a + 2) % 3;
+        let s = (1. + r[a][a] - r[b][b] - r[c][c]).max(0.).sqrt() * 2.;
+        let mut q = [0.; 4];
+        q[a] = s / 4.; q[b] = (r[a][b] + r[b][a]) / s; q[c] = (r[a][c] + r[c][a]) / s;
+        q[3] = (r[b][c] - r[c][b]) / s;
+        q
+    };
+    let length = q.iter().map(|v| v * v).sum::<f32>().sqrt();
+    Ok(q.map(|v| v / length))
 }
 
 impl DynamicEntity {

@@ -11,7 +11,27 @@ use risen_formats::props::{PropertyObject, format_value};
 use risen_formats::strs::Unknown;
 use risen_formats::tab::Tab;
 use risen_formats::tple::Tple;
+use risen_formats::vfs::{GameVfs, Source, VfsError};
+use risen_formats::world::ProjectFile;
 use serde::Serialize;
+use risen_formats::wrldatasc::WorldData;
+
+mod project;
+mod geometry;
+
+const PROJECTS: &str = "data/common/projects";
+const TEMPLATES: &str = "data/common/templates";
+const STRINGS: &str = "data/compiled/strings";
+
+fn relative_asset(path: &str, scope: &str) -> String {
+    path[scope.len() + 1..].replace('/', "\\")
+}
+
+fn same_file(a: &Path, b: &Path) -> bool {
+    let a = std::fs::canonicalize(a).unwrap_or_else(|_| a.to_path_buf());
+    let b = std::fs::canonicalize(b).unwrap_or_else(|_| b.to_path_buf());
+    a.to_string_lossy().eq_ignore_ascii_case(&b.to_string_lossy())
+}
 
 #[derive(Parser)]
 #[command(name = "risen", version, about = "Risen data files: paks, world layers, templates")]
@@ -25,6 +45,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// List mounted assets and their effective source (mountlist, archives, loose overrides)
+    Vfs {
+        filter: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
     /// List the files of a .pak: stored size, encryption+compression, path
     PakList {
         pak: PathBuf,
@@ -33,14 +59,61 @@ enum Cmd {
     },
     /// Unpack one file (by name or path inside the pak) to OUT
     PakExtract { pak: PathBuf, name: String, out: PathBuf },
-    /// List world layers (.lrent) in data\common\projects.pak
+    /// List mounted world layers (.lrent), including loose files and archive patches
     Layers {
         /// Only paths containing this text (case-insensitive)
         filter: Option<String>,
     },
+    /// List mounted worlds/sectors: world-data filename or the sector's layer filenames
+    Projects {
+        /// Only paths containing this text (case-insensitive)
+        filter: Option<String>,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Read + write every .sec and .wrl of projects.pak and compare bytes (format check)
+    ProjectsCheck {
+        /// Default: data\common\projects.pak
+        pak: Option<PathBuf>,
+    },
+    /// Show a world's sector list (world name, .wrl, or a .wrldatasc file)
+    WorldSectors {
+        #[arg(default_value = "World")]
+        world: String,
+        #[arg(long)]
+        json: bool,
+    },
+    /// Read + write every .wrldatasc of projects.pak and compare bytes
+    WorldDataCheck { pak: Option<PathBuf> },
+    /// Create an empty layer + sector and register them in the world, with backup and rollback
+    LayerCreate {
+        name: String,
+        #[arg(long, default_value = "World")]
+        world: String,
+        /// Installed layer + sector whose header versions are used
+        #[arg(long, default_value = "Game_Start_Item")]
+        like: String,
+        /// Optional first entity, built from its template in the new layer
+        #[arg(long, requires = "to")]
+        spawn: Option<String>,
+        #[arg(long, num_args = 3, allow_hyphen_values = true, requires = "spawn")]
+        to: Option<Vec<f32>>,
+        /// Write a game-shaped staging tree here instead of installing into the game
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Restore a layer-create backup (game must be closed)
+    WorldRestore {
+        backup: PathBuf,
+        /// Discard subsequent edits to the affected files
+        #[arg(long)]
+        force: bool,
+    },
     /// List the entities of a layer: name, position, property set classes
     Entities {
-        /// Layer: a name / path inside projects.pak (Harbour_Town_NPC_01) or a .lrent file
+        /// Layer: a mounted name / path (Harbour_Town_NPC_01) or a .lrent file
         layer: String,
         /// Print every property of every property set
         #[arg(long)]
@@ -51,7 +124,97 @@ enum Cmd {
         #[arg(long)]
         json: bool,
     },
-    /// Find entities by name (substring, case-insensitive) or GUID in every layer of projects.pak
+    /// Inspect render models, actor nodes and collision shapes; export resource triangles as OBJ
+    Geometry {
+        /// Template name/GUID/.tple, a ._xmsh/._xmac/._xcom resource, or a layer with ENTITY
+        source: String,
+        entity: Option<String>,
+        #[arg(long)]
+        json: bool,
+        /// Export OBJ: render triangles for entities; collision triangles for ._xcom; actors in bind pose
+        #[arg(long)]
+        obj: Option<PathBuf>,
+    },
+    /// Unlock an existing rigid body for gravity, or freeze its motion (selected entity only)
+    Physics {
+        layer: String,
+        entity: String,
+        #[arg(long, value_parser = ["dynamic", "frozen"])]
+        mode: String,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Set an existing collider's ledge-climbing permission (selected entity only)
+    Climbable {
+        layer: String,
+        entity: String,
+        #[arg(long, action = clap::ArgAction::Set, required = true)]
+        enabled: bool,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Place an entity/subtree on visual static-mesh surfaces, or on an explicit horizontal plane
+    Ground {
+        layer: String,
+        entity: String,
+        /// Use solid colliders for the moving object and static supports (default: visual meshes)
+        #[arg(long)]
+        collision: bool,
+        /// Explicit plane height (cm); otherwise sample visible static mesh triangles
+        #[arg(long, allow_negative_numbers = true)]
+        height: Option<f32>,
+        /// Fit local +Y to the sampled surface, preserving horizontal heading and scale
+        #[arg(long)]
+        align: bool,
+        /// Dense underside grid per axis (3..17); --align defaults to 7, plus mesh vertices
+        #[arg(long, value_parser = clap::value_parser!(u16).range(3..=17))]
+        samples: Option<u16>,
+        /// Refuse a steeper fitted surface when --align is used (degrees)
+        #[arg(long, default_value_t = 45.0)]
+        max_slope: f32,
+        /// Restrict automatic surface search to this layer (default: active world layers)
+        #[arg(long, conflicts_with = "height")]
+        surface_layer: Option<String>,
+        /// Initial world sector configuration used for automatic search
+        #[arg(long, default_value = "World", conflicts_with = "surface_layer")]
+        world: String,
+        #[arg(long, default_value_t = 1000.0)]
+        max_drop: f32,
+        #[arg(long, default_value_t = 100.0)]
+        max_rise: f32,
+        /// Positive = clearance; negative = embed into the surface (cm)
+        #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
+        gap: f32,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Align world bounding-box faces; negative --gap deliberately overlaps the objects
+    Snap {
+        layer: String,
+        entity: String,
+        #[arg(long)]
+        against: String,
+        #[arg(long)]
+        target_layer: Option<String>,
+        #[arg(long, default_value = "top", value_parser = ["top", "bottom", "left", "right", "front", "back"])]
+        side: String,
+        #[arg(long, default_value_t = 0.0, allow_negative_numbers = true)]
+        gap: f32,
+        /// Also center on the other two axes
+        #[arg(long)]
+        center: bool,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Find entities by name (substring, case-insensitive) or GUID in every mounted world layer
     Find {
         text: String,
         /// Print every property of every property set
@@ -111,11 +274,14 @@ enum Cmd {
     /// template and moves the copy there; a template with no instance in the world (or with
     /// --from-template) is built from the template itself (needs --layer)
     Spawn {
-        /// Template name (It_Plant_Mushroom, Wolf) or GUID
+        /// Template name (It_Plant_Mushroom, Wolf), GUID, or a .tple file (built directly)
         template: String,
         /// World position x y z (y = up)
         #[arg(long, num_args = 3, allow_negative_numbers = true, required = true)]
         to: Vec<f32>,
+        /// Absolute world heading in degrees: 0 = +Z, 90 = +X; keeps pitch, roll and scale
+        #[arg(long, allow_negative_numbers = true)]
+        yaw: Option<f32>,
         /// Put the copies into this layer (default: the layer with the most instances). The source
         /// instance comes from this layer when it has one, else from the layer with the most
         #[arg(long)]
@@ -155,7 +321,7 @@ enum Cmd {
         /// Default: data\common\projects.pak
         pak: Option<PathBuf>,
     },
-    /// List templates (data\common\templates.pak): name, GUID, property set classes, path
+    /// List mounted templates: name, GUID, property set classes, path (including loose templates)
     Templates {
         /// Only names / paths containing this text (case-insensitive), or a template GUID
         filter: Option<String>,
@@ -164,6 +330,21 @@ enum Cmd {
         props: bool,
         #[arg(long)]
         json: bool,
+    },
+    /// Copy a template under a new internal name with new GUIDs (single templates only).
+    /// Adds a loose .tple alongside the source's path; existing files are never overwritten.
+    TemplateCopy {
+        /// Source template name, GUID, or a .tple file
+        template: String,
+        /// New internal name (ASCII letters, digits, underscores); no .tple suffix
+        name: String,
+        /// Write here instead of data/common/templates/<source folder>/<name>.tple.
+        /// A file source defaults to its own folder.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Only print what would change
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Read + write every .tple of a pak and compare bytes (format check)
     TpleCheck {
@@ -262,23 +443,24 @@ fn templates_pak(game: &Path) -> PathBuf {
 }
 
 /// Template GUID ("{...}", upper case) -> template name, for creator names.
-fn template_names(game: &Path) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
-    let pak = Pak::open(templates_pak(game))?;
+fn template_names(vfs: &GameVfs) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
     let mut map = HashMap::new();
-    for pe in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".tple")) {
-        let t = Tple::read(&pak.read(pe)?).map_err(|e| format!("{}: {e}", pe.path))?;
+    for pe in vfs.files(TEMPLATES, ".tple") {
+        let t = Tple::read(&vfs.read(pe)?).map_err(|e| format!("{}: {e}", vfs.source(pe)))?;
         if let Some(e) = t.template() {
-            map.insert(e.id.text(), t.name(e).to_string());
+            let name = t.name(e).to_string();
+            if let Some(old) = map.insert(e.id.text(), name.clone()) {
+                return Err(format!("duplicate template GUID {}: {old}, {name} ({})", e.id.text(), pe.path).into());
+            }
         }
     }
     Ok(map)
 }
 
-/// The template with this GUID ("{...}", upper case) and its path in templates.pak.
-fn load_template(game: &Path, guid: &str) -> Result<(Tple, String), Box<dyn std::error::Error>> {
-    let pak = Pak::open(templates_pak(game))?;
-    for pe in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".tple")) {
-        let t = Tple::read(&pak.read(pe)?).map_err(|e| format!("{}: {e}", pe.path))?;
+/// The template with this GUID ("{...}", upper case) and its mounted virtual path.
+fn load_template(vfs: &GameVfs, guid: &str) -> Result<(Tple, String), Box<dyn std::error::Error>> {
+    for pe in vfs.files(TEMPLATES, ".tple") {
+        let t = Tple::read(&vfs.read(pe)?).map_err(|e| format!("{}: {e}", vfs.source(pe)))?;
         if t.template().is_some_and(|e| e.id.text() == guid) {
             return Ok((t, pe.path.clone()));
         }
@@ -286,45 +468,58 @@ fn load_template(game: &Path, guid: &str) -> Result<(Tple, String), Box<dyn std:
     Err(format!("template {guid} not found").into())
 }
 
-/// Mesh paks for the local bounding box of a new entity built from a template.
-struct MeshPaks {
-    meshes: Pak,
-    animations: Pak,
+/// Explicit file or a unique name/GUID in the mounted template catalog (including loose files).
+fn template_source(vfs: &GameVfs, spec: &str) -> Result<(Tple, String), Box<dyn std::error::Error>> {
+    let path = Path::new(spec);
+    if path.is_file() {
+        let t = Tple::read(&std::fs::read(path)?).map_err(|e| format!("{spec}: {e}"))?;
+        t.template().ok_or("multi-template: not supported")?;
+        return Ok((t, spec.to_string()));
+    }
+    if spec.to_ascii_lowercase().ends_with(".tple") || spec.contains(['/', '\\']) {
+        let entry = vfs.find(TEMPLATES, spec)?;
+        let t = Tple::read(&vfs.read(entry)?).map_err(|e| format!("{}: {e}", vfs.source(entry)))?;
+        t.template().ok_or("multi-template: not supported")?;
+        return Ok((t, entry.path.clone()));
+    }
+    let names = template_names(vfs)?;
+    let want = spec.trim_matches(['{', '}']);
+    let matches: Vec<_> = names.iter().filter(|(g, n)| {
+        n.eq_ignore_ascii_case(want) || g.trim_matches(['{', '}']).eq_ignore_ascii_case(want)
+    }).collect();
+    let guid = match matches.as_slice() {
+        [(guid, _)] => *guid,
+        [] => return Err(format!("{spec}: no such template (see `risen templates`)").into()),
+        _ => return Err(format!("{spec}: ambiguous template name; use its GUID or file path").into()),
+    };
+    load_template(vfs, guid)
 }
 
-impl MeshPaks {
-    fn open(game: &Path) -> Result<MeshPaks, Box<dyn std::error::Error>> {
-        Ok(MeshPaks {
-            meshes: Pak::open(game.join("data").join("common").join("meshes.pak"))?,
-            animations: Pak::open(game.join("data").join("compiled").join("animations.pak"))?,
-        })
+/// Mesh paks for the local bounding box of a new entity built from a template.
+struct MeshPaks<'a> {
+    vfs: &'a GameVfs,
+}
+
+impl<'a> MeshPaks<'a> {
+    fn open(vfs: &'a GameVfs) -> Self {
+        MeshPaks { vfs }
     }
 
     /// The `Boundary` of the template's mesh (eCMesh_PS) or animated model (eCAnimation_PS), as world
     /// entities store it; else a 1 m cube. Returns the box and where it came from.
     fn local_box(&self, t: &Tple) -> Result<([f32; 6], String), Box<dyn std::error::Error>> {
-        let te = t.template().ok_or("multi-template")?;
-        let s = t.strings();
-        let sources = [
-            ("eCMesh_PS", "MeshFileName", &self.meshes, "_xmsh"),
-            ("eCAnimation_PS", "ResourceFilePath", &self.animations, "_xmac"),
-        ];
-        for (class, prop, pak, ext) in sources {
-            let Some(p) =
-                te.sets.iter().find(|x| x.object.class(s) == class).and_then(|x| x.object.body.as_ref()?.props.get(s, prop))
-            else {
-                continue;
-            };
-            let Some(file) = p.value.get(..2).and_then(|v| s.get(u16::from_le_bytes([v[0], v[1]]) as usize)) else {
-                continue;
-            };
-            if let Some(e) = pak.find(&risen_formats::resource::compiled_name(file, ext))
-                && let Some(b) = risen_formats::resource::boundary(&pak.read(e)?)
-            {
-                return Ok((b, e.path.clone()));
+        let b = risen_formats::bounds::template_bounds(t, |scope, name| {
+            match self.vfs.find(scope, name) {
+                Ok(e) => {
+                    let bytes = self.vfs.read(e).map_err(|e| e.to_string())?;
+                    Ok(risen_formats::resource::boundary(&bytes).map(|b| (b, e.path.clone())))
+                }
+                Err(VfsError::NotFound(_)) => Ok(None),
+                Err(e) => Err(e.to_string()),
             }
-        }
-        Ok(([-50.0, -50.0, -50.0, 50.0, 50.0, 50.0], "default 1 m cube (no mesh bounds found)".into()))
+        })?;
+        let how = format!("{}{}", b.sources.join(" + "), if b.approximate { " (approximate)" } else { "" });
+        Ok((b.local_box, how))
     }
 }
 
@@ -339,20 +534,16 @@ struct EditTab {
     src: String,
     loose: PathBuf,
     tab: Tab,
+    default_writable: bool,
 }
 
-fn open_tab_for_edit(game: &Path, table: &str) -> Result<EditTab, Box<dyn std::error::Error>> {
-    let pak = Pak::open(strings_pak(game))?;
+fn open_tab_for_edit(vfs: &GameVfs, table: &str) -> Result<EditTab, Box<dyn std::error::Error>> {
     let name = if table.to_lowercase().ends_with(".tab") { table.to_string() } else { format!("{table}.tab") };
-    let pe = pak.find(&name).ok_or_else(|| format!("{name}: not in strings.pak (see `risen tab`)"))?;
-    let loose = pe.path.split('\\').fold(game.join("data").join("compiled").join("strings"), |p, part| p.join(part));
-    let (src, data) = if loose.is_file() {
-        (loose.display().to_string(), std::fs::read(&loose)?)
-    } else {
-        (format!("strings.pak:{}", pe.path), pak.read(pe)?)
-    };
+    let pe = vfs.find(STRINGS, &name)?;
+    let loose = pe.loose.clone();
+    let (src, data) = (vfs.source(pe), vfs.read(pe)?);
     let tab = Tab::read(&data).map_err(|e| format!("{src}: {e}"))?;
-    Ok(EditTab { src, loose, tab })
+    Ok(EditTab { src, loose, tab, default_writable: !vfs.no_physical || matches!(pe.source, Source::Loose(_)) })
 }
 
 impl EditTab {
@@ -364,6 +555,9 @@ impl EditTab {
     }
 
     fn save(&self, out: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+        if out.is_none() && !self.default_writable {
+            return Err("NoPhysical=true: the game ignores loose overrides; use --out or enable them in the mountlist".into());
+        }
         let bytes = self.tab.write();
         Tab::read(&bytes).map_err(|e| format!("written table does not read back: {e}"))?;
         let dest = out.unwrap_or_else(|| self.loose.clone());
@@ -376,11 +570,6 @@ impl EditTab {
     }
 }
 
-/// Loose override of a projects.pak file: data\common\projects\<path in pak>.
-fn loose_path(game: &Path, pak_path: &str) -> PathBuf {
-    pak_path.split('\\').fold(game.join("data").join("common").join("projects"), |p, part| p.join(part))
-}
-
 /// A layer opened for editing: the loose file if one exists (earlier edits), else the pak copy.
 struct EditLayer {
     /// Where it was read from, for messages
@@ -388,24 +577,21 @@ struct EditLayer {
     /// Where edits are written (the loose file)
     loose: PathBuf,
     lrent: Lrent,
+    default_writable: bool,
 }
 
-fn open_layer_for_edit(game: &Path, pak: &Pak, layer: &str) -> Result<EditLayer, Box<dyn std::error::Error>> {
+fn open_layer_for_edit(vfs: &GameVfs, layer: &str) -> Result<EditLayer, Box<dyn std::error::Error>> {
     // A .lrent file on disk is edited in place (unless --out).
     if Path::new(layer).is_file() {
         let lrent = Lrent::read(&std::fs::read(layer)?).map_err(|e| format!("{layer}: {e}"))?;
-        return Ok(EditLayer { src: layer.to_string(), loose: PathBuf::from(layer), lrent });
+        return Ok(EditLayer { src: layer.to_string(), loose: PathBuf::from(layer), lrent, default_writable: true });
     }
     let name = if layer.to_lowercase().ends_with(".lrent") { layer.to_string() } else { format!("{layer}.lrent") };
-    let pe = pak.find(&name).ok_or_else(|| format!("{name}: not in projects.pak (see `risen layers`)"))?;
-    let loose = loose_path(game, &pe.path);
-    let (src, data) = if loose.is_file() {
-        (loose.display().to_string(), std::fs::read(&loose)?)
-    } else {
-        (format!("projects.pak:{}", pe.path), pak.read(pe)?)
-    };
+    let pe = vfs.find(PROJECTS, &name)?;
+    let loose = pe.loose.clone();
+    let (src, data) = (vfs.source(pe), vfs.read(pe)?);
     let lrent = Lrent::read(&data).map_err(|e| format!("{src}: {e}"))?;
-    Ok(EditLayer { src, loose, lrent })
+    Ok(EditLayer { src, loose, lrent, default_writable: !vfs.no_physical || matches!(pe.source, Source::Loose(_)) })
 }
 
 impl EditLayer {
@@ -428,6 +614,9 @@ impl EditLayer {
 
     /// Writes the layer to `out` or the loose file (after checking that it reads back).
     fn save(&self, out: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
+        if out.is_none() && !self.default_writable {
+            return Err("NoPhysical=true: the game ignores loose overrides; use --out or enable them in the mountlist".into());
+        }
         let bytes = self.lrent.write();
         Lrent::read(&bytes).map_err(|e| format!("written layer does not read back: {e}"))?;
         let dest = out.unwrap_or_else(|| self.loose.clone());
@@ -464,15 +653,13 @@ impl EditLayer {
 }
 
 /// Loads a layer from a file path, or from projects.pak by name / path (".lrent" optional).
-fn load_layer(game: Option<PathBuf>, spec: &str) -> Result<(String, Lrent), Box<dyn std::error::Error>> {
+fn load_layer(vfs: Option<&GameVfs>, spec: &str) -> Result<(String, Lrent), Box<dyn std::error::Error>> {
     let p = Path::new(spec);
     let data = if p.is_file() {
         (spec.to_string(), std::fs::read(p)?)
     } else {
-        let pak = Pak::open(projects_pak(&game_dir(game)?))?;
-        let name = if spec.to_lowercase().ends_with(".lrent") { spec.to_string() } else { format!("{spec}.lrent") };
-        let e = pak.find(&name).ok_or_else(|| format!("{name}: not in projects.pak (see `risen layers`)"))?;
-        (e.path.clone(), pak.read(e)?)
+        let l = open_layer_for_edit(vfs.ok_or("game folder is needed to find a layer by name")?, spec)?;
+        return Ok((l.src, l.lrent));
     };
     Ok((data.0, Lrent::read(&data.1)?))
 }
@@ -504,7 +691,7 @@ struct EntityOut {
     guid: String,
     position: [f32; 3],
     creator: Option<String>,
-    /// Name of the creator template (templates.pak)
+    /// Name of the creator template (mounted catalog)
     template: Option<String>,
     sets: Vec<SetOut>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -610,6 +797,22 @@ fn print_entities(list: &[EntityOut]) {
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     match cli.cmd {
+        Cmd::Vfs { filter, json } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            #[derive(Serialize)]
+            struct FileOut { path: String, size: u64, source: String }
+            let filter = filter.map(|s| s.to_ascii_lowercase());
+            let files: Vec<_> = vfs.entries.iter().filter(|e| {
+                filter.as_ref().is_none_or(|s| e.path.to_ascii_lowercase().contains(s))
+            }).map(|e| FileOut { path: e.path.clone(), size: e.size, source: vfs.source(e) }).collect();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&files)?);
+            } else {
+                for e in &files { println!("{:9} {} <- {}", e.size, e.path, e.source); }
+            }
+            eprintln!("{} files shown, {} mounted, {} archives; NoPhysical={} NoPacked={}",
+                files.len(), vfs.entries.len(), vfs.archive_count(), vfs.no_physical, vfs.no_packed);
+        }
         Cmd::PakList { pak, filter } => {
             let pak = Pak::open(&pak)?;
             let filter = filter.map(|f| f.to_lowercase());
@@ -628,17 +831,147 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             println!("wrote {} bytes to {}", data.len(), out.display());
         }
         Cmd::Layers { filter } => {
-            let pak = Pak::open(projects_pak(&game_dir(cli.game)?))?;
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
             let filter = filter.map(|f| f.to_lowercase());
-            for e in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".lrent")) {
+            for e in vfs.files(PROJECTS, ".lrent") {
                 if filter.as_ref().is_none_or(|f| e.path.to_lowercase().contains(f)) {
-                    println!("{:9} {}", e.size, e.path);
+                    println!("{:9} {}", e.size, relative_asset(&e.path, PROJECTS));
                 }
             }
         }
+        Cmd::Projects { filter, json } => {
+            #[derive(Serialize)]
+            struct ProjectOut {
+                path: String,
+                source: String,
+                class: String,
+                version: u16,
+                enabled: Option<u8>,
+                layers: Vec<String>,
+                world_data_file: Option<String>,
+            }
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let filter = filter.map(|f| f.to_lowercase());
+            let mut list = Vec::new();
+            for e in vfs.files(PROJECTS, ".wrl").chain(vfs.files(PROJECTS, ".sec")) {
+                if filter.as_ref().is_some_and(|f| !e.path.to_lowercase().contains(f)) { continue; }
+                let p = ProjectFile::read(&vfs.read(e)?).map_err(|err| format!("{}: {err}", vfs.source(e)))?;
+                let s = p.sector();
+                let w = p.world();
+                list.push(ProjectOut {
+                    path: relative_asset(&e.path, PROJECTS),
+                    source: vfs.source(e),
+                    class: p.root.class(&p.archive.strings).to_string(),
+                    version: s.map(|s| s.version).or_else(|| w.map(|w| w.version)).unwrap(),
+                    enabled: s.and_then(|s| s.enabled),
+                    layers: s.map(|s| s.layers.iter().map(|&r| format!("{}.lrent", p.archive.str(r))).collect()).unwrap_or_default(),
+                    world_data_file: w.and_then(|w| w.world_data_file).map(|r| p.archive.str(r).to_string()),
+                });
+            }
+            if json {
+                println!("{}", serde_json::to_string_pretty(&list)?);
+            } else {
+                for p in list {
+                    println!("{}  {} v{}{}", p.path, p.class, p.version,
+                        p.enabled.map(|v| format!(" enabled={v}")).unwrap_or_default());
+                    if let Some(file) = p.world_data_file { println!("  world data: {file}"); }
+                    for layer in p.layers { println!("  {layer}"); }
+                }
+            }
+        }
+        Cmd::ProjectsCheck { pak } => {
+            let pak = pak.map_or_else(|| game_dir(cli.game).map(|g| projects_pak(&g)), Ok)?;
+            for ext in [".sec", ".wrl"] {
+                println!("{ext}:");
+                round_trip_check(&pak, ext, |d| ProjectFile::read(d).map(|p| {
+                    let n = p.sector().map_or(1, |s| s.layers.len());
+                    (p.write(), n)
+                }))?;
+            }
+        }
+        Cmd::WorldSectors { world, json } => {
+            #[derive(Serialize)]
+            struct SectorOut<'a> { name: &'a str, enabled: bool }
+            let data = if Path::new(&world).is_file() && world.to_ascii_lowercase().ends_with(".wrldatasc") {
+                WorldData::read(&std::fs::read(&world)?)?
+            } else {
+                let vfs = GameVfs::open(game_dir(cli.game)?)?;
+                let path = if world.to_ascii_lowercase().ends_with(".wrldatasc") { world.clone() } else {
+                    let name = if world.to_ascii_lowercase().ends_with(".wrl") { world.clone() } else { format!("{world}.wrl") };
+                    let p = ProjectFile::read(&vfs.read(vfs.find(PROJECTS, &name)?)?)?;
+                    let r = p.world().and_then(|w| w.world_data_file).ok_or("world has no world-data filename")?;
+                    p.archive.str(r).to_string()
+                };
+                WorldData::read(&vfs.read(vfs.find(PROJECTS, &path)?)?)?
+            };
+            if json {
+                let out: Vec<_> = data.sectors().iter().map(|s| SectorOut { name: &s.name, enabled: s.enabled }).collect();
+                println!("{}", serde_json::to_string_pretty(&out)?);
+            } else {
+                for s in data.sectors() { println!("{}={}", s.name, s.enabled); }
+            }
+        }
+        Cmd::WorldDataCheck { pak } => {
+            let pak = pak.map_or_else(|| game_dir(cli.game).map(|g| projects_pak(&g)), Ok)?;
+            round_trip_check(&pak, ".wrldatasc", |d| WorldData::read(d).map(|w| (w.write(), w.sectors().len())))?;
+        }
+        Cmd::LayerCreate { name, world, like, spawn, to, out_dir, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let mut changes = project::plan(&vfs, &name, &world, &like)?;
+            if let Some(template) = spawn {
+                let pos: [f32; 3] = to.ok_or("--spawn needs --to")?.try_into().map_err(|_| "--to needs 3 coordinates")?;
+                if !pos.iter().all(|v| v.is_finite()) { return Err("--to coordinates must be finite".into()); }
+                let (t, path) = template_source(&vfs, &template)?;
+                let (bounds, how) = MeshPaks::open(&vfs).local_box(&t)?;
+                let change = changes.iter_mut().find(|c| c.path.ends_with(".lrent")).ok_or("no new layer")?;
+                let mut l = Lrent::read(&change.bytes)?;
+                let n = l.spawn_template(&t, pos, bounds)?;
+                change.bytes = l.write();
+                Lrent::read(&change.bytes)?;
+                println!("spawn {path} [{n}] at {pos:?}, bounds from {how}");
+            }
+            for c in &changes { println!("{} {} ({} bytes)", if c.replace { "update" } else { "create" }, c.path, c.bytes.len()); }
+            if !dry_run {
+                if out_dir.is_none() && vfs.no_physical { return Err("NoPhysical=true: enable loose files or use --out-dir".into()); }
+                let root = out_dir.unwrap_or_else(|| vfs.root.clone());
+                std::fs::create_dir_all(&root)?;
+                let backup = project::apply(&root, &changes)?;
+                println!("BACKUP: {}", backup.display());
+                println!("RESTORE: risen world-restore \"{}\"", backup.display());
+            }
+        }
+        Cmd::WorldRestore { backup, force } => {
+            project::restore(&backup, force)?;
+            println!("restored {}", backup.display());
+        }
+        Cmd::Physics { layer, entity, mode, out, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            geometry::physics(&vfs, &layer, &entity, &mode, out, dry_run)?;
+        }
+        Cmd::Climbable { layer, entity, enabled, out, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            geometry::climbable(&vfs, &layer, &entity, enabled, out, dry_run)?;
+        }
+        Cmd::Ground { layer, entity, collision, height, align, samples, max_slope, surface_layer, world, max_drop, max_rise, gap, out, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            geometry::ground(&vfs, &layer, &entity, collision, height, align, samples.map(usize::from), max_slope, surface_layer.as_deref(), &world, max_drop, max_rise, gap, out, dry_run)?;
+        }
+        Cmd::Snap { layer, entity, against, target_layer, side, gap, center, out, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            geometry::snap(&vfs, &layer, &entity, &against, target_layer.as_deref(), &side, gap, center, out, dry_run)?;
+        }
+        Cmd::Geometry { source, entity, json, obj } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            geometry::inspect(&vfs, &source, entity.as_deref(), json, obj.as_deref())?;
+        }
         Cmd::Entities { layer, props, geometry, json } => {
-            let templates = game_dir(cli.game.clone()).ok().and_then(|g| template_names(&g).ok()).unwrap_or_default();
-            let (path, l) = load_layer(cli.game, &layer)?;
+            let vfs = match game_dir(cli.game) {
+                Ok(game) => Some(GameVfs::open(game)?),
+                Err(_) if Path::new(&layer).is_file() => None,
+                Err(e) => return Err(e.into()),
+            };
+            let templates = vfs.as_ref().map(template_names).transpose()?.unwrap_or_default();
+            let (path, l) = load_layer(vfs.as_ref(), &layer)?;
             let s = l.strings();
             let list: Vec<_> = l
                 .entities()
@@ -659,13 +992,13 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         Cmd::Find { text, props, json } => {
             let game = game_dir(cli.game)?;
-            let templates = template_names(&game)?;
-            let pak = Pak::open(projects_pak(&game))?;
+            let vfs = GameVfs::open(&game)?;
+            let templates = template_names(&vfs)?;
             let needle = text.to_lowercase();
             let needle = needle.trim_matches(['{', '}']);
             let mut list = Vec::new();
-            for pe in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".lrent")) {
-                let l = Lrent::read(&pak.read(pe)?).map_err(|e| format!("{}: {e}", pe.path))?;
+            for pe in vfs.files(PROJECTS, ".lrent") {
+                let l = Lrent::read(&vfs.read(pe)?).map_err(|e| format!("{}: {e}", vfs.source(pe)))?;
                 let s = l.strings();
                 for (i, e) in l.entities().iter().enumerate() {
                     let name = s.get(e.name.0 as usize).map_or(String::new(), |n| n.to_lowercase());
@@ -673,7 +1006,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     if name.contains(needle) || guid.trim_matches(['{', '}']) == needle {
                         let mut o = entity_out(i, e, s, props, &templates);
                         o.parent = parent_of(&l, i);
-                        o.layer = Some(pe.path.clone());
+                        o.layer = Some(relative_asset(&pe.path, PROJECTS));
                         list.push(o);
                     }
                 }
@@ -687,8 +1020,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         Cmd::Move { layer, entity, to, by, out, dry_run } => {
             let game = game_dir(cli.game)?;
-            let pak = Pak::open(projects_pak(&game))?;
-            let mut l = open_layer_for_edit(&game, &pak, &layer)?;
+            let vfs = GameVfs::open(&game)?;
+            let mut l = open_layer_for_edit(&vfs, &layer)?;
             let i = l.entity_index(&entity)?;
             let from = l.lrent.entities()[i].position();
             let d = match (to, by) {
@@ -706,15 +1039,15 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         Cmd::Copy { layer, entity, into, to, by, count, out, dry_run } => {
             let game = game_dir(cli.game)?;
-            let pak = Pak::open(projects_pak(&game))?;
-            let mut l = open_layer_for_edit(&game, &pak, &layer)?;
+            let vfs = GameVfs::open(&game)?;
+            let mut l = open_layer_for_edit(&vfs, &layer)?;
             let i = l.entity_index(&entity)?;
             let from = l.lrent.entities()[i].position();
             println!("{}", l.src);
             println!("copy {}", l.describe(i));
             // --into the same layer = an ordinary copy.
             let mut target = match &into {
-                Some(t) => Some(open_layer_for_edit(&game, &pak, t)?).filter(|t| t.loose != l.loose),
+                Some(t) => Some(open_layer_for_edit(&vfs, t)?).filter(|t| !same_file(&t.loose, &l.loose)),
                 None => None,
             };
             if let Some(t) = &target {
@@ -741,19 +1074,19 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 target.as_ref().unwrap_or(&l).save(out)?;
             }
         }
-        Cmd::Spawn { template, to, layer, count, spread, from_template, out, dry_run } => {
+        Cmd::Spawn { template, to, yaw, layer, count, spread, from_template, out, dry_run } => {
+            if !to.iter().all(|v| v.is_finite()) || !spread.is_finite() {
+                return Err("spawn coordinates and spread must be finite".into());
+            }
+            if yaw.is_some_and(|v| !v.is_finite()) { return Err("yaw must be finite".into()); }
+            if let Some(yaw) = yaw { println!("yaw {yaw} degrees (world heading: 0 = +Z, 90 = +X)"); }
             let game = game_dir(cli.game)?;
-            let names = template_names(&game)?;
-            let want = template.trim_matches(['{', '}']).to_lowercase();
-            let guid = names
-                .iter()
-                .find(|(g, n)| n.to_lowercase() == want || g.trim_matches(['{', '}']).to_lowercase() == want)
-                .map(|(g, _)| g.clone())
-                .ok_or_else(|| format!("{template}: no such template (see `risen templates`)"))?;
-            let pak = Pak::open(projects_pak(&game))?;
+            let vfs = GameVfs::open(&game)?;
+            let (t, template_path) = template_source(&vfs, &template)?;
+            let guid = t.template().ok_or("multi-template: not supported")?.id.text();
             // Source instance (top-level, i.e. direct child of the layer root): from the target
             // layer when it has one, else from the layer with the most instances.
-            let target = layer.as_ref().map(|t| open_layer_for_edit(&game, &pak, t)).transpose()?;
+            let target = layer.as_ref().map(|t| open_layer_for_edit(&vfs, t)).transpose()?;
             // Position of copy k: on a circle around --to.
             let place = |k: usize| {
                 let a = k as f32 / count as f32 * std::f32::consts::TAU;
@@ -761,11 +1094,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 [to[0] + r * a.cos(), to[1], to[2] + r * a.sin()]
             };
             let mut source = None;
-            let mut from_template = from_template;
+            let mut from_template = from_template || Path::new(&template).is_file();
             if !from_template && target.as_ref().is_none_or(|t| instances(&t.lrent, &guid).is_empty()) {
                 let mut best: Option<(usize, String)> = None;
-                for pe in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".lrent")) {
-                    let l = Lrent::read(&pak.read(pe)?).map_err(|e| format!("{}: {e}", pe.path))?;
+                for pe in vfs.files(PROJECTS, ".lrent") {
+                    let l = Lrent::read(&vfs.read(pe)?).map_err(|e| format!("{}: {e}", vfs.source(pe)))?;
                     let n = instances(&l, &guid).len();
                     if n > 0 && best.as_ref().is_none_or(|b| n > b.0) {
                         best = Some((n, pe.path.clone()));
@@ -773,9 +1106,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 match best {
                     Some((_, path)) => {
-                        let s = open_layer_for_edit(&game, &pak, &path)?;
+                        let s = open_layer_for_edit(&vfs, &path)?;
                         // (The target's loose file may have lost the instances its pak copy has.)
-                        if target.as_ref().is_none_or(|t| t.loose != s.loose) {
+                        if target.as_ref().is_none_or(|t| !same_file(&t.loose, &s.loose)) {
                             source = Some(s);
                         }
                     }
@@ -787,12 +1120,12 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             if from_template {
                 let mut l = target.ok_or("--layer is needed to spawn from the template")?;
-                let (t, path) = load_template(&game, &guid)?;
-                let (local_box, how) = MeshPaks::open(&game)?.local_box(&t)?;
-                println!("template {path}, local box from {how}");
+                let (local_box, how) = MeshPaks::open(&vfs).local_box(&t)?;
+                println!("template {template_path}, local box from {how}");
                 println!("into {}", l.src);
                 for k in 0..count {
                     let n = l.lrent.spawn_template(&t, place(k), local_box)?;
+                    if let Some(yaw) = yaw { l.lrent.set_yaw(n, yaw)?; }
                     println!("  -> {}", l.describe(n));
                 }
                 if !dry_run {
@@ -818,6 +1151,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     Some(s) => l.copy_from(s, i, d, k == 0)?,
                     None => l.copy(i, d)?,
                 };
+                if let Some(yaw) = yaw { l.lrent.set_yaw(n, yaw)?; }
                 println!("  -> {}", l.describe(n));
             }
             if !dry_run {
@@ -826,8 +1160,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         }
         Cmd::Delete { layer, entity, out, dry_run } => {
             let game = game_dir(cli.game)?;
-            let pak = Pak::open(projects_pak(&game))?;
-            let mut l = open_layer_for_edit(&game, &pak, &layer)?;
+            let vfs = GameVfs::open(&game)?;
+            let mut l = open_layer_for_edit(&vfs, &layer)?;
             let i = l.entity_index(&entity)?;
             println!("{}", l.src);
             println!("delete {}", l.describe(i));
@@ -843,12 +1177,11 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 if count_bytes(&this_layer, &e.id.guid) > 0 {
                     hits.push("this layer".to_string());
                 }
-                for pe in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".lrent")) {
-                    let loose = loose_path(&game, &pe.path);
-                    if loose == l.loose {
+                for pe in vfs.files(PROJECTS, ".lrent") {
+                    if same_file(&pe.loose, &l.loose) {
                         continue;
                     }
-                    let data = if loose.is_file() { std::fs::read(&loose)? } else { pak.read(pe)? };
+                    let data = vfs.read(pe)?;
                     if count_bytes(&data, &e.id.guid) > 0 {
                         hits.push(pe.path.clone());
                     }
@@ -881,15 +1214,16 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             spawn_check(&game, &into, verbose)?;
         }
         Cmd::Tab { table: None, .. } => {
-            let pak = Pak::open(strings_pak(&game_dir(cli.game)?))?;
-            for e in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".tab")) {
-                let t = Tab::read(&pak.read(e)?).map_err(|err| format!("{}: {err}", e.path))?;
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            for e in vfs.files(STRINGS, ".tab") {
+                let t = Tab::read(&vfs.read(e)?).map_err(|err| format!("{}: {err}", vfs.source(e)))?;
                 let cols: Vec<_> = t.columns.iter().map(|c| c.name.as_str()).collect();
-                println!("{:14} {:6} rows  {}", e.path.trim_end_matches(".tab"), t.rows(), cols.join(" "));
+                println!("{:14} {:6} rows  {}", relative_asset(&e.path, STRINGS).trim_end_matches(".tab"), t.rows(), cols.join(" "));
             }
         }
         Cmd::Tab { table: Some(table), filter, langs, all, json } => {
-            let t = open_tab_for_edit(&game_dir(cli.game)?, &table)?;
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let t = open_tab_for_edit(&vfs, &table)?;
             let cols: Vec<usize> = if all {
                 (1..t.tab.columns.len()).collect()
             } else {
@@ -929,7 +1263,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Cmd::TabSet { table, key, text, langs, out, dry_run } => {
-            let mut t = open_tab_for_edit(&game_dir(cli.game)?, &table)?;
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let mut t = open_tab_for_edit(&vfs, &table)?;
             let cols: Vec<usize> = if langs.is_empty() {
                 t.tab.text_columns()
             } else {
@@ -948,7 +1283,8 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         Cmd::TabDelete { table, key, out, dry_run } => {
-            let mut t = open_tab_for_edit(&game_dir(cli.game)?, &table)?;
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let mut t = open_tab_for_edit(&vfs, &table)?;
             println!("{}", t.src);
             if !t.tab.remove(&key) {
                 return Err(format!("{key}: no such key in {table}").into());
@@ -975,12 +1311,53 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                 return Err("strings check failed".into());
             }
         }
+        Cmd::TemplateCopy { template, name, out, dry_run } => {
+            let game = game_dir(cli.game)?;
+            let vfs = GameVfs::open(&game)?;
+            let (src, path) = template_source(&vfs, &template)?;
+            let t = src.copy_named(&name)?;
+            if out.is_none() && vfs.no_physical && !Path::new(&template).is_file() && !dry_run {
+                return Err("NoPhysical=true: the game ignores loose templates; use --out or enable them in the mountlist".into());
+            }
+            if template_names(&vfs)?.values().any(|n| n.eq_ignore_ascii_case(&name)) {
+                return Err(format!("{name}: a template with this name already exists in mounted assets").into());
+            }
+            let dest = out.unwrap_or_else(|| {
+                let source = if Path::new(&template).is_file() {
+                    PathBuf::from(&template)
+                } else {
+                    vfs.find(TEMPLATES, &path).expect("loaded template is in VFS").loose.clone()
+                };
+                source.with_file_name(format!("{name}.tple"))
+            });
+            if dest.exists() {
+                return Err(format!("{}: already exists; choose a different --out", dest.display()).into());
+            }
+            println!("source {path}: {} {}", src.name(src.template().unwrap()), src.template().unwrap().id.text());
+            println!("  -> {name} {}", t.template().unwrap().id.text());
+            println!("  new text keys: focus FO_{name}, items ITEMDESC_{name}");
+            let bytes = t.write();
+            let back = Tple::read(&bytes).map_err(|e| format!("copied template does not read back: {e}"))?;
+            if back.write() != bytes {
+                return Err("copied template does not round-trip".into());
+            }
+            if dry_run {
+                println!("would write {} ({} bytes)", dest.display(), bytes.len());
+            } else {
+                if let Some(dir) = dest.parent().filter(|p| !p.as_os_str().is_empty()) {
+                    std::fs::create_dir_all(dir)?;
+                }
+                use std::io::Write;
+                std::fs::OpenOptions::new().write(true).create_new(true).open(&dest)?.write_all(&bytes)?;
+                println!("wrote {} ({} bytes)", dest.display(), bytes.len());
+            }
+        }
         Cmd::Templates { filter, props, json } => {
-            let pak = Pak::open(templates_pak(&game_dir(cli.game)?))?;
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
             let needle = filter.map(|f| f.to_lowercase().trim_matches(['{', '}']).to_string());
             let mut list = Vec::new();
-            for pe in pak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".tple")) {
-                let t = Tple::read(&pak.read(pe)?).map_err(|e| format!("{}: {e}", pe.path))?;
+            for pe in vfs.files(TEMPLATES, ".tple") {
+                let t = Tple::read(&vfs.read(pe)?).map_err(|e| format!("{}: {e}", vfs.source(pe)))?;
                 // Multi-templates are listed by their root entity (named like the file).
                 let Some(e) = t.template().or(t.entities.first()) else {
                     continue;
@@ -996,7 +1373,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
                     list.push(TemplateOut {
                         name,
                         guid,
-                        path: pe.path.clone(),
+                        path: relative_asset(&pe.path, TEMPLATES),
                         multi: t.is_multi().then(|| t.entities.len() - 1),
                         sets: e.sets.iter().map(|ps| set_out(&ps.object, s, props)).collect(),
                     });
@@ -1063,7 +1440,8 @@ fn spawn_check(game: &Path, into: &str, verbose: bool) -> Result<(), Box<dyn std
     use risen_formats::lrent::Creator;
     let pak = Pak::open(projects_pak(game))?;
     let tpak = Pak::open(templates_pak(game))?;
-    let mesh = MeshPaks::open(game)?;
+    let vfs = GameVfs::open(game)?;
+    let mesh = MeshPaks::open(&vfs);
     let mut templates: HashMap<[u8; 16], Tple> = HashMap::new();
     for pe in tpak.entries.iter().filter(|e| e.path.to_lowercase().ends_with(".tple")) {
         let t = Tple::read(&tpak.read(pe)?).map_err(|e| format!("{}: {e}", pe.path))?;

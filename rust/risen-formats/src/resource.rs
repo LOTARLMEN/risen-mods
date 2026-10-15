@@ -6,9 +6,47 @@
 
 use crate::bin_io::{Reader, Result};
 
-fn inline_str(r: &mut Reader) -> Result<String> {
+pub(crate) fn inline_str(r: &mut Reader) -> Result<String> {
     let n = r.u16()? as usize;
     Ok(String::from_utf8_lossy(r.bytes(n)?).into_owned())
+}
+
+#[derive(Debug, Clone)]
+pub struct InlineProperty {
+    pub name: String,
+    pub ty: String,
+    pub value: Vec<u8>,
+}
+
+/// The common resource object header. `data_offset` follows its property list, before class data.
+pub fn properties(data: &[u8]) -> Result<(String, Vec<InlineProperty>, usize)> {
+    let mut head = Reader::new(data);
+    let magic = head.bytes(8)?;
+    if !matches!(magic, b"GR01MS02" | b"GR01MA02" | b"GR01CM00") { return head.err("unsupported resource magic"); }
+    let at = head.u32()? as usize;
+    let mut r = Reader::new(data.get(at..).ok_or_else(|| crate::bin_io::ParseError { offset: at, msg: "resource offset outside file".into() })?);
+    r.u16()?;
+    if r.u8()? != 1 { return r.err("empty resource object"); }
+    r.bytes(3)?;
+    let class = inline_str(&mut r)?;
+    r.bytes(11)?;
+    let props = inline_properties(&mut r)?;
+    Ok((class, props, at + r.pos()))
+}
+
+pub(crate) fn inline_properties(r: &mut Reader) -> Result<Vec<InlineProperty>> {
+    r.u16()?;
+    let count = r.u32()? as usize;
+    if count > r.remaining() / 12 { return r.err("invalid inline property count"); }
+    let mut props = Vec::with_capacity(count);
+    for _ in 0..count {
+        let name = inline_str(r)?;
+        let ty = inline_str(r)?;
+        r.u16()?;
+        let size = r.u32()? as usize;
+        props.push(InlineProperty { name, ty, value: r.bytes(size)?.to_vec() });
+    }
+    Ok(props)
 }
 
 /// `Boundary` (bCBox: min xyz, max xyz) of a compiled mesh / motion actor; `None` when the file
@@ -52,7 +90,7 @@ pub fn boundary(data: &[u8]) -> Option<[f32; 6]> {
 pub fn compiled_name(file: &str, ext: &str) -> String {
     let base = file.rsplit(['/', '\\']).next().unwrap_or(file);
     let stem = match base.rsplit_once('.') {
-        Some((stem, e)) if ["xmsh", "_xmsh", "xac", "_xmac"].iter().any(|x| x.eq_ignore_ascii_case(e)) => stem,
+        Some((stem, e)) if ["xmsh", "_xmsh", "xac", "_xmac", "xcom", "_xcom", "xnvmsh", "spt", "_xspt"].iter().any(|x| x.eq_ignore_ascii_case(e)) => stem,
         _ => base,
     };
     format!("{stem}.{ext}")

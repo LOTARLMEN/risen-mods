@@ -641,6 +641,12 @@ impl<'a> StrWalk<'a> {
             }
             ClassData::DynamicLayer(l) => self.object(&mut l.context),
             ClassData::DynamicContext(c) => self.context(c),
+            ClassData::Sector(s) => {
+                for layer in &mut s.layers { self.str(layer); }
+            }
+            ClassData::World(w) => {
+                if let Some(s) = &mut w.world_data_file { self.str(s); }
+            }
         }
     }
 

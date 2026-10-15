@@ -12,6 +12,7 @@
 use crate::archive::StrRef;
 use crate::bin_io::{ParseError, Reader, Result, Writer};
 use crate::lrent::{DynamicContext, DynamicLayer};
+use crate::world::{Sector, World};
 
 #[derive(Debug, Clone)]
 pub struct Property {
@@ -32,6 +33,8 @@ pub enum ClassData {
     Raw(Vec<u8>),
     DynamicLayer(Box<DynamicLayer>),
     DynamicContext(Box<DynamicContext>),
+    Sector(Sector),
+    World(World),
 }
 
 #[derive(Debug, Clone)]
@@ -144,6 +147,8 @@ impl PropertyObject {
                 ClassData::Raw(d) => w.bytes(d),
                 ClassData::DynamicLayer(l) => l.write(w),
                 ClassData::DynamicContext(c) => c.write(w),
+                ClassData::Sector(s) => s.write(w),
+                ClassData::World(world) => world.write(w),
             }
         });
     }
@@ -159,7 +164,7 @@ impl PropertyObject {
         }
         match &mut b.data {
             ClassData::Raw(d) => n += replace_in(d, from, to),
-            ClassData::DynamicLayer(_) | ClassData::DynamicContext(_) => {}
+            ClassData::DynamicLayer(_) | ClassData::DynamicContext(_) | ClassData::Sector(_) | ClassData::World(_) => {}
         }
         n
     }
@@ -175,6 +180,8 @@ fn parse_class(name: &str, raw: &[u8], strings: &[String]) -> Result<ClassData> 
     let data = match name {
         "gCDynamicLayer" => ClassData::DynamicLayer(Box::new(DynamicLayer::read(&mut r, strings)?)),
         "eCEntityDynamicContext" => ClassData::DynamicContext(Box::new(DynamicContext::read(&mut r, strings)?)),
+        "gCSector" => ClassData::Sector(Sector::read(&mut r)?),
+        "gCWorld" => ClassData::World(World::read(&mut r)?),
         _ => return Ok(ClassData::Raw(raw.to_vec())),
     };
     if r.remaining() != 0 {

@@ -698,8 +698,8 @@ data\ini\ConfigDefault.xml / ConfigPerformance*.xml already have ViewDistance (l
 - [ ] If it helps: F10 slider in the Window mod (or own small mod) writing the value at runtime (find the engine
       setter) or into ConfigLocal.xml with "restart needed". Size: 1 session, result not guaranteed (LOD limits)
 
-## Stage 5.21 — World editing: old Risen Editor recon -> own Rust tools (user's idea 2026-10-14; PAUSED 2026-10-14 by the user after .tab strings;
-next when resumed: "New key test" (new template + FO_/ITEMDESC_ rows), then Game VFS)
+## Stage 5.21 — World editing: old Risen Editor recon -> own Rust tools (user's idea 2026-10-14;
+resumed 2026-10-15: "New key test" PASSED in game; Game VFS and .sec/.wrl round trips DONE)
 Goal: get the community world editor (Risen Editor by Galrath 434, ~2013, place/copy/delete NPCs, monsters, items)
 working with the 2023 64-bit re-release; later an AI-friendly CLI over the world/template data and maybe a nicer
 world-editing wrapper. Old 32-bit DLL mods (Elusively Patched Unit, Baltram's Script_Extensions) are known broken on
@@ -760,8 +760,23 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       rust/.cargo/config.toml -Cdlltool=D:/Rust/tools/llvm-dlltool.exe (copy of llvm-ar.exe from llvm-tools;
       re-copy after a toolchain update if builds break). Std 1.99 has its own read_le -> don't call binrw's
       read_le on primitives (ambiguity warning), use BinRead::read for structs.
-- [ ] Game VFS over all paks + loose data\ files (the 19 duplicate names: later pak wins like the patched editor;
-      loose files override paks - check the game's real order when we first need it)
+- [x] Game VFS 2026-10-15: risen-formats `vfs.rs` reads bin/mountlist_packed.ini (RootPath, NoPhysical,
+      NoPacked; Bin/Physical/Packed mounts, aliases, wildcard speech_* and environment variables). Only mounted
+      archives/directories participate: this installation mounts 23 of 25 paks; common/strings.pak and gui2_back.pak
+      are not listed. New loose files are included, not just overrides of known PAK entries. Case-insensitive virtual
+      paths; ambiguous short names are refused rather than picking an arbitrary file.
+      Verified against native FFC.dll + FileSystem2.dll in an isolated Python process (`tools/vfs-native-probe.py`,
+      generated fixtures only, system version.dll preloaded so our mod loader is not loaded): for the SAME virtual
+      path, the later mounted archive wins even with an older entry FILETIME; loose wins over archives. Same with
+      cache enabled. Chain = .pak -> .p00 -> .p01 ...; stops at the first missing volume (FFC 0x38be0).
+      Engine Mount 0x734440 / ProcessMountList 0x734bd0: NoPhysical/NoPacked gate [Packed]; explicit [Physical]
+      and [Bin] remain directory mounts. Native basename-cache arbitration across DIFFERENT virtual paths is not
+      emulated: CLI uses scoped unique lookup. Details and commands: notes/vfs-rev2045.md.
+      CLI layers/entities/find/templates/spawn/copy/move/delete/template-copy/tab + mesh bounds use VFS;
+      `risen vfs [filter] [--json]` shows effective file sources. Archive format/corpus checks stay PAK-based.
+      Tests: 8 independent G3V0 fixture tests passed; 6 native priority cases passed with cache off/on; real-data
+      CLI checks passed (new template catalog, named layer == explicit loose layer, find, spawn by name, delete
+      without false refs). Game loose data SHA256 unchanged; output files only in build/tests. Debug/release built.
 - [x] .lrent read + write 2026-10-14 (risen-formats: archive.rs GENOMFLE + string table, props.rs property
       objects, lrent.rs layer/context/entities, bin_io.rs). Format: "GENOMFLE", u16 1, u32 table offset; body =
       u32 0xD0DEFADE + gCDynamicLayer object; its class data = "GENOMEDL" + u16 + eCEntityDynamicContext object
@@ -775,7 +790,46 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       entities, Ingvar -2240 493 -20187 with gCNPC_PS etc.), `risen find <name|guid> [--props] [--json]` over all
       410 layers in ~1 s. Position = world matrix translation (m[12..15]); entity 0 "DRE" = layer root;
       creator = template GUID (name lookup needs templates.pak - next).
-- [ ] .sec / .wrl round trip (small files, same archive + property objects; gCSector lists its layers)
+- [x] .sec / .wrl round trip 2026-10-15: risen-formats `world.rs` (ProjectFile, typed Sector / World
+      class data in PropertyObject, string remap via StrWalk). Both = GENOMFLE + u32 0xD0DEFADE + accessor.
+      gCSector: u16 version, u8 enabled from v27; from v200 ALWAYS u32 layer count, u32 reserved, string
+      indices (basenames without .lrent), even when enabled=0. FOUND another old editor bug: GENOME_Files.cs
+      gates that list on enabled instead of version; 20 disabled story sectors were misread. Verified against
+      Game.dll Rev.2045 gCSector::OnRead 0x991450 / OnWrite 0x991330. gCWorld: u16 version + string from v36
+      (World.wrl points to #G3:/data/common/projects/World/World.wrldatasc, a text [Sector.List]; NOT parsed yet).
+      CLI `risen projects [filter] [--json]` lists mounted worlds / sectors, versions, enabled byte and references;
+      `risen projects-check [pak]`: all 352 .sec + 5 .wrl byte-identical. Seven independent fixture tests: disabled
+      sectors, old versions, typed list edit retaining properties, bad/truncated data, string remap. Existing 8
+      VFS tests pass; lrent-check 410 / tple-check 2679 identical; strings-check 3089 remaps pass, unchanged
+      unknown classes. Debug/release built. Game files and deployed DLLs unchanged; no in-game test needed
+      for the read-only CLI. World-container creation follows below.
+- [x] .wrldatasc 2026-10-15: `wrldatasc.rs` lossless sector-list reader/editor; comments, line endings,
+      key order, BOM and unrelated sections kept. Add/update/remove entries in [Sector.List]; duplicate names
+      (case-insensitive), malformed flags, UTF-16/NUL refused. `risen world-sectors [world|file] [--json]`,
+      `world-data-check`: all 5 shipped lists byte-identical. Seven independent parser/edit tests pass.
+- [x] Own layer + sector creation 2026-10-15: `Lrent::empty_like` retains only plain DRE, new GUID, empty
+      bounds, terminator hierarchy, compact first-use string table. Corpus example `layer_create_check`: all
+      410 donors produce valid independent layers (finite bounds, unique GUIDs, original donors unchanged).
+      `ProjectFile::sector_like` discards old layer names, enables sector / startup / persistence flags.
+      `risen layer-create <name> [--world World] [--like Game_Start_Item] [--spawn T --to x y z]
+      [--out-dir staging] [--dry-run]`: new .lrent + .sec under World/RisenMods, registration in World.wrldatasc.
+      Existing names refused. If World_local.wrldatasc is mounted, also enable the new sector there:
+      Game.dll OnRead 0x995a42..0x995a76 disables a sector missing from the local list. Original .wrl untouched.
+      All bytes validated before writing; verified before/after snapshots + manifest in backup/world-edits;
+      atomic file replacement, automatic rollback on failure. `world-restore <backup> [--force]` refuses later
+      edits by default. Five CLI tests include injected partial write failure and a real process-path guard:
+      IMPORTANT: game Risen.exe and CLI risen.exe share the basename; guard must match full bin/Risen.exe path.
+      Total 28 tests pass (one ignored helper is launched by the process test). Staging create/restore passed;
+      debug/release built. Usage: notes/world-editing.md.
+- [x] Own-layer in-game test PASSED 2026-10-15 (user confirmed; prepared 09:13 with
+      `tools/test-new-layer.ps1`, also supports -StageOnly):
+      installed RisenMods_NewLayer_Test.sec/.lrent + loose World/World.wrldatasc; one It_Shield_Round at
+      (-36950, 200, -5100), near Sara, GUID {01FC69BC-9A93-4219-BD9A-4E6DF55E7470}.
+      Backup: risen-mods/backup/world-edits/B40E0E21-4562-4710-9884-73E01506F057; restore with world-restore.
+      Game VFS sees the new sector, named layer lookup returns DRE + shield, all existing loose project files
+      except the registry have unchanged SHA256. No DLL changes. USER CONFIRMED: shield appeared on the
+      ground and stayed there after save/load; pickup worked (inventory screenshot), after another save/load
+      it remained in inventory. A newly registered independent sector/layer loads and its item persists.
 - [x] First real edit: `risen move <layer> <guid|index> --to x y z | --by dx dy dz [--out f] [--dry-run]` DONE
       2026-10-14 (lrent.rs DynamicContext::translate + update_root_bounds). Writes loose file
       data\common\projects\<layer path>; an existing loose file is edited further. Moves world+local translation,
@@ -973,16 +1027,265 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       data\compiled\strings. IN-GAME TEST PASSED 2026-10-14: the club shows "Дубина огра [мод]" in focus and inventory,
       inventory tooltip shows the new ITEMDESC text (user's screenshot) -> the game
       reads loose data\compiled\strings\*.tab (NoPhysical=false). Loose focus.tab + items.tab left in place.
-- [ ] New key test: a NEW template (copy of a .tple under a new name) + FO_/ITEMDESC_ rows for it, spawned in game
-- [ ] Fix: `entities <name>` / `find` read the PAK copy, not the loose file (needs the VFS; pass a .lrent path for now)
-- [ ] Fix: `delete` reference warning scans the edited layer's OLD file on disk -> false "still referenced in
-      <same layer>" (seen 2026-10-14 deleting Wolf_Black from Game_Start_NPC_01; the written file has 0 refs).
-      Search the edited layer in memory instead. (Test wolves removed 2026-10-14 on user's request: Harbour /
+- [x] New key test: a NEW template (copy of a .tple under a new name) + FO_/ITEMDESC_ rows for it, spawned in game
+      IMPLEMENTED 2026-10-15: `Tple::copy_named` + `risen template-copy <name|guid|file> <new-name> [--out] [--dry-run]`:
+      new root/template GUIDs, in-copy GUID refs replaced, new internal names, string table rebuilt in first-use
+      order; scripts/meshes/external refs unchanged, unknown data and multi-templates refused, no overwrite.
+      `spawn <file.tple>` builds directly from that file; Game VFS now includes loose templates by name too.
+      Corpus check: `cargo run -p risen-formats --example template_copy_check -- ../../data/common/templates.pak`:
+      2665 copies byte-identical after undoing names/GUIDs and restoring original string indices; 14 refused
+      (13 multi-templates + 1 eCLightStreaks_PS). Existing-name spawn dry-run also passed.
+      `tools/test-new-key.ps1` prepares the test, backs up changed files with SHA256 + restore.ps1; automatic
+      rollback also verified. Installed loose Items/Weapons_Axes/It_Axe_RisenMods_Test.tple (copy of It_Axe_Ogre,
+      GUID {6EE13EEC-7A6C-414A-86A0-AC79A03AAFF3}); Game_Start_Item [213] at (-37150, 200, -5100), near Sara,
+      entity GUID {E6E4C652-DDD1-4AB4-97A6-D50EC7B70B4C}. NEW rows in focus.tab / items.tab:
+      FO_It_Axe_RisenMods_Test = "Тестовая дубина [новый шаблон]" / "Test club [new template]";
+      ITEMDESC_It_Axe_RisenMods_Test = "Новый шаблон с собственным текстовым ключом. Проверка Risen Mods."
+      (+ English text). Tables read back correctly. Backup: D:/RisenModding/backup/new-key-20261015-074916.
+      IN-GAME TEST PASSED 2026-10-15 07:57 (user): the new club appeared, pickup into inventory worked,
+      its custom description was shown, save/load broke nothing. New loose template + new text keys work.
+      Test data left installed; DLLs in bin were not updated for this data-only test.
+- [x] Fix 2026-10-15: `entities <name>` / `find` now use Game VFS, including new loose layers and modified layers.
+      Verified: Game_Start_Item by name == explicit loose file; find resolves the new club + creator template.
+- [x] Fix 2026-10-15: `delete` checks the edited layer in memory and skips its OLD disk copy by canonical file
+      identity (also when invoked with an explicit .lrent path). Reference scans in other layers use VFS.
+      Named/explicit-path deletion of the test club into scratch files: no false "same layer" warning.
+      (Test wolves removed 2026-10-14 on user's request: Harbour /
       Wild_Outdoor loose layers deleted, Wolf_Black out of Game_Start_NPC_01; backup
       D:\RisenModding\backup\wolves-removed-20261014)
-- [ ] `translate` / move: only direct children of the layer root are supported - nested entities later
-- [ ] Optional `--yaw` rotation for `spawn` (now always the template rotation)
-- [ ] Local box is approximate for strip weapons, VFX/SFX and monsters (spawn-check: 1122 of 1591 match)
+- [x] Nested `translate` / move 2026-10-15: world-space offset transformed through the inverse parent
+      basis (rotation, scale, shear); only the selected node's local translation changes, descendant locals
+      stay unchanged. World bounds/poses move with the subtree, ancestor geometry/context bounds refreshed.
+      Shipped door matrices have rounded m[15] (e.g. 0.9999944), retained without normalization. Standard
+      parent geometry = own world box + child geometry; exceptional authored/cached volumes are retained
+      conservatively. Invalid hierarchy, singular parents, nonfinite inputs/overflow refuse atomically.
+- [x] Optional `spawn --yaw <degrees>` 2026-10-15: absolute world heading about +Y (0 = +Z, 90 = +X),
+      preserving pitch/roll/scale; subtree rotates about its root position. Works for same-layer copies,
+      imports, --from-template and explicit .tple files, including --count/--spread. Bounds, navigation and
+      both rigid-body positions/quaternions synchronized; omitted --yaw keeps the previous behavior.
+      Sheared/reflected rigid-body bases are refused because they cannot be represented by a quaternion.
+      10 transform fixtures cover nested/scaled/sheared parents, rounded m[15], ancestor shrink/extra bounds,
+      yaw quadrants/tilt/physics and atomic refusal. Commands/examples: notes/world-editing.md.
+      Final checks: 38 tests passed; transform_check over all 410 shipped layers covers all 902 nested
+      entities: 1686 subtree moves + 1686 yaw edits, matrices/binary readback/unrelated data verified,
+      no refusals. CLI scratch checks passed; game data/INI/DLL SHA256 unchanged. Debug/release built.
+- [x] In-game check of nested move and spawn --yaw: PASSED 2026-10-15; prepared 10:10 with
+      `tools/test-nested-yaw.ps1` (also -StageOnly). Monastery_Dyn #1625 plank + child #1626 barrel
+      copied to the existing RisenMods_NewLayer_Test layer at (-37450,120,-5700); only the nested
+      barrel moved 140 cm along the plank's local X. A second copy spawned at (-36850,120,-5700)
+      with --yaw 90; child local matrix retained. Installed layer = DRE + original shield + 2 groups.
+      Stage/restore, named VFS lookup, hierarchy/positions/yaw and SHA256 checks passed: only that .lrent
+      changed, all other game data/INI/DLLs unchanged. Backup/world-restore:
+      `backup/world-edits/E18FA613-B903-4627-B806-F4FAC3365E1C` (restore this before the earlier shield backup).
+      User: NEW game, two differently oriented planks with a barrel near one end of each near Sara;
+      save/load and recheck both groups. USER CONFIRMED 2026-10-15 10:15: both planks/barrels appeared;
+      screenshot shows the groups oriented differently with barrels standing on the planks.
+      USER CONFIRMED 10:17: everything stayed in place after save/load. Nested child placement and
+      rotated groups load and persist correctly. Test data left installed. Game not launched by the script.
+- [x] Bounds/geometry investigation + first placement tools 2026-10-15: shared Rust modules
+      bounds.rs / geometry.rs / collision.rs / placement.rs. Native RE: entity bounds merge property-set
+      contributions (Engine 0x69e070); strip offsets, decal size/offset, billboard half-diagonal, audio
+      box or MinDistance*10, collision OuterAABBLocal when no visual or OverrideEntityAABB=true.
+      spawn-check now 1184/1591 vs 1122; 94 new matches, 32 old matches change because the template's
+      contributions differ from the archived instance. Example: Sword_Bronco template strip ends at
+      z=90 but instance bounds/strip use ~80.47. Instance property-set census matches 1233/1591.
+      Static model triangles: 1665 files, 3306600 vertices / 2220771 triangles; one procedural
+      SpeedTreeBillboardMesh refused (non-float3 position layout). All 111 actors: 4142 nodes,
+      334301 split vertices / 465507 bind-pose triangles, both byte orders; skin deformation not applied.
+      CLI: geometry <template|layer entity|resource> [--json] [--obj]; collision shapes/flags/resources
+      shown separately. `ground <layer> <entity>` finds visual static surface using center + 4 AABB
+      corners; --surface-layer, --world, --height, --max-drop/rise, --gap. World scan respects registered
+      enabled sectors/local list (excludes import/test worlds). `snap ... --against ID --side ...
+      [--center] [--gap]`: world render AABB faces, negative gap embeds objects. Descendants follow.
+      Writes into game data have verified backup/world-restore and require game closed; --out scratch
+      and --dry-run supported. 50 tests passed; geometry_check/bounds_check and tools/test-placement.ps1
+      passed; lrent-check 410 and tple-check 2679 byte-identical. Details: notes/geometry-placement.md.
+- [x] Cooked PhysX ._xcom polygon decoder (2026-10-15): read-only Rust xcom.rs, no runtime PhysX
+      dependency. All 637 physics.pak resources read: 1087 triangle meshes + 2 convex hulls,
+      339572 vertices / 565676 triangles. Every coordinate/index and stream boundary matches the
+      independent x86 PhysX 2.8.4 reader (tools/xcom-native-check.cpp); metres converted to cm, Y up.
+      MESH 1, CVXM 3 / CLHL 0 / CVHL 5 / VALE 2, optional SUPM/GAUS, 8/16/32-bit indices,
+      nested endianness, triangle materials and resource flags. Tree payloads skipped by length;
+      32-bit disk polygon pointers never treated as host pointers. geometry now reports decoded
+      collision resources + selected mesh index; direct ._xcom --obj exports collision triangles.
+      Fixed original .xnvmsh -> ._xcom references. Details/verification: notes/geometry-placement.md.
+      66 workspace tests passed (one ignored helper); debug/release built, release CLI 15:14:01.
+      tools/test-xcom.ps1 native comparison, multi-mesh/convex OBJ counts/indices, template lookup,
+      existing board render/box inspection, overwrite/truncation refusal all passed. SHA256 of
+      game data/INI/DLL/physics.pak unchanged. Stage: build/tests/xcom-20261015-151445/result.json.
+      No game launch or deploy needed; bin DLLs remain October 12-14 builds. No commit/push.
+- [x] Collision-based ground mode (2026-10-15): `ground --collision` uses the selected solid
+      box/triangle/convex colliders for the moving entity and serialized static colliders as supports.
+      Dense underside grid (default 7) + vertices; --align/--samples/--height/--gap supported. Mesh
+      references select triangle/convex array and resource index; world + primitive local poses apply.
+      Box half-extents are decoded; sphere/capsule supports use analytic vertical intersections.
+      Entity enabled/collision flags, PS/shape disable/response/ray flags and a conservative solid
+      shape-group policy filter supports. Invisible colliders participate; rigid-body supports excluded.
+      Physical bounds drive culling, resources cached/indexed once; active-world search passed with
+      5 candidates / 0 unavailable at board A. Default visual ground and snap retained; no fallback
+      to visual geometry in collision mode. Native RE: Engine 0x656ad0 and 0x65774d (scaled triangle
+      colliders refused at scale delta >0.0001). Nonuniform/sheared/reflected poses, legacy/adapted
+      colliders and curved MOVING colliders explicitly unsupported. Sampled placement, not PhysX.
+      All 74 tests passed; CLI release 15:41:43. tools/test-collision-ground.ps1 -Install passed:
+      physical results, child locals/world poses, unchanged properties/other entities, repeatability,
+      visual control, slope/missing-physical-surface refusal, named VFS and unrelated SHA256 checks.
+- [x] In-game collision-ground contact/save-load check PASSED (user report recorded 2026-10-15):
+      user: boards touch the ground excellently; save/load changes nothing. Walking/jumping was not
+      separately reported in this confirmation. Shield was already lying there; a fresh fall was
+      NOT observed in this scene. Do not count this as another dynamic-drop test; developer controls
+      below now prepare repeatable lift/freeze/release checks. PREPARED/INSTALLED 15:43: only the test .lrent changed,
+      boards [2]/[33] and child barrels [3]/[34] moved; all other 30 non-root entities retained.
+      Board A y=65.28201 (+2.07447 cm), old tilt retained; steep board y=325.83588 (+5.65546 cm),
+      tilt 29.72299 degrees, 85 samples, residual above gap=-2 about 9.682 cm. Test scene remains
+      35 entities; shields/towers/board B unchanged. Backup/world-restore:
+      backup/world-edits/811942CC-14FE-4B98-AF92-B4D00A034CE6 (restore before DE9ED2C4...).
+      Stage: build/tests/collision-ground-20261015-154309/installed-test.json.
+      NEW game: inspect both boards, walk/jump onto boards/barrels, AutoLoot off for falling shield,
+      save/load and recheck. Game launched through Steam 15:44:16; bin/Risen.exe and main menu
+      confirmed in the new log. Contact/persistence now user-confirmed. No DLL deploy at this step;
+      bin DLLs were October 12-14 builds. No commit/push.
+- [ ] Remaining geometry: pose-dependent animated bounds / skinning; particle runtime extents;
+      SpeedTree procedural geometry; collision-based contact/overlap checks using decoded ._xcom
+      and primitive colliders. NEXT: repeatable live debug controls (below), then analytic
+      curved moving undersides / broader contact and overlap queries. Ground defaults to visual
+      triangles/five samples; --collision uses physical geometry with dense sampling.
+      Slope/normal alignment and denser samples DONE and user-tested below. Do not label it an
+      exact PhysX simulation. Existing rigid-body presence alone does not imply a freely falling body.
+- [x] Slope-aware `ground` (user 2026-10-15): implemented and user-tested on the stronger slope below.
+      `--align` fits local +Y to a sampled height plane, keeps forward XZ heading/positive axis scales;
+      `--samples 3..17` enables an NxN mesh-underside grid + model vertices (align default 7).
+      Legacy no-flag five-point vertical-only behavior retained. `--max-slope` default 45 degrees.
+      Centered f64 plane fit, conservative candidate search after rotation, missing support / shear /
+      reflected scale / excessive slope / nonconvergence refused. Final vertical offset avoids sampled
+      penetration; gap is vertical cm. Model shape/terrain hollows can leave gaps; not PhysX contact.
+      `Lrent::set_world_matrix`: atomic subtree pose/bounds/nav/rigid-body synchronization,
+      child locals and rounded parent homogeneous component retained. 61 tests passed; release CLI
+      2026-10-15 14:15:39. CLI checks of both board headings, dense without tilt, repeatability,
+      slope-limit refusal, child local/world pose, scale, properties and unrelated hashes passed.
+      `tools/test-ground-align.ps1 -Install` changed ONLY board A [2] and barrel [3] (+aggregate bounds)
+      in RisenMods_NewLayer_Test.lrent; other 30 non-root entities unchanged. Board A y=63.207546,
+      tilt=5.766 degrees, normal=(-0.05390177,0.99494123,-0.08477335), 67 samples, gap=-2.
+      Largest sampled residual above requested gap 8.816 cm (absolute max clearance ~6.816 cm).
+      Board B aligned only offline: 10.392 deg, 20.320 cm residual; game board B/supports retained.
+      Verified backup/world-restore: backup/world-edits/C1C74A65-5796-444C-BCFD-5B781F514F31
+      (restore before DD3140F6...). Stage: build/tests/ground-align-20261015-141825/installed-test.json.
+      Initial 5.766-degree test was visually subtle; stronger 29.727-degree follow-up passed below.
+      Towers remain installed. No DLL deploy;
+      bin DLLs remain October 12-14 builds. No commit/push.
+- [x] Stronger slope visual test (follow-up 2026-10-15): user saw only a slight possible tilt
+      at 5.766 deg; first slope test not marked passed (walking/save-load not reported).
+      PREPARED/INSTALLED 14:28: copied board A + child barrel as new [33]/[34], 35 total entities;
+      `spawn ... --to -37650 350 -4300 --yaw 90`, then `ground ... 33 --align --samples 9
+      --surface-layer Levelmesh_Landscape --max-rise 500 --gap -2`.
+      Selected natural terrain yields 29.72677 deg, board at (-37650,320.18042,-4300),
+      normal=(0.092219315,0.8683999,-0.48721367), 93 samples, residual 10.256 cm above gap
+      (max absolute clearance ~8.256 cm). No artificial animation or slope/terrain modifications.
+      Other candidates rejected/not installed: slope >45 deg or large residual/weak angle.
+      `tools/install-steep-ground-test.ps1` checked every old non-root entity unchanged, new GUIDs,
+      static properties, unchanged child local matrix, local*parent=world, VFS/installed bytes and
+      unrelated game data/INI/DLL SHA256. Only test .lrent changed; game closed for installation.
+      Verified backup/world-restore: backup/world-edits/DE9ED2C4-A0CD-4E07-9E9C-FF415E9C94A9
+      (restore before C1C74A65...). Stage: build/tests/ground-steep-20261015-142412/aligned-5.lrent
+      and installed-test.json. USER CONFIRMED (recorded 2026-10-15 14:40): looks acceptable,
+      can jump onto the construction; save/load breaks nothing. Slope placement/contact/persistence
+      test PASSED for this scene. Core/CLI/DLL builds unchanged from 14:20.
+- [x] Ground/player contact in-game test PASSED 2026-10-15 (user report recorded 11:29):
+      boards touch terrain, can walk on boards/barrels and jump onto barrels; save/load stable.
+      Horizontal boards still overhang sloped terrain; user accepts future supports/custom models.
+      Initial frozen shield stayed suspended and could be picked up; dynamic retest passed below.
+      Test PREPARED 2026-10-15 11:09: only RisenMods_NewLayer_Test.lrent changed,
+      A board y=88.86705 (was 120), B y=144.67282 (was 120), both with -2 cm surface inset; barrel children
+      followed. Added one template shield [6] {5877E235-280B-4F03-AF10-F16DF4E82114} at
+      (-37450,188.86705,-5700), 1 m above board A. Backup/world-restore:
+      backup/world-edits/F981321D-300A-4CEE-9D31-BC69D3873A5A; restore this before E18FA613... .
+      Stage/CLI checks passed; other loose assets/INI/DLL SHA256 unchanged. User: NEW game, inspect
+      board/ground contact, walk on/against boards, AutoLoot off to observe shield/board contact, save/load.
+      Player/visual contact confirmed; dynamic shield contact confirmed separately below. DLLs remain the previous deployed builds (07:40 C++ not deployed).
+- [x] Explicit rigid-body modes 2026-10-15 11:32: `physics <layer> <entity> --mode dynamic|frozen`
+      changes only the selected existing rigid body; --dry-run / --out and verified backup supported.
+      Dynamic clears frozen axes/kinematic/gravity-disable, enables physics and sets WakeUpCounter=1;
+      frozen locks six axes, clears kinematic and sets WakeUpCounter=0. Unknown bits, poses, velocities
+      and other entities preserved. Static objects/malformed properties refused atomically.
+      geometry now shows decoded motion flags and wake counter. 53 tests pass; CLI dynamic/refreeze
+      returns the entire original layer byte-identically; refusal/dry-run/SHA256 checks passed.
+- [x] Dynamic item/contact test PASSED 2026-10-15 11:47 (user): shield rests on the board,
+      save/load breaks nothing. Confirms this dynamic shield/static board contact; does not establish
+      all collision-group interactions or exact offline PhysX contact. Prepared 11:32:
+      shield template BodyFlag=126 (0x7e=FROZEN), PhysicsEnabled=1,
+      WakeUpCounter=0. Frozen axes explain why mere rigid-body presence did not produce a fall.
+      Local RisenEditor REnums.cs confirms mask. `tools/test-physics.ps1 -Install` changed ONLY shield [6]
+      to BodyFlag=0 / WakeUpCounter=1, same position. Backup/world-restore:
+      backup/world-edits/E362247A-B2D7-4236-B71B-A303A275C881 (restore before F981321D...).
+      Other game data/INI/DLL SHA256 unchanged; game closed during install. NEW game, AutoLoot off:
+      observe shield falling/resting on board, then save/load and pickup. Resting contact and save/load
+      now confirmed; pickup after this dynamic retest not explicitly reported (earlier frozen pickup passed).
+      Default template physics for all other spawned items is retained. Test data left installed.
+- [x] Small in-game `snap` test for static models touching and partly
+      embedded (`--gap 0` / negative gap), e.g. a support against/under the plank; verify visual join,
+      player collision and save/load. Do not start broad PhysX decoding until this scoped check is done.
+      Current CLI release: 2026-10-15 11:29:51; 53 tests passed. Resume from this item after reading
+      AGENTS.md, TODO.md, DEVELOPMENT_LOG.md and notes/geometry-placement.md. Game data edits only
+      while closed, with verified backup. No commit/push authorized.
+      PREPARED 2026-10-15 13:26: `tools/test-snap.ps1 -Install` added two static barrel supports
+      beneath board B [4]: [7] (-36825,30.476822,-5800), gap 0; [8]
+      (-36825,38.47682,-5600), gap -8 cm. Lower parts are deliberately buried in the slope.
+      All six existing non-root entities/properties unchanged; contact equations, static box colliders,
+      staging/installed byte identity, VFS readback and unrelated game-data/INI/DLL SHA256 checks passed.
+      Only RisenMods_NewLayer_Test.lrent changed, with verified backup/world-restore:
+      backup/world-edits/E0FE4009-EBD9-4E0B-ADBC-43DC08FC7855 (restore before E362247A...).
+      Stage: build/tests/snap-20261015-132526/installed-test.json; no new CLI/DLL build or commit/push.
+      USER CONFIRMED (recorded 2026-10-15 13:34): joins look good (screenshot); walking/jumping works;
+      positions remain after saving/loading. Scoped snap contact/embedding test PASSED.
+- [x] Climbable environment (user 2026-10-15): investigate/edit the flag for climbing onto environment.
+      FOUND: bool IsClimbable in eCCollisionShape_PS; current test boards/barrels/shields all have 0.
+      Game.dll TestClimbMode 0x8e94e0 calls Engine.dll eCCollisionShape_PS::IsClimbable
+      at 0x8e985e; false rejects at 0x8e9866. Also tests ray hits, surface angle and CanStandAtGoal.
+      Engine IsClimbable 0x650fd0 reads flag at this+0x44 for normal owner branch, but has an
+      owner-dependent true fallback (virtual owner call +0x170 returns null); do not equate the
+      serialized flag alone with guaranteed runtime behavior for every entity type.
+      IMPLEMENTED/PREPARED 2026-10-15 13:42: `climbable <layer> <entity> --enabled true|false`
+      edits only the existing selected collision PS flag (missing/duplicate/malformed properties refused).
+      `geometry` now exposes is_climbable. Two crate towers, 3 Obj_Dec_Crate_01 each (~211 cm),
+      staged/installed by tools/test-climbable.ps1 -Install. OFF [9..11] at x=-37850, z=-5300,
+      base y=80.27632; ON [12..14] x=-37450, z=-5300, base y=114.43372 (closer to old boards).
+      Towers grounded separately on the slope, same models/orientation/relative stack geometry;
+      heights/positions differ with terrain, so if outcomes are ambiguous repeat by toggling the SAME tower.
+      All 55 workspace tests passed, CLI one-byte toggle/byte-identical undo, invalid root refusal,
+      dry-run, contacts, original non-root entities, VFS/installed bytes and unrelated hashes checked.
+      Only RisenMods_NewLayer_Test.lrent changed, verified backup/world-restore:
+      backup/world-edits/FD581343-207A-488E-9096-E0507B917946 (restore before E0FE4009...).
+      Stage: build/tests/climbable-20261015-134041/installed-test.json. Release CLI 13:39:24;
+      DLLs remain deployed October 12-14 builds. No commit/push.
+      USER CONFIRMED (recorded 2026-10-15 13:45): ON tower can be climbed from both sides,
+      OFF cannot; save/load preserves behavior. Animation is a jump/vault onto the surface,
+      not sustained hanging/pulling up. IsClimbable control and persistence test PASSED.
+- [x] Climb height ladder: automatically selected movement modes, compared
+      with the confirmed jump/vault. Native code has ClimbLow/Mid/High action strings and
+      ProcessClimbStandard/High; exact mode/animation of the observed vault was not logged.
+      IsClimbable is permission, not an animation selector. Height/approach/clearance influence
+      detection; confirm higher-mode animation in game before claiming a ledge-grab test passed.
+      PREPARED 2026-10-15 (recorded 13:53): tools/test-climb-heights.ps1 -Install + scratch-only
+      example climb_height_stage added 1/2/4/5/6-crate towers, 18 static crates, 33 total entities.
+      Original 3-crate ON/OFF towers and all earlier non-root entity bytes unchanged.
+      New layout: z=-4900, x=-37850 (1 crate [15]), -37450 (2 [16..17]), -37050 (4 [18..21]);
+      z=-4500, x=-37850 (5 [22..26]), -37450 (6 [27..32]). All IsClimbable=1, yaw=0.
+      Visual front/back walk-up heights (cm): 1=59.8/97.2, 2=131.9/178.6,
+      4=274.8/320.8, 5=314.6/453.6, 6=410.9/466.1. Samples 80 cm beyond +/-Z model faces.
+      Terrain/shape queries, exact old-entity byte preservation, tower contacts, serialization
+      readback, dry-run, VFS/installed byte identity and unrelated data/INI/DLL SHA256 passed.
+      Initial west/shore layout refused offline before writes (underwater terrain samples);
+      final land layout installed ONLY RisenMods_NewLayer_Test.lrent with verified backup:
+      backup/world-edits/DD3140F6-2622-474D-A64A-E24ADD6C3CD0 (restore before FD581343...).
+      Stage: build/tests/climb-heights-20261015-135238/installed-test.json and heights.csv.
+      USER CONFIRMED (recorded 2026-10-15 14:02): climbed every new tower; lowest uses jump/vault,
+      higher towers use climbing. Tallest accessible only from one side and a particular approach
+      position. Save/load preserves the scene and behavior. Height-dependent native animation
+      selection and tall-ledge climbing test PASSED. Specific numeric modes/animation assets not logged.
+      Tallest result shows the offline >400 cm walk-up sample is not a universal reachability cap;
+      actual runtime approach/character Y and collider hit position matter (exact cause not measured).
+      No animation/player-coordinate patches. Physical runtime hit points can differ from visual samples.
+      Release CLI still 13:39:24; 55 core tests previously passed (core unchanged in this step).
+      DLLs in bin remain October 12-14 builds; no commit/push.
 - [ ] Release of world edits: the installer must patch [Root] NoPhysical=false in mountlist_packed.ini and undo it
 - [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
       pipe, JSON commands) so any agent or our editor can find / move / spawn / delete entities in the running game
@@ -993,6 +1296,34 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
 - [ ] Optional / low priority: editor-trace profiler for the OLD RisenEditor.exe (C# + ClrMD, csc.exe) - only if we
       still use the old editor; symptoms: World.wrl load minutes, double-click picking freeze, exit hangs minutes.
       Untextured white/grey meshes in the old editor = materials it can't parse.
+
+## Stage 5.22 — World developer controls (user 2026-10-15)
+- [x] Prototype `mods/world-debug`, Risen World Debug 0.1: separate F10 page, opt-in source defaults,
+      selected loose/unowned rigid-body ITEM by player focus, GUID selection retained while camera moves.
+      NUMPAD7 select, NUMPAD5 freeze/release, NUMPAD9 lift 100 cm + freeze, NUMPAD0 native freecam.
+      Keys/lift height/camera speed configurable. NUMPAD8 avoided (native debug camera binding).
+      Physics enable means release frozen axes/kinematic/gravity-disable and wake; freeze stops motion
+      and locks axes. Existing NPCs, attached/inventory/owned items, static objects and out-of-range
+      targets refused (20 m from player). Every command resolves GUID afresh through scene admin;
+      no entity/PS pointer retained. Object changes can persist in saves. Mode off returns owned freecam.
+      Full build passed without errors/warnings; tools/check-world-debug.py matched all 32 exports
+      against actual installed game DLLs. Deployed ONLY world_debug.dll build 16:06:20 + test INI
+      Enabled=1 while the game was closed; other DLL/INI SHA256 unchanged, game data untouched.
+      Backup/absence manifest: backup/world-debug-20261015-160834/manifest.json.
+      Game launched through Steam 16:08:50; log 16:09:13 confirms API resolution, scene/camera module
+      lookup, then main menu. Other bin mod DLLs remain October 12-14. No commit/push/package.
+- [x] Hands-on World Debug core test: user 2026-10-15 confirmed everything works without problems
+      (selection, lift/freeze/release and native freecam); camera speed was the only reported issue,
+      still too fast at 10. Individual pickup/out-of-range refusal and debug-action save/load cases
+      were not described separately. Earlier board contact/save-load test remains confirmed.
+- [ ] Retest freecam speed in World Debug 0.1.1: fixed F10/INI changes only taking effect on next
+      camera toggle; now applied immediately to an active owned camera. Range 0.1..1000 cm/s,
+      default 30 (was 300), precise Ctrl+click entry. Preserve user's installed speed 10 and all
+      other INI settings on deployment. Details and build/deployment evidence: notes/world-debug.md.
+      Full C++ build and 32-export check passed. Installed ONLY world_debug.dll build 16:24:35;
+      INI SHA256 preserved, other DLL/INI unchanged. Backup world-debug-20261015-162506.
+      Startup 16:25:17 confirms 0.1.1 and speed=10; 16:25:25 API/modules resolved, main menu.
+      User explicitly deferred hands-on speed retest to next session; resume here.
 
 ## Stage 6 — Release
 - [x] README with install/uninstall steps (every mod, RU + EN)
