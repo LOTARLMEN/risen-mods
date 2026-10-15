@@ -25,6 +25,11 @@ cl %CFLAGS% /LD loader\*.cpp /Fobuild\obj\loader\ /Fe:build\bin\version.dll /lin
 rem Mod folder "fast-start" -> fast_start.dll
 for /d %%M in (mods\*) do call :mod %%~nxM || exit /b 1
 
+rem build\bin\scripts\Script_RisenMods.dll: our script names for the game's GUI (Game.dll loads bin\scripts\*script_*.dll).
+if not exist build\bin\scripts mkdir build\bin\scripts
+if not exist build\obj\scripts mkdir build\obj\scripts
+cl %CFLAGS% /LD scripts\risenmods\*.cpp /Fobuild\obj\scripts\ /Fe:build\bin\scripts\Script_RisenMods.dll /link %LIBS% || exit /b 1
+
 rem build\RisenModsInstaller.exe: installs the mods of the latest GitHub release.
 if not exist build\obj\installer mkdir build\obj\installer
 rc /nologo /fobuild\obj\installer\installer.res installer\installer.rc || exit /b 1
@@ -35,7 +40,8 @@ cl %CFLAGS% installer\*.cpp /Fobuild\obj\installer\ build\obj\installer\installe
 if /i "%~1"=="deploy" (
     copy /y build\bin\version.dll ..\bin\version.dll >nul || exit /b 1
     if not exist ..\bin\mods mkdir ..\bin\mods
-    for %%F in (build\bin\mods\*.dll) do if /i not "%%~nF"=="startup_trace" copy /y %%F ..\bin\mods\ >nul || exit /b 1
+    for %%F in (build\bin\mods\*.dll) do if /i not "%%~nF"=="startup_trace" if /i not "%%~nF"=="ui_lab" copy /y %%F ..\bin\mods\ >nul || exit /b 1
+    copy /y build\bin\scripts\Script_RisenMods.dll ..\bin\scripts\ >nul || exit /b 1
     echo deployed to ..\bin
 )
 exit /b 0

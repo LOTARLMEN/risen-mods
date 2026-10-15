@@ -24,10 +24,19 @@ void ModInitAt(const char* basePath)
 
 void ModInit(HINSTANCE instance, const char* name)
 {
+    ModInitIn(instance, name, nullptr);
+}
+
+void ModInitIn(HINSTANCE instance, const char* name, const char* relDir)
+{
     char dir[MAX_PATH];
     GetModuleFileNameA(instance, dir, MAX_PATH);
     if (char* slash = strrchr(dir, '\\'))
         *slash = 0;
+    if (relDir) {
+        size_t len = strlen(dir);
+        snprintf(dir + len, MAX_PATH - len, "\\%s", relDir);
+    }
     snprintf(g_iniPath, MAX_PATH, "%s\\%s.ini", dir, name);
     snprintf(g_logPath, MAX_PATH, "%s\\%s", dir, kSharedLog);
     snprintf(g_logTag, sizeof(g_logTag), "%s", name);

@@ -1,16 +1,19 @@
-// No Limits: strength and dexterity go past the game's maximum of 200 (MaxValue, 1000 by default) and teachers
+// No Limits: strength and dexterity go past the game's maximum of 200 (to kMaxValue, practically no limit) and teachers
 // train them up to that maximum instead of their personal limit. Other skills keep the teachers' limits. Learning
 // point costs are unchanged (each teach option has a fixed cost).
+// Second option (IgnoreBonus): teachers look only at the trained (base) value, so rings / amulets / armour bonuses
+// no longer use up a teacher's range - a +10 ring doesn't make a "max 100" teacher stop at 90. All skills.
 //
 // The maximum: gCSkills_PS::ms_arrSkillInfos (Game.dll, 0x80 bytes per skill: min, max, default, ...) is filled by
 // a static initializer (strength / dexterity: 0, 200, 100). Every clamp of the game (GetTotal, GetSkillInfo,
-// GetSkillMaxValue, ...) reads max from there, so the mod writes its MaxValue into it and 200 back when switched off.
+// GetSkillMaxValue, ...) reads max from there, so the mod writes kMaxValue into it and 200 back when switched off.
 // A save with a value above 200 loaded without the mod shows 200 (the stored base value isn't touched).
 //
 // How: gCInfoConditionCanTeachSkill::IsSatisfied (Game.dll) decides whether a teach option is shown. For every
 // skill range of the teacher it checks  teacher.min <= player's value + amount <= teacher.max.  We patch the end of
 // that loop body in memory to compare against the global maximum (gCSkills_PS::GetSkillMaxValue, already in eax
-// at that point) instead of teacher.max for strength and dexterity. Nothing is written to saves: without the mod the game is as before.
+// at that point) instead of teacher.max for strength and dexterity, and (IgnoreBonus) to take only the base value
+// (gCSkills_PS +0x20, GetSkillBaseValue) instead of base + modifier (+0xA8, GetSkillModifyValue). Nothing is written to saves: without the mod the game is as before.
 // Only for the Steam build Rev. 2045: the patched bytes are checked first, otherwise the mod stays off.
 // Settings: mods\no_limits.ini. The patch is switched on the game thread (posted window message).
 
@@ -25,11 +28,12 @@ static const char kDefaultIni[] =
     "; No Limits mod settings. Changes are picked up while the game is running.\r\n"
     "\r\n"
     "[NoLimits]\r\n"
-    "; Strength and dexterity go up to MaxValue instead of 200; teachers train them that far instead of\r\n"
+    "; Strength and dexterity have no limit (instead of 200); teachers train them past their own limit.\r\n"
     "; their own limit. Other skills are unchanged, so are the learning point costs.\r\n"
     "Enabled=1\r\n"
-    "; Maximum of strength and dexterity (the game's own is 200)\r\n"
-    "MaxValue=1000\r\n"
+    "; Teachers look only at what you trained: rings, amulets and other item bonuses don't count against\r\n"
+    "; their limit (they still add to the total). All skills.\r\n"
+    "IgnoreBonus=1\r\n"
     "\r\n"
     "[Debug]\r\n"
     "; Writes the skill table and the player's skills to no_limits.log\r\n"
@@ -37,10 +41,11 @@ static const char kDefaultIni[] =
 
 static WNDPROC g_origProc;
 static bool g_enabled = true;
-static int g_maxValue = 1000;
+static bool g_ignoreBonus = true;
 static int g_dumpKey;
 constexpr UINT WM_NOLIMITS_DUMP = WM_APP + 0x5501;
 constexpr UINT WM_NOLIMITS_APPLY = WM_APP + 0x5502;
+constexpr UINT WM_NOLIMITS_WATCH = WM_APP + 0x5503;
 
 // ---------------------------------------------------------------------------------------------
 // The patch
@@ -78,14 +83,25 @@ static const uint8_t kCave[] = {
 };
 constexpr size_t kJumpSize = 14; // jmp [rip+0] + 8-byte address
 
+// Cave switches, rewritten by Apply (game thread, like IsSatisfied itself).
+constexpr size_t kCaveValueSize = 13; // mov ecx,[..+0A8h] / add ecx,[..+20h] = base + modifier
+static const uint8_t kValueBaseOnly[kCaveValueSize] = {
+    0x41, 0x8B, 0x4C, 0xAF, 0x20,                        // mov ecx,[r15+rbp*4+20h] = base only
+    0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00};     // 8-byte nop
+constexpr size_t kCaveSkillJump = 65; // ja teachermax (77 06): EB 06 = every skill keeps the teacher's max
+
 constexpr int kSkills[] = {7, 8}; // strength, dexterity
 constexpr int kGameMax = 200;
+// "No limit": the table needs a number. 9999 = 4 digits on the character screen; a much bigger one only risks
+// effects that scale with the maximum (percent-of-maximum changes in PSSkills::SetBase).
+constexpr int kMaxValue = 9999;
 static int32_t* g_skillInfos; // gCSkills_PS::ms_arrSkillInfos, 32 ints per skill, [1] = max
 static int g_writtenMax;      // what the table holds now (kGameMax = as in the game)
 
 static uint8_t* g_site;
 static uint8_t* g_cave;
 static bool g_patched;
+static int g_caveMode = -1; // bit 0 no limits, bit 1 ignore bonus, as written into the cave
 static int g_state; // 0 not tried, 1 ready, -1 wrong game version
 
 static bool Prepare()
@@ -114,6 +130,11 @@ static bool Prepare()
         return false;
     }
     memcpy(g_cave, kCave, sizeof(kCave));
+    if (g_cave[kCaveSkillJump] != 0x77 || g_cave[kCaveSkillJump + 1] != 0x06) {
+        Log("patch: cave layout check failed, mod disabled");
+        g_state = -1;
+        return false;
+    }
     uintptr_t next = reinterpret_cast<uintptr_t>(base + kNextRva), success = reinterpret_cast<uintptr_t>(base + kSuccessRva);
     memcpy(g_cave + sizeof(kCave), &next, 8);
     memcpy(g_cave + sizeof(kCave) + 8, &success, 8);
@@ -139,16 +160,30 @@ static void Apply()
 {
     if (!Prepare())
         return;
-    int max = g_enabled ? g_maxValue : kGameMax;
+    int max = g_enabled ? kMaxValue : kGameMax;
     if (max != g_writtenMax) {
         for (int id : kSkills)
             g_skillInfos[id * 32 + 1] = max;
         g_writtenMax = max;
         Log("maximum of strength / dexterity: %d", max);
     }
-    if (g_enabled == g_patched)
+    int mode = (g_enabled ? 1 : 0) | (g_ignoreBonus ? 2 : 0);
+    if (mode != g_caveMode) {
+        uint8_t cave[sizeof(kCave)];
+        memcpy(cave, kCave, sizeof(kCave));
+        if (g_ignoreBonus)
+            memcpy(cave, kValueBaseOnly, kCaveValueSize);
+        if (!g_enabled)
+            cave[kCaveSkillJump] = 0xEB;
+        WriteCode(g_cave, cave, sizeof(cave));
+        g_caveMode = mode;
+        Log("patch: strength / dexterity limits %s, item bonuses %s for teachers", g_enabled ? "off" : "as in the game",
+            g_ignoreBonus ? "ignored" : "counted (as in the game)");
+    }
+    bool want = mode != 0;
+    if (want == g_patched)
         return;
-    if (g_enabled) {
+    if (want) {
         uint8_t jump[kJumpSize] = {0xFF, 0x25, 0, 0, 0, 0};
         uintptr_t cave = reinterpret_cast<uintptr_t>(g_cave);
         memcpy(jump + 6, &cave, 8);
@@ -156,8 +191,8 @@ static void Apply()
     } else {
         WriteCode(g_site, kSiteOriginal, kJumpSize);
     }
-    g_patched = g_enabled;
-    Log("patch: strength / dexterity teacher limits %s", g_patched ? "OFF (up to the maximum)" : "back ON (as in the game)");
+    g_patched = want;
+    Log("patch: teacher check %s", g_patched ? "patched" : "as in the game");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -211,31 +246,68 @@ static void Dump()
     }
 }
 
+// The player's strength / dexterity in the log whenever they change (and after a load): base, item bonus, total
+// and maximum - so a user's log shows whether the values really go past 200 without pressing any key.
+static void Watch()
+{
+    static HMODULE script;
+    static Entity* (*getPlayer)(Entity*);
+    static bool (*valid)(const Entity*);
+    static int (*base)(const Entity*, int);
+    static int (*total)(const Entity*, int);
+    static int (*maximum)(const Entity*, int);
+    static int last[2][3] = {{-1, -1, -1}, {-1, -1, -1}};
+    if (!script) {
+        if (!(script = GetModuleHandleA("Script.dll")))
+            return;
+        getPlayer = reinterpret_cast<Entity* (*)(Entity*)>(GetProcAddress(script, "?GetPlayer@Entity@@SA?AV1@XZ"));
+        valid = reinterpret_cast<bool (*)(const Entity*)>(GetProcAddress(script, "?IsValid@PSSkills@@QEBA_NXZ"));
+        base = reinterpret_cast<int (*)(const Entity*, int)>(GetProcAddress(script, "?GetBase@PSSkills@@QEBAHW4gESkill@@@Z"));
+        total = reinterpret_cast<int (*)(const Entity*, int)>(GetProcAddress(script, "?GetTotal@PSSkills@@QEBAHW4gESkill@@@Z"));
+        maximum = reinterpret_cast<int (*)(const Entity*, int)>(
+            GetProcAddress(script, "?GetMaximum@PSSkills@@QEBAHW4gESkill@@@Z"));
+    }
+    if (!getPlayer || !valid || !base || !total || !maximum)
+        return;
+    Entity player;
+    getPlayer(&player);
+    if (!player.e || !valid(&player))
+        return;
+    for (int i = 0; i < 2; ++i) {
+        int id = kSkills[i], b = base(&player, id), t = total(&player, id), m = maximum(&player, id);
+        if (b == last[i][0] && t == last[i][1] && m == last[i][2])
+            continue;
+        last[i][0] = b, last[i][1] = t, last[i][2] = m;
+        Log("player %s: trained %d, total %d (items etc. %+d), maximum %d", SkillName(id), b, t, t - b, m);
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Settings, menu, window
 
 static void ConfigLoad()
 {
     g_enabled = IniInt("NoLimits", "Enabled", 1) != 0;
-    g_maxValue = IniInt("NoLimits", "MaxValue", 1000);
-    if (g_maxValue < kGameMax)
-        g_maxValue = kGameMax;
-    if (g_maxValue > 9999)
-        g_maxValue = 9999;
+    g_ignoreBonus = IniInt("NoLimits", "IgnoreBonus", 1) != 0;
     g_dumpKey = IniKey("Debug", "DumpKey", 0);
-    Log("config: enabled=%d max=%d dump=0x%02X", g_enabled, g_maxValue, g_dumpKey);
+    Log("config: enabled=%d ignoreBonus=%d dump=0x%02X", g_enabled, g_ignoreBonus, g_dumpKey);
 }
 
 static const HubItem kItems[] = {
     {HubCheckbox, "NoLimits", "Enabled", "Strength and dexterity without limits", "Сила и ловкость без лимитов", 1,
      0, 0, 0, 0, nullptr, -1,
-     "Past the game's maximum of 200, and teachers train them that far instead of their own limit. Other skills "
-     "and learning point costs are unchanged.",
-     "Выше максимума игры (200), и учителя учат до него, а не до своего предела. Остальные навыки и стоимость в "
-     "очках обучения не меняются."},
-    {HubSlider, "NoLimits", "MaxValue", "Maximum", "Максимум", 1000, 200, 2000, 10, 0, "%.0f", 0},
+     "No maximum of 200 any more, and teachers train them past their own limit. Other skills and learning point "
+     "costs are unchanged.",
+     "Максимума 200 больше нет, и учителя учат дальше своего предела. Остальные навыки и стоимость в очках "
+     "обучения не меняются."},
     {HubNote, nullptr, nullptr, "Without the mod a save shows at most 200 again, the trained points stay in it.",
      "Без мода в сохранении снова будет не больше 200, вкачанное в нём остаётся."},
+    {HubCheckbox, "NoLimits", "IgnoreBonus", "Teachers ignore item bonuses", "Учителя не учитывают бонусы вещей", 1,
+     0, 0, 0, 0, nullptr, -1,
+     "Teachers look only at what you trained: rings, amulets and other item bonuses don't use up their limit. "
+     "The bonuses still add to the total. All skills.",
+     "Учителя смотрят только на вкачанное: кольца, амулеты и другие бонусы вещей не съедают их предел. В сумму "
+     "бонусы по-прежнему идут. Для всех навыков."},
 };
 
 static void OnMenuChanged()
@@ -257,6 +329,9 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         ConfigLoad();
         Apply();
         return 0;
+    case WM_NOLIMITS_WATCH:
+        Watch();
+        return 0;
     }
     return CallOriginalWndProc(g_origProc, hwnd, msg, wp, lp);
 }
@@ -276,6 +351,8 @@ static DWORD WINAPI Worker(LPVOID)
         wasDown = down;
         if (tick % 30 == 0 && IniChanged())
             PostMessageW(hwnd, WM_NOLIMITS_APPLY, 0, 0);
+        if (tick % 100 == 50) // ~3 s
+            PostMessageW(hwnd, WM_NOLIMITS_WATCH, 0, 0);
         Sleep(30);
     }
     return 0;
@@ -286,7 +363,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID)
     if (reason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);
         ModInit(instance, "no_limits");
-        Log("No Limits 0.2.1");
+        Log("No Limits 0.3");
         g_page.iniPath = IniPath(kDefaultIni);
         ConfigLoad();
         if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))

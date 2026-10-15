@@ -329,3 +329,14 @@ void WindowDraw(float scale)
     if (!keepOpen)
         MenuSetOpen(FindGameWindow(), false);
 }
+
+// For native_page.cpp: the same values and writes as the window (one cache, so both stay in sync).
+std::vector<float>& MenuValues(const HubPage* page)
+{
+    return Values(page);
+}
+
+void MenuWriteValue(const HubPage& page, int index, float value)
+{
+    WriteValue(page, index, value);
+}

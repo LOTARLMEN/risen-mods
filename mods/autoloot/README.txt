@@ -13,6 +13,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
        и нажать правую кнопку мыши: всё сразу в инвентарь, без окна лута, квестовые предметы тоже.
        С достанным оружием не работает (в бою ПКМ - обычное действие игры).
        Запертый ничей сундук, ключ от которого у вас есть, ПКМ откроет ключом и сразу облутает.
+       Если ПКМ держать зажатой, лут повторяется 4 раза в секунду: можно водить взглядом по предметам.
   F    включить / выключить автоподбор: предметы на земле в радиусе 3 м подбираются сами,
        в том числе в боевой стойке. Пока автоподбор включён, в левом верхнем углу горит рука.
        По желанию (в настройках) он же обыскивает трупы и ничьи открытые сундуки рядом.
@@ -37,7 +38,9 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
   месте - игра решает это сама по зоне) по ПКМ взять можно, но это кража: кто это видел - отреагирует
   так же, как при обычном подборе. Если никто не видел - ничего не будет.
   Автоподбор (F) чужое не берёт никогда, и ничего не берёт сквозь стены, пол и закрытые двери.
-  Никогда не берётся: запертые сундуки без ключа, люди без сознания (их обыск - кража),
+  Человека, вырубленного в драке (не насмерть), ПКМ обыскивает так же, как труп - но только если игра сама
+  даёт его обыскать (как по ЛКМ). Автоподбор (F) с Bodies=1 обыскивает и их (KnockedOut=0 - не трогать).
+  Никогда не берётся: запертые сундуки без ключа,
   квестовые объекты, которые игра пока не даёт взять (черепа и т.п.). Это остаётся для обычного взаимодействия.
   Лут идёт через собственный скрипт игры, так что квесты на сбор предметов засчитываются как обычно.
 
@@ -77,6 +80,7 @@ https://github.com/LOTARLMEN/risen-mods/releases/latest - сам найдёт и
       ToggleKey=F        кнопка включения
       Radius=300         радиус в сантиметрах (300 = 3 м)
       Bodies=0           обыскивать трупы в радиусе (1 = да)
+      KnockedOut=1       вместе с трупами - и вырубленных в драке (0 = нет)
       Chests=0           опустошать ничьи открытые сундуки в радиусе (1 = да)
       Cone=1             только впереди (0 = весь круг вокруг)
       ConeAngle=120      ширина конуса, градусы
@@ -125,7 +129,10 @@ Quick looting for Risen (64-bit 2023 re-release, Steam), no loot window, no anim
 Theft works as in the game itself: RMB may take what isn't yours (owned, or lying in someone's house, camp or a
 guarded place - the game decides by the zone), but NPCs who see it react as to a normal theft; unseen, nothing
 happens. AutoLoot (F) never takes what would be theft, and nothing through walls, floors or closed doors.
-Never taken: locked chests, unconscious people, quest objects the game won't let you take
+Someone knocked out in a non-lethal fight is searched like a body, only when the game itself lets you (as with
+LMB) - by RMB, and by AutoLoot (F) with dead bodies on ([AutoLoot] KnockedOut=0 leaves them alone).
+Holding RMB repeats QuickLoot 4 times a second, so you can sweep your view over items.
+Never taken: locked chests, quest objects the game won't let you take
 yet (skulls and the like). Uses the game's own loot script, so quests count the items as usual.
 A small silent sparkle (the game's own effect) marks each looted spot, coloured by what was taken: gold = quest
 item, red = weapons and ammo, light blue = armour, violet = scrolls and runes, green = potions, food and plants,

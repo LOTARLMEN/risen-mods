@@ -15,6 +15,8 @@ constexpr long long kLogMaxBytes = 2 * 1024 * 1024;
 
 // Call first thing in DllMain(DLL_PROCESS_ATTACH): the mod's tag in the shared log and its ini path.
 void ModInit(HINSTANCE instance, const char* name);
+// Same for a DLL outside bin\mods: relDir is relative to the module's folder ("..\mods" for bin\scripts).
+void ModInitIn(HINSTANCE instance, const char* name, const char* relDir);
 // Standalone programs (the installer): own fresh "<base>.log" and "<base>.ini" instead of the shared log.
 void ModInitAt(const char* basePath);
 // Loader only: modsDir\RisenMods.log -> RisenMods.prev.log, a fresh log tagged "loader", old per-mod logs removed.
@@ -52,6 +54,6 @@ HWND WaitForGameWindow();
 // Replaces the game window's procedure; returns the previous one for CallOriginalWndProc.
 // Every mod posts its own WM_APP + 0xNNxx messages to the shared window, one block per mod - a duplicate is
 // swallowed by whichever mod sees it first: speed 0x52xx, window 0x53xx, autoloot 0x54xx, no-limits 0x55xx,
-// menu 0x56xx, quick-lockpick 0x57xx.
+// menu 0x56xx, quick-lockpick 0x57xx, ui-lab (dev) 0x58xx.
 WNDPROC SubclassWindow(HWND hwnd, WNDPROC proc);
 LRESULT CallOriginalWndProc(WNDPROC orig, HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);

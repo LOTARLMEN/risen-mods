@@ -34,6 +34,7 @@ static std::atomic<int> g_wheel; // mouse wheel while the window is open, WHEEL_
 
 constexpr UINT WM_MENU_OPEN = WM_APP + 0x5601; // wParam: 1 open, 0 close
 constexpr UINT WM_MENU_RELOAD = WM_APP + 0x5602;
+constexpr UINT WM_MENU_NATIVE = WM_APP + 0x5603; // NativeTick: the "Моды" tab in the game's options
 
 static float Clamp(float v, float lo, float hi)
 {
@@ -216,6 +217,18 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     if (g_open)
         CollectWheel(msg, wp, lp);
+    // Esc on a mod's page in the game's options goes back to the mod list instead of closing the options.
+    static bool escUsed;
+    if (msg == WM_KEYDOWN && wp == VK_ESCAPE && !g_open && NativeOnEscape()) {
+        escUsed = true;
+        return 0;
+    }
+    if (msg == WM_MOUSEWHEEL && !g_open && NativeOnWheel(GET_WHEEL_DELTA_WPARAM(wp)))
+        return 0;
+    if (msg == WM_KEYUP && wp == VK_ESCAPE && escUsed) {
+        escUsed = false;
+        return 0;
+    }
     LRESULT result;
     if (InputCaptureFilter(hwnd, msg, wp, lp, &result))
         return result;
@@ -225,6 +238,9 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         return 0;
     case WM_MENU_RELOAD:
         ConfigLoad();
+        return 0;
+    case WM_MENU_NATIVE:
+        NativeTick();
         return 0;
     case WM_ACTIVATE:
         if (LOWORD(wp) == WA_INACTIVE && g_open)
@@ -267,6 +283,8 @@ static DWORD WINAPI Worker(LPVOID)
             PostMessageW(hwnd, WM_MENU_OPEN, 0, 0);
         if (tick % 20 == 0 && IniChanged())
             PostMessageW(hwnd, WM_MENU_RELOAD, 0, 0);
+        if (tick % 3 == 0) // ~0.1 s: key rebinding on the native page polls the keyboard
+            PostMessageW(hwnd, WM_MENU_NATIVE, 0, 0);
         Sleep(30);
     }
     return 0;

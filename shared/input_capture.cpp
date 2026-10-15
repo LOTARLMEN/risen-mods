@@ -41,7 +41,7 @@ bool InputCaptureInstall()
     return true;
 }
 
-void InputCaptureSet(HWND hwnd, bool on)
+void InputCaptureSet(HWND hwnd, bool on, bool restoreCursor)
 {
     if (on == g_captured)
         return;
@@ -55,7 +55,8 @@ void InputCaptureSet(HWND hwnd, bool on)
         g_origClipCursor(&r);
     } else {
         g_captured = false;
-        g_origSetCursorPos(g_savedCursor.x, g_savedCursor.y); // no camera jump on the first mouse-look frame
+        if (restoreCursor)
+            g_origSetCursorPos(g_savedCursor.x, g_savedCursor.y); // no camera jump on the first mouse-look frame
     }
 }
 

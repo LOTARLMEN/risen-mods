@@ -36,3 +36,11 @@ void* OverlayAtlas(); // IDirect3DTexture9* of the game's GUI atlas (game_assets
 // window.cpp: the settings window, inside an ImGui frame.
 void WindowOpened(); // re-reads every page's ini
 void WindowDraw(float scale);
+// Item values in ini units (read once per page, shared with the window); writing saves the ini + onChanged.
+std::vector<float>& MenuValues(const HubPage* page);
+void MenuWriteValue(const HubPage& page, int index, float value);
+
+// native_page.cpp: the "Моды" tab in the game's own options menu (TODO 5.12 M3-M6). Game thread.
+void NativeTick();
+bool NativeOnEscape();
+bool NativeOnWheel(int delta); // true = the wheel scrolled a long mod's rows // true = Esc used (back to the mod list / rebind cancelled), don't pass it to the game

@@ -1,0 +1,1359 @@
+# Live GUI tree, Steam Risen x64 Rev. 2045, RU, 1365x768 virtual (16:9), dumped by mods/ui-lab 2026-10-13
+# All loaded pages are siblings under one root; each line: RTTI class, name, ID, pos, size, text
+==== page 13 0000021EFF0F13E0 visible=1
+.?AVgCHudPage2@@ 'DLG_MENU_MAIN' id=0 pos=0,0 size=1365x768
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=921,653 size=153x41 text=Выход
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=763,653 size=153x41 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=605,653 size=153x41 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=447,653 size=153x41 text=Игра
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=289,653 size=153x41 text=Продолжить
+.?AVgCHudPage2@@ 'DLG_MENU_START' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiPanel2@@ '' id=65535 pos=432,323 size=500x260
+    .?AVgCModalResultButton@@ '' id=2 pos=180,204 size=140x32
+      .?AVgCPageCloseButton@@ '' id=5 pos=54,-5 size=32x32
+    .?AVeCScriptStatic@@ '' id=1 pos=25,40 size=450x155 text=Нажми кнопку START
+.?AVgCHudPage2@@ 'PAGE_GAME_MAIN' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_MAIN
+  .?AVgCTutorialLabel2@@ '' id=65535 pos=214,62 size=800x80
+  .?AVgCLockpickStatic2@@ '' id=65535 pos=102,-38 size=50x50 text=-lockpick info-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,580 size=1228x111
+    .?AVgCCompassPicbox2@@ '' id=65535 pos=1126,9 size=92x92
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=486,2 size=238x21
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=429,28 size=33x13 text=3
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=475,28 size=33x13 text=4
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=521,28 size=33x13 text=5
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=567,28 size=33x13 text=6
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=613,28 size=33x13 text=7
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=659,28 size=33x13 text=8
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=705,28 size=33x13 text=9
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=751,28 size=33x13 text=0
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=745,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=699,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=653,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=607,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=561,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=515,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=469,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=423,41 size=46x49 text=888
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=153,89 size=42x18 text=2
+    .?AVgCQuickPicbox2@@ '' id=65535 pos=52,89 size=42x18 text=1
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=136,33 size=32x32 text=888
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=36,34 size=32x32
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=150,47 size=46x46
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=50,47 size=46x46
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=387,84 size=220x30
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=606,84 size=221x30
+  .?AVgCMiscProgressBar@@ '' id=65535 pos=503,-18 size=200x21
+  .?AVgCLootStatic2@@ '' id=65535 pos=20,373 size=780x200 text=-loot info-
+.?AVeCGuiFrame2@@ '' id=0 pos=0,0 size=800x600 text=CONSOLE_FRAME
+  .?AVeCPropertyEditFrame2@@ '' id=0 pos=0,250 size=800x600 text=Property Editor
+    .?AVeCPropertiesPanel2@@ '' id=65535 pos=0,0 size=100x60
+    .?AVeCPropertiesListCtrl2@@ '' id=65535 pos=0,0 size=400x300 text=PropertyBrowser
+  .?AVeCConsoleListCtrl2@@ '' id=65535 pos=0,0 size=400x300 text=CONSOLE_LIST
+  .?AVeCConsoleEdit2@@ '' id=65535 pos=0,200 size=100x60
+.?AVgCPictureStatic2@@ '' id=65535 pos=0,0 size=100x60
+.?AVgCEntityDebugStatic2@@ '' id=65535 pos=0,0 size=100x60
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_SETTINGS_C' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS_SETTINGS
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Параметры игры
+  .?AVgCSpinButton@@ '' id=65535 pos=931,428 size=16x22
+  .?AVgCSpinButton@@ '' id=1006 pos=678,428 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,428 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,427 size=307x24 text=Сообщения о достижениях
+  .?AVgCSpinButton@@ '' id=65535 pos=931,399 size=16x22
+  .?AVgCSpinButton@@ '' id=1005 pos=678,399 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,399 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,398 size=307x24 text=Текст обучения
+  .?AVgCSpinButton@@ '' id=65535 pos=931,370 size=16x22
+  .?AVgCSpinButton@@ '' id=1004 pos=678,370 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,370 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,340 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,340 size=16x22
+  .?AVgCSpinButton@@ '' id=1003 pos=678,340 size=253x22 text=On/Off
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,368 size=307x24 text=Сложность игры
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,339 size=307x24 text=Отображение субтитров
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Параметры игры
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=307x24 text=Инверсия вертикальной оси
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=307x24 text=Чувствительность правого джойстика
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,278 size=307x24 text=Чувствительность левого джойстика
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=307x24 text=Подсветка предметов
+  .?AVgCSpinButton@@ '' id=1001 pos=678,220 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,310 size=16x22
+  .?AVgCSpinButton@@ '' id=1002 pos=678,310 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=931,310 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,457 size=307x24 text=Режим Контроллера
+  .?AVgCSpinButton@@ '' id=65535 pos=662,458 size=16x22
+  .?AVgCSpinButton@@ '' id=1007 pos=678,458 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=931,458 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,488 size=250x25 text=Языки
+  .?AVgCSpinButton@@ '' id=65535 pos=931,558 size=16x22
+  .?AVgCSpinButton@@ '' id=1009 pos=678,558 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,558 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,557 size=310x24 text=Язык текста
+  .?AVgCSpinButton@@ '' id=65535 pos=931,528 size=16x22
+  .?AVgCSpinButton@@ '' id=1008 pos=678,528 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,528 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,527 size=310x24 text=Язык голоса
+  .?AVeCScriptRadioButton@@ '' id=1010 pos=662,588 size=285x28 text=Применить
+  .?AVgCStickSensScrollBar2@@ '' id=1100 pos=662,250 size=285x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=1200 pos=940,249 size=70x24 text=+888%
+  .?AVgCStickSensScrollBar2@@ '' id=1101 pos=662,280 size=285x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=1201 pos=940,279 size=70x24 text=+888%
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_C' id=0 pos=0,0 size=1365x768 text=Options
+  .?AVeCScriptRadioButton@@ '' id=11 pos=255,710 size=205x23 text=Новая игра
+  .?AVeCScriptRadioButton@@ '' id=13 pos=687,710 size=205x23 text=Сохранить
+  .?AVeCScriptRadioButton@@ '' id=14 pos=903,710 size=205x23 text=Достижения
+  .?AVeCScriptRadioButton@@ '' id=12 pos=471,710 size=205x23 text=Загрузить
+  .?AVeCScriptRadioButton@@ '' id=2 pos=447,651 size=153x64 text=Игра
+  .?AVeCGuiStatic2@@ '' id=65535 pos=234,706 size=896x32
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=763,653 size=153x41 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=3 pos=605,653 size=153x41 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=1 pos=289,653 size=153x41 text=Продолжить
+  .?AVeCScriptRadioButton@@ '' id=5 pos=921,653 size=153x41 text=Выход
+.?AVgCHudPopUp2@@ 'POP_SKILLBASE' id=65535 pos=0,0 size=250x300 text=POP_SKILLBASE
+  .?AVgCSkillInfo@@ '' id=65535 pos=0,0 size=240x50 text=Static
+  .?AVgCSkillInfo@@ '' id=65535 pos=0,50 size=240x50 text=-description-
+.?AVgCHudDialog2@@ 'MOD_WAIT' id=0 pos=0,0 size=1365x768 text=MOD_WAIT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVeCGuiStatic2@@ '' id=65535 pos=25,90 size=300x30 text=Пожалуйста, подождите
+.?AVgCHudDialog2@@ 'MOD_RESOLUTION_ACCEPT' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=1001 pos=645,419 size=74x23 text=00:00
+  .?AVeCGuiStatic2@@ '' id=65535 pos=544,276 size=276x19 text=Подтвердить
+  .?AVeCGuiStatic2@@ '' id=65535 pos=530,301 size=304x124 text=Пожалуйста, подтвердите изменение разрешения. В противном случае через некоторое время будет восстановлено прежнее разрешение.
+  .?AVgCDlgResultButton2@@ '' id=65535 pos=694,464 size=140x32 text=Нет
+  .?AVgCDlgResultButton2@@ '' id=65535 pos=530,464 size=140x32 text=Да
+  .?AVeCGuiStatic2@@ '' id=65535 pos=506,275 size=352x217
+.?AVgCHudDialog2@@ 'MOD_STACKAMOUNT' id=0 pos=0,0 size=1365x768 text=MOD_STACKAMOUNT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210 text=Выбрать
+    .?AVeCScriptStatic@@ '' id=65535 pos=15,28 size=320x95 text=-blah blah blah-
+    .?AVeCScriptTrackbar@@ '' id=65535 pos=25,123 size=300x30
+    .?AVeCGuiStatic2@@ '' id=1000 pos=136,153 size=78x18 text=33
+    .?AVgCModalResultButton@@ '' id=65535 pos=184,181 size=140x32 text=-nein-
+    .?AVgCModalResultButton@@ '' id=65535 pos=28,181 size=140x32 text=-ja-
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_INPUT_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Управление
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,174 size=210x24 text=Увеличить
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,211 size=310x24 text=Показать панель быстрого доступа
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,248 size=340x24 text=Режим оружия ближнего боя
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,285 size=210x24 text=Вниз
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,322 size=210x24 text=Красться
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,359 size=320x24 text=Движение персонажа
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,396 size=210x24 text=Снаряжение
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,433 size=210x24 text=Задания
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,507 size=210x24 text=Навыки
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,544 size=210x24 text=Статистика персонажа
+  .?AVeCGuiStatic2@@ '' id=65535 pos=230,470 size=210x24 text=Карта
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,174 size=210x24 text=Главное меню
+  .?AVeCGuiStatic2@@ '' id=65535 pos=715,211 size=420x24 text=Натянуть тетиву лука (удерживать)
+  .?AVeCGuiStatic2@@ '' id=65535 pos=715,248 size=420x24 text=Выстрел (отпустить)
+  .?AVeCGuiStatic2@@ '' id=65535 pos=825,285 size=310x24 text=Режим оружия дальнего боя
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,322 size=210x24 text=Дополнительное действие
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,359 size=210x24 text=Блок
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,396 size=210x24 text=Основное действие
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,433 size=210x24 text=Уклонение
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,470 size=210x24 text=Режим камеры
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,507 size=210x24 text=Прыжок
+  .?AVeCGuiStatic2@@ '' id=65535 pos=925,544 size=210x24 text=Вверх
+  .?AVeCGuiStatic2@@ '' id=65535 pos=180,160 size=960x450
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+  .?AVeCGuiPanel2@@ '' id=65535 pos=192,140 size=980x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=975x470
+.?AVgCHudPage2@@ 'PAGE_GAME_INVENTORY' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_INVENTORY
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,587 size=1228x104
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,125 size=1228x462
+    .?AVgCWrittenStatic2@@ '' id=65535 pos=502,1 size=352x460 text=-letter-
+    .?AVgCWrittenStatic2@@ '' id=65535 pos=298,-22 size=564x485 text=-book-
+    .?AVgCWrittenStatic2@@ '' id=65535 pos=147,-40 size=500x500 text=Static
+    .?AVeCGuiPanel2@@ '' id=65535 pos=872,5 size=341x72
+      .?AVgCFilterButton@@ '' id=65535 pos=240,16 size=48x57
+      .?AVgCFilterButton@@ '' id=65535 pos=285,16 size=48x57
+      .?AVgCFilterButton@@ '' id=65535 pos=196,16 size=48x57
+      .?AVgCFilterButton@@ '' id=65535 pos=108,16 size=48x57
+      .?AVgCFilterButton@@ '' id=65535 pos=64,16 size=48x57
+      .?AVgCFilterButton@@ '' id=65535 pos=11,16 size=48x57
+      .?AVgCFilterButton@@ '' id=65535 pos=152,16 size=48x57
+    .?AVeCGuiPanel2@@ '' id=65535 pos=853,64 size=378x396
+      .?AVgCInventoryList@@ '' id=65535 pos=46,23 size=283x308 text=ListCtrl
+      .?AVgCInvAmountPicbox@@ '' id=1001 pos=75,339 size=167x20 text=-gold amount-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=48,340 size=20x20
+.?AVgCHudPage2@@ 'PAGE_GAME_ITEMSELECT' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_ITEMSELECT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=814,203 size=360x224
+    .?AVgCPageCloseButton@@ '' id=1001 pos=116,200 size=145x28 text=Закрыть
+    .?AVgCLocIDLabel@@ '' id=11 pos=80,-1 size=200x30 text=-altar-
+    .?AVgCInventoryList@@ '' id=65535 pos=38,46 size=283x132 text=ListCtrl
+.?AVgCHudPage2@@ 'PAGE_GAME_LOOT' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_LOOT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=50,112 size=360x220
+    .?AVgCPageCloseButton@@ '' id=65535 pos=186,195 size=122x28 text=Закрыть
+    .?AVeCScriptRadioButton@@ '' id=1001 pos=53,195 size=122x28 text=Взять все
+    .?AVgCLocIDLabel@@ '' id=65535 pos=80,0 size=200x30 text=-beute-
+    .?AVgCInventoryList@@ '' id=65535 pos=38,40 size=283x132 text=-loot inventory-
+.?AVgCHudPage2@@ 'DLG_MENU_CHEATS' id=0 pos=0,0 size=1365x768
+.?AVgCHudPage2@@ 'DLG_MENU_MAIN_C' id=0 pos=0,0 size=1365x768
+  .?AVeCScriptRadioButton@@ '' id=1 pos=289,653 size=153x41 text=Продолжить
+  .?AVeCScriptRadioButton@@ '' id=2 pos=447,653 size=153x41 text=Игра
+  .?AVeCScriptRadioButton@@ '' id=3 pos=605,653 size=153x41 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=4 pos=763,653 size=153x41 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=5 pos=921,653 size=153x41 text=Выход
+.?AVgCHudPage2@@ 'DLG_MENU_CREDITS_C' id=0 pos=0,0 size=1365x768 text=DLG_MENU_CREDITS
+  .?AVgCCreditsLabel2@@ '' id=65535 pos=222,160 size=916x480 text=Static
+  .?AVeCScriptRadioButton@@ '' id=5 pos=921,653 size=153x41 text=Выход
+  .?AVeCScriptRadioButton@@ '' id=4 pos=763,650 size=153x64 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=3 pos=605,653 size=153x41 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=2 pos=447,653 size=153x41 text=Игра
+  .?AVeCScriptRadioButton@@ '' id=1 pos=289,653 size=153x41 text=Продолжить
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_SAVE' id=0 pos=0,0 size=1365x768 text=DLG_MENU_GAME_SAVE
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=850,586 size=180x32 text=OK
+  .?AVeCScriptEdit@@ '' id=65535 pos=330,582 size=510x40 text=-neuer spielstand-
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Сохранить
+  .?AVgCSavegameListCtrl2@@ '' id=65535 pos=332,176 size=698x410
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,24 size=795x470
+.?AVgCHudDialog2@@ 'MOD_RESOLUTION_ACCEPT_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=1001 pos=645,419 size=74x23 text=00:00
+  .?AVeCGuiStatic2@@ '' id=65535 pos=544,276 size=276x19 text=Подтвердить
+  .?AVeCGuiStatic2@@ '' id=65535 pos=530,301 size=304x124 text=Пожалуйста, подтвердите изменение разрешения. В противном случае через некоторое время будет восстановлено прежнее разрешение.
+  .?AVgCModalResultButton@@ '' id=65535 pos=714,444 size=140x32 text=-nein-
+    .?AVgCPageCloseButton@@ '' id=65535 pos=-1,0 size=32x32
+  .?AVgCModalResultButton@@ '' id=65535 pos=530,444 size=140x32 text=-ja-
+    .?AVgCPageCloseButton@@ '' id=65535 pos=0,0 size=32x32
+  .?AVeCGuiStatic2@@ '' id=65535 pos=506,275 size=352x217
+.?AVgCHudDialog2@@ 'MOD_ACTION_ACCEPT' id=0 pos=0,0 size=1365x768 text=MOD_ACTION_ACCEPT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVgCModalResultButton@@ '' id=65535 pos=184,181 size=140x32 text=-nein-
+    .?AVgCModalResultButton@@ '' id=65535 pos=28,181 size=140x32 text=-ja-
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,40 size=300x125 text=-blah blah blah-
+    .?AVeCScriptStatic@@ '' id=65535 pos=65,0 size=220x20 text=-aktion-
+.?AVgCHudPage2@@ 'PAGE_GAME_MAP_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_MAP
+  .?AVeCGuiPanel2@@ '' id=65535 pos=77,22 size=566x615
+    .?AVgCLocIDLabel@@ '' id=65535 pos=63,-3 size=438x25 text=- map -
+    .?AVeCGuiStatic2@@ '' id=65535 pos=105,31 size=40x40
+    .?AVeCGuiStatic2@@ '' id=65535 pos=420,31 size=40x40
+    .?AVgCMapLabel@@ '' id=1001 pos=17,71 size=530x530
+    .?AVgCFilterButton@@ '' id=22 pos=282,27 size=133x45 text=Область
+    .?AVgCFilterButton@@ '' id=21 pos=150,27 size=133x45 text=Карта мира
+    .?AVeCGuiPanel2@@ '' id=65535 pos=2,54 size=562x28
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_SYSTEM_C' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS_SYSTEM
+  .?AVgCSpinButton@@ '' id=65535 pos=930,428 size=16x22
+  .?AVgCSpinButton@@ '' id=1008 pos=678,428 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,428 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,427 size=307x24 text=Качество шейдеров
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Производительность
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=307x24 text=Фильтрация текстур
+  .?AVgCSpinButton@@ '' id=1002 pos=678,250 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,250 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,250 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,398 size=16x22
+  .?AVgCSpinButton@@ '' id=1007 pos=678,398 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,398 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,397 size=307x24 text=Глубина резкости
+  .?AVgCSpinButton@@ '' id=65535 pos=931,368 size=16x22
+  .?AVgCSpinButton@@ '' id=1006 pos=678,368 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,368 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,367 size=307x24 text=Дальность обзора
+  .?AVgCSpinButton@@ '' id=65535 pos=931,339 size=16x22
+  .?AVgCSpinButton@@ '' id=1005 pos=678,339 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,339 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,338 size=307x24 text=Качество эффектов
+  .?AVgCSpinButton@@ '' id=65535 pos=931,310 size=16x22
+  .?AVgCSpinButton@@ '' id=1004 pos=678,310 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,310 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,280 size=16x22
+  .?AVgCSpinButton@@ '' id=1003 pos=678,280 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,280 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,220 size=16x22
+  .?AVgCSpinButton@@ '' id=1001 pos=678,220 size=253x22 text=Quality
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=307x24 text=Детализация растительности
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,279 size=307x24 text=Детализация теней
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=307x24 text=Качество текстур
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Производительность
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudPage2@@ 'PAGE_GAME_TALK_C' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_TALK
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=1365x82
+    .?AVeCScriptStatic@@ '' id=65535 pos=9,41 size=1343x43 text=This is an incredibly long speech text. You know, one of those you don't really read because it's just too much to be bothered with... Nevertheless, some idiot wrote it and expects you to read all those words ....
+    .?AVeCScriptStatic@@ '' id=65535 pos=9,18 size=1343x24 text=Who's talking to me ???
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_AUDIO' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Звук
+  .?AVeCGuiStatic2@@ '' id=65535 pos=352,498 size=310x24 text=Динамики
+  .?AVgCSpeakerStatic@@ '' id=65535 pos=662,478 size=60x60
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,400 size=250x25 text=Воспроизведение
+  .?AVgCSpinButton@@ '' id=65535 pos=931,438 size=16x22
+  .?AVgCSpinButton@@ '' id=1006 pos=678,438 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,438 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=352,437 size=310x24 text=Звуковой драйвер
+  .?AVeCGuiStatic2@@ '' id=1001 pos=948,218 size=50x24 text=100
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Громкость
+  .?AVeCGuiStatic2@@ '' id=1002 pos=948,248 size=50x24 text=100
+  .?AVeCGuiStatic2@@ '' id=1003 pos=948,278 size=50x24 text=100
+  .?AVeCGuiStatic2@@ '' id=1004 pos=948,308 size=50x24 text=100
+  .?AVeCGuiStatic2@@ '' id=1005 pos=948,337 size=50x24 text=100
+  .?AVgCAudioVolumeScrollBar2@@ '' id=65535 pos=663,339 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=65535 pos=663,310 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=65535 pos=663,280 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=65535 pos=663,250 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=65535 pos=663,220 size=284x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,338 size=310x24 text=Окружение
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=310x24 text=Эффекты
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,279 size=310x24 text=Речь
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=310x24 text=Музыка
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=310x24 text=Общая
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudPage2@@ 'PAGE_GAME_LOOT_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_LOOT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=77,222 size=360x220
+    .?AVeCGuiPanel2@@ '' id=65535 pos=188,191 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Закрыть
+    .?AVeCGuiPanel2@@ '' id=65535 pos=2,192 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Забрать все
+    .?AVgCLocIDLabel@@ '' id=65535 pos=80,0 size=200x30 text=-beute-
+    .?AVgCInventoryList@@ '' id=1 pos=38,40 size=283x132 text=-loot inventory-
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_VIDEO_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Графика
+  .?AVgCSpinButton@@ '' id=65535 pos=931,250 size=16x22
+  .?AVgCSpinButton@@ '' id=1002 pos=678,250 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,250 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,220 size=16x22
+  .?AVgCSpinButton@@ '' id=1001 pos=678,220 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=931,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,280 size=16x22
+  .?AVgCSpinButton@@ '' id=1003 pos=678,280 size=253x22 text=On/Off
+  .?AVgCFOVScrollBar2@@ '' id=1010 pos=662,308 size=285x22 text=TrackBar
+  .?AVgCSpinButton@@ '' id=65535 pos=931,280 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=250x24 text=Частота обновления
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=250x24 text=Разрешение
+  .?AVeCScriptRadioButton@@ '' id=1008 pos=662,340 size=285x28 text=Применить
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,547 size=306x24 text=Синий
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,517 size=306x24 text=Зеленый
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,487 size=306x24 text=Красный
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,456 size=306x24 text=Контраст
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,427 size=306x24 text=Яркость
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Разрешение
+  .?AVeCGuiStatic2@@ '' id=105 pos=948,546 size=50x24 text=+10
+  .?AVeCGuiStatic2@@ '' id=104 pos=948,516 size=50x24 text=+10
+  .?AVeCGuiStatic2@@ '' id=103 pos=948,486 size=50x24 text=+10
+  .?AVeCGuiStatic2@@ '' id=102 pos=948,456 size=50x24 text=+10
+  .?AVeCGuiStatic2@@ '' id=101 pos=948,426 size=50x24 text=+10
+  .?AVgCGammaScrollBar2@@ '' id=1009 pos=662,547 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=1007 pos=662,517 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=1006 pos=662,487 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=1005 pos=662,457 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=1004 pos=662,427 size=285x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,389 size=250x25 text=Дисплей
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,278 size=300x24 text=Вертикальная синхронизация
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=300x24 text=Поле зрения
+  .?AVeCGuiStatic2@@ '' id=100 pos=940,307 size=70x24 text=+888%
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudPage2@@ 'PAGE_GAME_PICKPOCKET_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_PICKPOCKET
+  .?AVeCGuiPanel2@@ '' id=65535 pos=77,226 size=360x240
+    .?AVeCGuiPanel2@@ '' id=65535 pos=188,212 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Закрыть
+    .?AVeCGuiPanel2@@ '' id=65535 pos=2,212 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Карманная кража
+    .?AVgCPageTimerProgressBar@@ '' id=11 pos=40,178 size=280x20
+    .?AVgCInventoryList@@ '' id=1 pos=38,40 size=283x132 text=-pickpocket inventory-
+    .?AVgCLocIDLabel@@ '' id=65535 pos=80,-1 size=200x30 text=-diebeskunst-
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_VIDEO' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS_VIDEO
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Графика
+  .?AVgCSpinButton@@ '' id=65535 pos=931,250 size=16x22
+  .?AVgCSpinButton@@ '' id=1012 pos=678,250 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,250 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,220 size=16x22
+  .?AVgCSpinButton@@ '' id=1011 pos=678,220 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=931,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,280 size=16x22
+  .?AVgCSpinButton@@ '' id=1013 pos=678,280 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=931,280 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,278 size=300x24 text=Вертикальная синхронизация
+  .?AVgCFOVScrollBar2@@ '' id=65535 pos=662,308 size=285x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=1000 pos=940,307 size=70x24 text=+888%
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=300x24 text=Поле зрения
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=300x24 text=Частота обновления
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=300x24 text=Разрешение
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=662,340 size=285x28 text=Применить
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,547 size=306x24 text=Синий
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,516 size=306x24 text=Зеленый
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,487 size=306x24 text=Красный
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,457 size=306x24 text=Контраст
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,427 size=306x24 text=Яркость
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Разрешение
+  .?AVeCGuiStatic2@@ '' id=1005 pos=948,546 size=70x24 text=+888%
+  .?AVeCGuiStatic2@@ '' id=1004 pos=948,516 size=70x24 text=+888%
+  .?AVeCGuiStatic2@@ '' id=1003 pos=948,486 size=70x24 text=+888%
+  .?AVeCGuiStatic2@@ '' id=1002 pos=948,456 size=70x24 text=+888%
+  .?AVeCGuiStatic2@@ '' id=1001 pos=948,427 size=70x24 text=+888%
+  .?AVgCGammaScrollBar2@@ '' id=65535 pos=662,547 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=65535 pos=662,517 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=65535 pos=662,487 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=65535 pos=662,457 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=65535 pos=662,428 size=285x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,389 size=250x25 text=Дисплей
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_VIDEO_C_Pro' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Графика
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,280 size=306x24 text=Гамма
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,250 size=306x24 text=Контраст
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,220 size=306x24 text=Яркость
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,320 size=306x24 text=Производительность
+  .?AVeCGuiStatic2@@ '' id=103 pos=948,280 size=50x24 text=+10
+  .?AVeCGuiStatic2@@ '' id=102 pos=948,250 size=50x24 text=+10
+  .?AVeCGuiStatic2@@ '' id=101 pos=948,220 size=50x24 text=+10
+  .?AVgCGammaScrollBar2@@ '' id=1005 pos=662,280 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=1004 pos=662,250 size=285x22 text=TrackBar
+  .?AVgCGammaScrollBar2@@ '' id=1003 pos=662,220 size=285x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Дисплей
+  .?AVgCSpinButton@@ '' id=65535 pos=931,320 size=16x22
+  .?AVgCSpinButton@@ '' id=1008 pos=678,320 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,320 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+.?AVgCHudPage2@@ 'PAGE_GAME_CRAFTSELECT_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_CRAFTSELECT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=77,236 size=360x220
+    .?AVeCGuiPanel2@@ '' id=65535 pos=188,191 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Закрыть
+    .?AVeCGuiPanel2@@ '' id=65535 pos=2,192 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Создать
+    .?AVgCInventoryList@@ '' id=1 pos=38,40 size=283x136 text=ListCtrl
+    .?AVgCLocIDLabel@@ '' id=11 pos=80,-1 size=200x30 text=-alchemie-
+.?AVgCHudDialog2@@ 'MOD_GAMEPAD_ACCEPT' id=0 pos=0,0 size=1365x768 text=MOD_GAMEPAD_ACCEPT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVgCModalResultButton@@ '' id=65535 pos=105,181 size=140x32 text=-ok-
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,90 size=300x125 text=-blah blah blah-
+.?AVgCHudPopUp2@@ 'POP_SKILLDESC' id=65535 pos=0,0 size=250x210 text=POP_SKILLDESC
+  .?AVgCSkillInfo@@ '' id=65535 pos=0,0 size=240x50 text=-header-
+  .?AVgCSkillInfo@@ '' id=65535 pos=0,50 size=240x50 text=-description-
+  .?AVgCSkillInfo@@ '' id=65535 pos=0,100 size=240x50 text=-level-
+  .?AVgCSkillInfo@@ '' id=65535 pos=0,150 size=240x50 text=-next level-
+.?AVgCHudPage2@@ 'PAGE_GAME_MAIN_C_JAP' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_MAIN
+  .?AVgCSavePicbox2@@ '' id=65535 pos=298,394 size=620x64 text=Сохранение...
+  .?AVeCGuiPanel2@@ '' id=65535 pos=102,20 size=1024x92
+    .?AVgCCompassPicbox2@@ '' id=65535 pos=932,0 size=92x92
+  .?AVeCGuiPanel2@@ '' id=65535 pos=102,466 size=1024x92
+    .?AVgCTutorialLabel2@@ '' id=65535 pos=196,0 size=620x92
+  .?AVgCLockpickStatic2@@ '' id=65535 pos=102,-38 size=50x50 text=-lockpick info-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=102,559 size=1024x130
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=381,85 size=238x21
+    .?AVgCStaticBitmap@@ '' id=20 pos=-4,42 size=46x46
+    .?AVgCStaticBitmap@@ '' id=21 pos=967,68 size=22x22
+    .?AVgCStaticBitmap@@ '' id=22 pos=967,41 size=22x22
+    .?AVgCStaticBitmap@@ '' id=23 pos=989,56 size=22x22
+    .?AVgCStaticBitmap@@ '' id=24 pos=945,56 size=22x22
+    .?AVgCQuickPicbox2@@ '' id=10 pos=962,91 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=9 pos=1012,49 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=8 pos=961,7 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=7 pos=912,51 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=6 pos=3,91 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=5 pos=52,51 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=4 pos=-48,51 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=3 pos=3,7 size=32x32 text=888
+    .?AVgCEquipPicbox2@@ '' id=31 pos=720,54 size=32x32 text=888
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=218,53 size=32x32
+    .?AVgCEquipPicbox2@@ '' id=30 pos=732,66 size=46x46
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=232,66 size=46x46
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=285,103 size=220x30
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=504,103 size=221x30
+  .?AVgCMiscProgressBar@@ '' id=65535 pos=502,20 size=200x21
+  .?AVgCLootStatic2@@ '' id=65535 pos=77,73 size=800x200 text=-loot info-
+.?AVgCHudDialog2@@ 'MOD_ACTIONKEY' id=0 pos=0,0 size=1365x768 text=MOD_ACTIONKEY
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVgCLocIDLabel@@ '' id=65535 pos=75,0 size=200x20 text=-tastenbelegung-
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,40 size=300x125 text=-blah blah blah-
+.?AVgCHudDialog2@@ 'MOD_STACKAMOUNT_C' id=0 pos=0,0 size=1365x768 text=MOD_STACKAMOUNT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210 text=Выбрать
+    .?AVeCScriptStatic@@ '' id=65535 pos=15,33 size=320x55 text=-blah blah blah-
+    .?AVeCScriptTrackbar@@ '' id=1 pos=25,91 size=300x30
+    .?AVeCGuiStatic2@@ '' id=1000 pos=136,125 size=78x18 text=33
+    .?AVeCGuiStatic2@@ '' id=65535 pos=255,153 size=90x25 text=Нет
+    .?AVeCGuiPanel2@@ '' id=65535 pos=218,150 size=32x32
+      .?AVeCGuiStatic2@@ '' id=45 pos=0,0 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=135,153 size=90x25 text=Да
+    .?AVeCGuiPanel2@@ '' id=65535 pos=98,150 size=32x32
+      .?AVeCGuiStatic2@@ '' id=45 pos=0,0 size=32x32
+.?AVgCHudPage2@@ 'PAGE_GAME_CRAFTSELECT' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_CRAFTSELECT
+  .?AVgCPageCloseButton@@ '' id=1001 pos=157,433 size=156x28 text=Закрыть
+  .?AVeCGuiPanel2@@ '' id=65535 pos=50,202 size=360x217
+    .?AVgCInventoryList@@ '' id=65535 pos=38,40 size=283x133 text=ListCtrl
+    .?AVgCLocIDLabel@@ '' id=11 pos=80,-1 size=200x30 text=-alchemie-
+.?AVgCHudPage2@@ 'PAGE_GAME_ITEMSELECT_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_ITEMSELECT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=77,236 size=360x220
+    .?AVeCGuiPanel2@@ '' id=65535 pos=188,191 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Закрыть
+    .?AVeCGuiPanel2@@ '' id=65535 pos=2,192 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=30,0 size=120x25 text=Выбрать
+    .?AVgCLocIDLabel@@ '' id=11 pos=80,-1 size=200x30 text=-altar-
+    .?AVgCInventoryList@@ '' id=1 pos=38,46 size=283x132 text=ListCtrl
+.?AVgCHudDialog2@@ 'MOD_SIGN_ACCEPT_C' id=0 pos=0,0 size=1365x768 text=MOD_SIGN_ACCEPT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=457,279 size=450x210
+    .?AVeCScriptStatic@@ '' id=65535 pos=325,160 size=140x32 text=Главное меню
+    .?AVgCModalResultButton@@ '' id=65535 pos=288,160 size=32x32
+      .?AVgCPageCloseButton@@ '' id=65535 pos=0,0 size=32x32
+    .?AVeCScriptStatic@@ '' id=65535 pos=90,160 size=180x32 text=Снова войти
+    .?AVgCModalResultButton@@ '' id=65535 pos=53,160 size=32x32
+      .?AVgCPageCloseButton@@ '' id=65535 pos=0,0 size=32x32
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,36 size=400x125 text=-blah blah blah-
+    .?AVeCScriptStatic@@ '' id=65535 pos=65,0 size=320x20 text=-aktion-
+.?AVgCHudPage2@@ 'PAGE_GAME_MAP' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_MAP
+  .?AVeCGuiPanel2@@ '' id=65535 pos=704,22 size=510x615 text=Карта
+    .?AVgCMapLabel@@ '' id=65535 pos=17,71 size=474x530
+    .?AVgCFilterButton@@ '' id=65535 pos=152,27 size=133x45 text=Область
+    .?AVgCFilterButton@@ '' id=65535 pos=20,27 size=133x45 text=Карта мира
+    .?AVeCGuiPanel2@@ '' id=65535 pos=2,54 size=506x28
+.?AVgCHudPopUp2@@ 'POP_INVITEM' id=65535 pos=0,0 size=275x460 text=POP_INVITEM
+  .?AVgCItemInfo@@ '' id=65535 pos=0,0 size=265x50 text=-header-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,50 size=265x50 text=-description-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,100 size=265x50 text=-modify skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,150 size=265x50 text=-damage-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,200 size=265x50 text=-required skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,250 size=265x50 text=-required mana-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,300 size=265x50 text=-ingredients-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,350 size=265x50 text=-craft required skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,400 size=265x50 text=-gold value-
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_SAVE_C' id=0 pos=0,0 size=1365x768 text=DLG_MENU_GAME_SAVE
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Сохранить
+  .?AVgCSavegameListCtrl2@@ '' id=31 pos=332,176 size=698x410
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=326,452 size=180x24 text=Удалить
+    .?AVgCPageCloseButton@@ '' id=65535 pos=290,448 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=89,452 size=180x24 text=Создать
+    .?AVgCPageCloseButton@@ '' id=65535 pos=53,448 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=565,452 size=180x24 text=Сохранить
+    .?AVgCPageCloseButton@@ '' id=65535 pos=529,448 size=32x32
+.?AVgCHudPopUp2@@ 'POP_WRITTEN' id=65535 pos=0,0 size=200x24 text=map info popup
+  .?AVgCWrittenTipStatic2@@ '' id=65535 pos=5,0 size=184x21 text=Static
+.?AVgCHudPage2@@ 'DLG_MENU_START_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiPanel2@@ '' id=65535 pos=432,323 size=500x260
+    .?AVgCModalResultButton@@ '' id=2 pos=180,114 size=140x32
+      .?AVgCPageCloseButton@@ '' id=5 pos=54,-5 size=32x32
+    .?AVeCScriptStatic@@ '' id=1 pos=80,109 size=140x32 text=Нажмите
+    .?AVeCScriptStatic@@ '' id=1 pos=280,109 size=140x32 text=для начала
+.?AVgCHudDialog2@@ 'MOD_ACTION_CHANGE_C' id=0 pos=0,0 size=1365x768 text=MOD_ACTION_CHANGE
+  .?AVeCGuiPanel2@@ '' id=65535 pos=457,279 size=450x237
+    .?AVeCScriptStatic@@ '' id=65535 pos=135,195 size=180x32 text=Выберите Профиль
+    .?AVgCModalResultButton@@ '' id=65535 pos=209,160 size=140x32
+      .?AVgCPageCloseButton@@ '' id=65535 pos=0,0 size=32x32
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,36 size=400x125 text=-blah blah blah-
+.?AVgCHudPage2@@ 'DLG_MENU_CREDITS' id=0 pos=0,0 size=1365x768 text=DLG_MENU_CREDITS
+  .?AVgCCreditsLabel2@@ '' id=65535 pos=222,160 size=916x480 text=Static
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=921,653 size=153x41 text=Выход
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=763,650 size=153x64 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=605,653 size=153x41 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=447,653 size=153x41 text=Игра
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=289,653 size=153x41 text=Продолжить
+.?AVgCHudPopUp2@@ 'POP_DEFAULT' id=65535 pos=0,0 size=200x40 text=POP_DEFAULT
+  .?AVeCGuiTooltipTextCtrl2@@ '' id=65535 pos=0,0 size=188x28 text=Static
+.?AVgCHudPage2@@ 'PAGE_GAME_INVENTORY_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_INVENTORY
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,587 size=1228x104
+  .?AVeCGuiPanel2@@ '' id=55 pos=0,125 size=1228x462
+    .?AVeCGuiPanel2@@ '' id=60 pos=502,1 size=352x460
+      .?AVgCItemInfo@@ '' id=65535 pos=0,0 size=265x50 text=-header-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,50 size=265x50 text=-description-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,100 size=265x50 text=-modify skills-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,150 size=265x50 text=-damage-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,200 size=265x50 text=-required skills-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,250 size=265x50 text=-required mana-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,300 size=265x50 text=-ingredients-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,350 size=265x50 text=-craft required skills-
+      .?AVgCItemInfo@@ '' id=65535 pos=0,400 size=265x50 text=-gold value-
+    .?AVgCWrittenStatic2@@ '' id=40 pos=502,1 size=352x460 text=-letter-
+    .?AVgCWrittenStatic2@@ '' id=41 pos=298,-22 size=564x485 text=-book-
+    .?AVgCWrittenStatic2@@ '' id=42 pos=147,-40 size=500x500 text=Static
+    .?AVeCGuiPanel2@@ '' id=65535 pos=872,5 size=341x72
+      .?AVeCGuiStatic2@@ '' id=45 pos=7,45 size=40x40
+      .?AVeCGuiStatic2@@ '' id=46 pos=290,45 size=40x40
+      .?AVgCFilterButton@@ '' id=6 pos=240,16 size=48x57
+      .?AVgCFilterButton@@ '' id=7 pos=285,16 size=48x57
+      .?AVgCFilterButton@@ '' id=5 pos=196,16 size=48x57
+      .?AVgCFilterButton@@ '' id=3 pos=108,16 size=48x57
+      .?AVgCFilterButton@@ '' id=2 pos=64,16 size=48x57
+      .?AVgCFilterButton@@ '' id=1 pos=11,16 size=48x57
+      .?AVgCFilterButton@@ '' id=4 pos=152,16 size=48x57
+    .?AVeCGuiPanel2@@ '' id=65535 pos=853,64 size=378x396
+      .?AVgCInventoryList@@ '' id=11 pos=46,23 size=283x308 text=ListCtrl
+      .?AVgCInvAmountPicbox@@ '' id=65535 pos=75,339 size=167x20 text=-gold amount-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=48,340 size=20x20
+.?AVgCHudDialog2@@ 'MOD_STACKACCEPT' id=0 pos=0,0 size=1365x768 text=MOD_STACKACCEPT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210 text=Выбрать
+    .?AVgCModalResultButton@@ '' id=65535 pos=184,181 size=140x32 text=-nein-
+    .?AVgCModalResultButton@@ '' id=65535 pos=28,181 size=140x32 text=-ja-
+    .?AVeCScriptStatic@@ '' id=65535 pos=15,28 size=320x95 text=-blah blah blah-
+.?AVgCHudPage2@@ 'PAGE_GAME_PICKPOCKET' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_PICKPOCKET
+  .?AVeCGuiPanel2@@ '' id=65535 pos=50,201 size=360x240
+    .?AVgCPageCloseButton@@ '' id=1001 pos=116,216 size=137x28 text=Закрыть
+    .?AVgCPageTimerProgressBar@@ '' id=11 pos=40,178 size=280x20
+    .?AVgCInventoryList@@ '' id=65535 pos=38,40 size=283x132 text=-pickpocket inventory-
+    .?AVgCLocIDLabel@@ '' id=65535 pos=80,-1 size=200x30 text=-diebeskunst-
+.?AVgCHudPage2@@ 'PAGE_LOADING_C' id=0 pos=0,0 size=1365x768 text=PAGE_LOADING
+  .?AVgCHintStatic@@ '' id=65535 pos=247,700 size=870x56
+  .?AVeCGuiStatic2@@ '' id=65535 pos=544,-6 size=216x92
+  .?AVeCGuiStatic2@@ '' id=65535 pos=466,27 size=464x167
+  .?AVeCGuiStatic2@@ '' id=65535 pos=887,667 size=37x30
+  .?AVeCGuiStatic2@@ '' id=65535 pos=440,667 size=37x30
+  .?AVeCScriptProgressbar@@ '' id=65535 pos=472,670 size=420x23 text=Loading...
+  .?AVeCGuiStatic2@@ '' id=65535 pos=0,-62 size=1365x138
+  .?AVeCGuiStatic2@@ '' id=65535 pos=0,691 size=1365x140
+  .?AVgCHintStatic@@ '' id=65535 pos=0,0 size=1365x768
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_SYSTEM' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS_SYSTEM
+  .?AVgCSpinButton@@ '' id=65535 pos=930,428 size=16x22
+  .?AVgCSpinButton@@ '' id=1008 pos=678,428 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,428 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,427 size=307x24 text=Качество шейдеров
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Производительность
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=307x24 text=Фильтрация текстур
+  .?AVgCSpinButton@@ '' id=1002 pos=678,250 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,250 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,250 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,398 size=16x22
+  .?AVgCSpinButton@@ '' id=1007 pos=678,398 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,398 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,397 size=307x24 text=Глубина резкости
+  .?AVgCSpinButton@@ '' id=65535 pos=931,368 size=16x22
+  .?AVgCSpinButton@@ '' id=1006 pos=678,368 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,368 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,367 size=307x24 text=Дальность обзора
+  .?AVgCSpinButton@@ '' id=65535 pos=931,339 size=16x22
+  .?AVgCSpinButton@@ '' id=1005 pos=678,339 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,339 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,338 size=307x24 text=Качество эффектов
+  .?AVgCSpinButton@@ '' id=65535 pos=931,310 size=16x22
+  .?AVgCSpinButton@@ '' id=1004 pos=678,310 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,310 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,280 size=16x22
+  .?AVgCSpinButton@@ '' id=1003 pos=678,280 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,280 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,220 size=16x22
+  .?AVgCSpinButton@@ '' id=1001 pos=678,220 size=253x22 text=Quality
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=307x24 text=Детализация растительности
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,279 size=307x24 text=Детализация теней
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=307x24 text=Качество текстур
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Производительность
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudDialog2@@ 'MOD_ACCEPTTRADE_C' id=0 pos=0,0 size=1365x768 text=MOD_ACCEPTTRADE
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVeCGuiPanel2@@ '' id=65535 pos=212,160 size=162x32
+      .?AVeCGuiStatic2@@ '' id=45 pos=0,0 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=32,3 size=120x25 text=Нет
+    .?AVeCGuiPanel2@@ '' id=65535 pos=74,160 size=162x32
+      .?AVeCGuiStatic2@@ '' id=45 pos=0,0 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=32,3 size=120x25 text=Да
+    .?AVgCLocIDLabel@@ '' id=65535 pos=65,0 size=220x20 text=-handel abschliessen-
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,33 size=300x125 text=-blah blah blah-
+.?AVgCHudPage2@@ 'PAGE_GAME_CHARACTER_C' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_CHARACTER_C
+  .?AVeCGuiStatic2@@ '' id=65535 pos=237,53 size=890x662
+    .?AVgCLocIDLabel@@ '' id=65535 pos=287,20 size=312x25 text=-character-
+    .?AVeCGuiStatic2@@ '' id=65535 pos=20,16 size=36x37
+    .?AVgCPageCloseButton@@ '' id=1001 pos=839,20 size=32x32
+    .?AVeCGuiPanel2@@ '' id=65535 pos=24,80 size=840x22
+      .?AVeCGuiPanel2@@ '' id=65535 pos=20,-28 size=600x58
+        .?AVeCGuiStatic2@@ '' id=65535 pos=5,0 size=40x40
+        .?AVeCGuiStatic2@@ '' id=65535 pos=455,0 size=40x40
+        .?AVgCFilterButton@@ '' id=23 pos=250,0 size=200x45 text=Навыки
+        .?AVgCFilterButton@@ '' id=22 pos=50,0 size=200x45 text=Характеристики
+    .?AVeCGuiStatic2@@ '' id=1 pos=24,86 size=840x550
+      .?AVeCGuiPanel2@@ '' id=65535 pos=0,270 size=840x260
+        .?AVeCGuiPanel2@@ '' id=65535 pos=25,9 size=435x250
+          .?AVgCSkillPicbox@@ '' id=65535 pos=286,0 size=98x20 text=- level -
+          .?AVgCMiscLabel@@ '' id=65535 pos=40,0 size=166x20 text=-gilde-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=392,191 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=392,160 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=392,129 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=392,98 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=392,67 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=392,36 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=13,37 size=374x24 text=-staerke-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=13,68 size=374x24 text=-geschick-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=12,100 size=374x24 text=-weisheit-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=13,130 size=374x24 text=-mana-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=13,161 size=374x24 text=-leben-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=13,192 size=374x24 text=-lernpunkte-
+        .?AVeCGuiPanel2@@ '' id=65535 pos=463,25 size=365x210
+          .?AVgCInventoryList@@ '' id=21 pos=28,28 size=310x162 text=ListCtrl
+          .?AVgCInvAmountPicbox@@ '' id=65535 pos=68,13 size=127x20 text=-gold amount-
+          .?AVeCGuiPanel2@@ '' id=65535 pos=43,15 size=20x20
+      .?AVeCGuiPanel2@@ '' id=666 pos=0,10 size=840x260
+        .?AVeCGuiStatic2@@ '' id=41 pos=574,239 size=32x32
+        .?AVeCGuiStatic2@@ '' id=40 pos=610,239 size=150x32 text=Инвентарь
+        .?AVeCGuiPanel2@@ '' id=65535 pos=500,0 size=290x240
+          .?AVgCEquipPicbox2@@ '' id=18 pos=19,60 size=44x44
+          .?AVgCEquipPicbox2@@ '' id=17 pos=19,116 size=44x44
+          .?AVgCEquipPicbox2@@ '' id=16 pos=31,180 size=29x29
+          .?AVgCEquipPicbox2@@ '' id=14 pos=231,184 size=29x29
+          .?AVgCEquipPicbox2@@ '' id=13 pos=231,116 size=44x44
+          .?AVgCEquipPicbox2@@ '' id=12 pos=231,60 size=44x44
+          .?AVgCEquipPicbox2@@ '' id=11 pos=127,4 size=44x44
+          .?AVgCEquipPicbox2@@ '' id=19 pos=135,64 size=29x29
+          .?AVgCEquipPicbox2@@ '' id=15 pos=127,148 size=44x44
+          .?AVeCGuiStatic2@@ '' id=65535 pos=56,20 size=187x203
+        .?AVeCGuiPanel2@@ '' id=65535 pos=25,5 size=435x250
+          .?AVgCSkillPicbox@@ '' id=65535 pos=90,-1 size=254x20 text=-erfahrung-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=14,191 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=39,192 size=382x24 text=-prot magic-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=39,161 size=382x24 text=-prot ice-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=14,160 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=14,129 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=39,130 size=382x24 text=-prot fire-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=39,99 size=382x24 text=-prot point-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=14,98 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=14,67 size=25x25
+          .?AVgCSkillPicbox@@ '' id=65535 pos=39,68 size=382x24 text=-prot blunt-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=39,37 size=382x24 text=-prot edge-
+          .?AVgCSkillPicbox@@ '' id=65535 pos=14,36 size=25x25
+    .?AVeCGuiStatic2@@ '' id=2 pos=24,86 size=840x550
+      .?AVeCGuiPanel2@@ '' id=65535 pos=420,15 size=400x270
+        .?AVeCGuiPanel2@@ '' id=65535 pos=5,21 size=390x245
+          .?AVgCSkillInfo@@ '' id=30 pos=10,10 size=370x50 text=-header-
+          .?AVgCSkillInfo@@ '' id=31 pos=10,60 size=370x50 text=-description-
+          .?AVgCSkillInfo@@ '' id=32 pos=10,110 size=370x50 text=-level-
+          .?AVgCSkillInfo@@ '' id=33 pos=10,160 size=370x70 text=-next level-
+        .?AVgCLocIDLabel@@ '' id=65535 pos=0,0 size=400x20 text=-Desc-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=420,286 size=200x250
+        .?AVgCSkillPicbox@@ '' id=514 pos=14,187 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,218 size=12x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,187 size=120x32 text=-schleichen-
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,168 size=12x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,136 size=120x32 text=-akrobatik-
+        .?AVgCSkillPicbox@@ '' id=513 pos=14,136 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,116 size=36x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,84 size=120x32 text=-taschendiebstal-
+        .?AVgCSkillPicbox@@ '' id=512 pos=14,84 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,59 size=36x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,28 size=120x32 text=-schloesser knacken-
+        .?AVgCSkillPicbox@@ '' id=511 pos=14,28 size=45x41
+        .?AVgCLocIDLabel@@ '' id=65535 pos=0,0 size=200x20 text=-diebeskunst-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=218,286 size=200x250
+        .?AVgCLocIDLabel@@ '' id=65535 pos=0,0 size=200x20 text=-magie-
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,116 size=12x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,84 size=120x32 text=-schriftrollen herstellen
+        .?AVgCSkillPicbox@@ '' id=510 pos=14,84 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,59 size=48x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,28 size=120x32 text=- kreis
+        .?AVgCSkillPicbox@@ '' id=509 pos=14,28 size=45x41
+      .?AVeCGuiPanel2@@ '' id=65535 pos=16,286 size=200x250
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,218 size=12x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,187 size=120x32 text=-tiere ausweiden-
+        .?AVgCSkillPicbox@@ '' id=506 pos=14,187 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,59 size=36x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,28 size=120x32 text=-alchemie-
+        .?AVgCSkillPicbox@@ '' id=503 pos=14,28 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,116 size=36x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,84 size=120x32 text=-schmieden-
+        .?AVgCSkillPicbox@@ '' id=504 pos=14,84 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,168 size=12x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,136 size=120x32 text=-erz schuerfen-
+        .?AVgCSkillPicbox@@ '' id=505 pos=14,136 size=45x41
+        .?AVgCLocIDLabel@@ '' id=65535 pos=0,0 size=200x20 text=-herstellung-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=622,286 size=200x250
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,168 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,136 size=120x32 text=-frostball-
+        .?AVgCSkillPicbox@@ '' id=517 pos=14,136 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,116 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,84 size=120x32 text=-feuerball-
+        .?AVgCSkillPicbox@@ '' id=516 pos=14,84 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=62,59 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=62,28 size=120x32 text=-magisches geschoss-
+        .?AVgCSkillPicbox@@ '' id=515 pos=14,28 size=45x41
+        .?AVgCLocIDLabel@@ '' id=65535 pos=0,0 size=200x20 text=-kampfmagie-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=16,15 size=400x270
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=239,148 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=239,116 size=120x32 text=-armbrustkampf-
+        .?AVgCSkillPicbox@@ '' id=508 pos=191,117 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=239,69 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=239,37 size=120x32 text=-bogenkampf-
+        .?AVgCSkillPicbox@@ '' id=507 pos=191,38 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=60,223 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=60,191 size=120x32 text=-stabkampf-
+        .?AVgCSkillPicbox@@ '' id=502 pos=12,192 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=60,148 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=60,116 size=120x32 text=-axtkampf-
+        .?AVgCSkillPicbox@@ '' id=501 pos=12,117 size=45x41
+        .?AVgCSkillProgressBar@@ '' id=65535 pos=60,69 size=120x12
+        .?AVgCSkillPicbox@@ '' id=65535 pos=60,37 size=120x32 text=-schwertkampf-
+        .?AVgCSkillPicbox@@ '' id=500 pos=12,38 size=45x41
+        .?AVgCLocIDLabel@@ '' id=65535 pos=0,0 size=400x20 text=-kampf-
+.?AVgCHudPage2@@ 'PAGE_GAME_DIALOG' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_DIALOG
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,668 size=1365x100
+    .?AVeCGuiStatic2@@ '' id=1001 pos=390,7 size=25x25
+    .?AVgCDialogListCtrl2@@ '' id=65535 pos=425,7 size=560x87 text=ListCtrl
+.?AVgCHudPage2@@ 'PAGE_GAME_TRADE_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_TRADE
+  .?AVeCGuiStatic2@@ '' id=65535 pos=169,15 size=890x662
+    .?AVeCGuiPanel2@@ '' id=65535 pos=140,600 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=32,0 size=120x28 text=Выбрать
+    .?AVeCGuiPanel2@@ '' id=65535 pos=344,600 size=220x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-4 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=32,0 size=170x28 text=Сменить окно
+    .?AVeCGuiPanel2@@ '' id=65535 pos=598,600 size=170x28
+      .?AVeCGuiStatic2@@ '' id=45 pos=-2,-2 size=32x32
+      .?AVeCGuiStatic2@@ '' id=65535 pos=32,0 size=120x28 text=Торговля
+    .?AVeCGuiStatic2@@ '' id=65535 pos=24,62 size=840x580
+      .?AVeCGuiPanel2@@ '' id=65535 pos=470,244 size=365x285
+        .?AVeCGuiPanel2@@ '' id=65535 pos=13,0 size=341x72
+          .?AVeCGuiStatic2@@ '' id=45 pos=7,45 size=40x40
+          .?AVeCGuiStatic2@@ '' id=46 pos=290,45 size=40x40
+          .?AVgCFilterButton@@ '' id=6 pos=240,16 size=48x57
+          .?AVgCFilterButton@@ '' id=7 pos=285,16 size=48x57
+          .?AVgCFilterButton@@ '' id=5 pos=196,16 size=48x57
+          .?AVgCFilterButton@@ '' id=3 pos=108,16 size=48x57
+          .?AVgCFilterButton@@ '' id=2 pos=64,16 size=48x57
+          .?AVgCFilterButton@@ '' id=1 pos=11,16 size=48x57
+          .?AVgCFilterButton@@ '' id=4 pos=152,16 size=48x57
+        .?AVeCGuiPanel2@@ '' id=65535 pos=0,57 size=365x225
+          .?AVgCInvAmountPicbox@@ '' id=65535 pos=70,24 size=252x20 text=-gold amount-
+          .?AVeCGuiPanel2@@ '' id=65535 pos=43,24 size=20x20
+          .?AVgCInventoryList@@ '' id=11 pos=28,38 size=311x162 text=-player inventory-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=5,5 size=365x240 text=Купить
+        .?AVgCInventoryList@@ '' id=13 pos=27,54 size=311x162 text=-player purchase-
+        .?AVeCGuiPanel2@@ '' id=65535 pos=32,32 size=20x20
+        .?AVgCInvAmountPicbox@@ '' id=65535 pos=62,32 size=252x20 text=-einkaufswert-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=470,5 size=365x240 text=Продать
+        .?AVgCInventoryList@@ '' id=14 pos=27,54 size=311x162 text=-player sale-
+        .?AVeCGuiPanel2@@ '' id=65535 pos=32,32 size=20x20
+        .?AVgCInvAmountPicbox@@ '' id=65535 pos=62,32 size=252x20 text=-verkaufswert-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=5,244 size=365x285 text=Торговец
+        .?AVgCInventoryList@@ '' id=12 pos=27,44 size=311x206 text=-trader inventory-
+      .?AVgCLocIDLabel@@ '' id=65535 pos=321,-49 size=312x25 text=-trade-
+    .?AVgCPageCloseButton@@ '' id=1001 pos=839,20 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=20,16 size=36x36
+.?AVgCHudPage2@@ 'DLG_MENU_GAME' id=0 pos=0,0 size=1365x768 text=Options
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=255,710 size=205x23 text=Новая игра
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=687,710 size=205x23 text=Сохранить
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=903,710 size=205x23 text=Достижения
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=471,710 size=205x23 text=Загрузить
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=447,651 size=153x64 text=Игра
+  .?AVeCGuiStatic2@@ '' id=65535 pos=234,706 size=896x32
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=921,653 size=153x41 text=Выход
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=763,653 size=153x41 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=605,653 size=153x41 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=289,653 size=153x41 text=Продолжить
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_AUDIO_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Звук
+  .?AVeCGuiStatic2@@ '' id=101 pos=948,218 size=80x24 text=100
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Громкость
+  .?AVeCGuiStatic2@@ '' id=102 pos=948,248 size=80x24 text=100
+  .?AVeCGuiStatic2@@ '' id=103 pos=948,278 size=80x24 text=100
+  .?AVeCGuiStatic2@@ '' id=104 pos=948,308 size=80x24 text=100
+  .?AVeCGuiStatic2@@ '' id=105 pos=948,337 size=80x24 text=100
+  .?AVgCAudioVolumeScrollBar2@@ '' id=1005 pos=663,339 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=1004 pos=663,310 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=1003 pos=663,280 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=1002 pos=663,250 size=284x22 text=TrackBar
+  .?AVgCAudioVolumeScrollBar2@@ '' id=1001 pos=663,220 size=284x22 text=TrackBar
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,338 size=310x24 text=Окружение
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=310x24 text=Эффекты
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,279 size=310x24 text=Речь
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=310x24 text=Музыка
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=310x24 text=Общая
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_LOAD_C' id=0 pos=0,0 size=1365x768 text=DLG_MENU_PAGE_LOAD
+  .?AVgCSavegameListCtrl2@@ '' id=21 pos=332,176 size=698x410 text=Item 000
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Загрузить
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVgCPageCloseButton@@ '' id=65535 pos=290,448 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=326,452 size=180x24 text=Удалить
+    .?AVgCPageCloseButton@@ '' id=65535 pos=529,448 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=565,452 size=180x24 text=Загрузить
+    .?AVeCGuiStatic2@@ '' id=65535 pos=4,24 size=795x470
+.?AVgCHudPage2@@ 'PAGE_GAME_CHARACTER' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_CHARACTER
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,250 size=941x430 text=-skill panel-
+    .?AVeCGuiPanel2@@ '' id=65535 pos=627,195 size=313x236 text=Воровство
+      .?AVgCSkillPicbox@@ '' id=65535 pos=67,164 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=116,192 size=12x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,172 size=135x16 text=-schleichen-
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=116,148 size=12x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,128 size=135x16 text=-akrobatik-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=67,120 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=116,104 size=36x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,84 size=135x16 text=-taschendiebstal-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=67,76 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=116,60 size=36x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,40 size=135x16 text=-schloesser knacken-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=67,32 size=45x41
+    .?AVeCGuiPanel2@@ '' id=65535 pos=313,195 size=313x236 text=Рунная магия
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=118,117 size=12x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,97 size=135x16 text=-schriftrollen herstellen
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,89 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,73 size=48x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,53 size=135x16 text=- kreis
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,45 size=45x41
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,195 size=313x236 text=Создание
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,194 size=12x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=117,174 size=135x16 text=-tiere ausweiden-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,166 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,62 size=36x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=117,42 size=135x16 text=-alchemie-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,34 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,106 size=36x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=117,86 size=135x16 text=-schmieden-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,78 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,150 size=12x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=117,130 size=135x16 text=-erz schuerfen-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,122 size=45x41
+    .?AVeCGuiPanel2@@ '' id=65535 pos=627,0 size=313x193 text=Магия кристаллов
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,148 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,128 size=135x16 text=-frostball-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,120 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,104 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,84 size=135x16 text=-feuerball-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,76 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=117,60 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=116,40 size=135x16 text=-magisches geschoss-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=69,32 size=45x41
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=627x193 text=Владение оружием
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=372,116 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=372,96 size=135x16 text=-armbrustkampf-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=324,88 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=372,70 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=372,50 size=135x16 text=-bogenkampf-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=324,42 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=178,148 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=178,128 size=135x16 text=-stabkampf-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=130,120 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=178,104 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=178,84 size=135x16 text=-axtkampf-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=130,76 size=45x41
+      .?AVgCSkillProgressBar@@ '' id=65535 pos=178,60 size=120x12
+      .?AVgCSkillPicbox@@ '' id=65535 pos=178,40 size=135x16 text=-schwertkampf-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=130,32 size=45x41
+  .?AVgCPageCloseButton@@ '' id=1001 pos=1285,-48 size=32x37
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-10,-48 size=36x37
+  .?AVgCLocIDLabel@@ '' id=65535 pos=493,-43 size=312x25 text=-character-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=941,250 size=380x430 text=-inventory panel-
+    .?AVeCGuiPanel2@@ '' id=65535 pos=5,0 size=365x73
+      .?AVgCFilterButton@@ '' id=65535 pos=253,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=300,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=204,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=107,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=57,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=11,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=155,3 size=51x64
+    .?AVeCGuiPanel2@@ '' id=65535 pos=5,60 size=365x370
+      .?AVgCInventoryList@@ '' id=65535 pos=25,38 size=310x250 text=ListCtrl
+      .?AVgCInvAmountPicbox@@ '' id=65535 pos=53,13 size=127x20 text=-gold amount-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=28,15 size=20x20
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=307,290 size=33x16 text=0
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=266,290 size=33x16 text=9
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=225,290 size=33x16 text=8
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=184,290 size=33x16 text=7
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=143,290 size=33x16 text=6
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=102,290 size=33x16 text=5
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=61,290 size=33x16 text=4
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=21,290 size=33x16 text=3
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=17,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=58,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=99,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=140,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=181,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=222,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=263,306 size=40x40 text=888
+      .?AVgCQuickPicbox2@@ '' id=65535 pos=304,306 size=40x40 text=888
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=1305x250
+    .?AVeCGuiPanel2@@ '' id=65535 pos=867,0 size=444x244
+      .?AVgCSkillPicbox@@ '' id=65535 pos=37,-1 size=370x20 text=-erfahrung-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=14,191 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=39,192 size=391x24 text=-prot magic-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=39,161 size=391x24 text=-prot ice-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=14,160 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=14,129 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=39,130 size=391x24 text=-prot fire-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=39,99 size=391x24 text=-prot point-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=14,98 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=14,67 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=39,68 size=391x24 text=-prot blunt-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=39,37 size=391x24 text=-prot edge-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=14,36 size=25x25
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=448x244
+      .?AVgCSkillPicbox@@ '' id=65535 pos=329,0 size=78x20 text=- level -
+      .?AVgCMiscLabel@@ '' id=65535 pos=40,0 size=166x20 text=-gilde-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=405,191 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=405,160 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=405,129 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=405,98 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=405,67 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=405,36 size=25x25
+      .?AVgCSkillPicbox@@ '' id=65535 pos=13,37 size=387x24 text=-staerke-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=13,68 size=387x24 text=-geschick-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=13,99 size=387x24 text=-weisheit-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=13,130 size=387x24 text=-mana-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=13,161 size=387x24 text=-leben-
+      .?AVgCSkillPicbox@@ '' id=65535 pos=13,192 size=387x24 text=-lernpunkte-
+    .?AVeCGuiPanel2@@ '' id=65535 pos=510,0 size=290x241
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=19,60 size=44x44
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=19,116 size=44x44
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=31,180 size=29x29
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=231,184 size=29x29
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=231,116 size=44x44
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=231,60 size=44x44
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=127,4 size=44x44
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=135,64 size=29x29
+      .?AVgCEquipPicbox2@@ '' id=65535 pos=127,148 size=44x44
+      .?AVeCGuiStatic2@@ '' id=65535 pos=56,20 size=187x203
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-8,-20 size=1325x704
+.?AVgCHudPage2@@ 'PAGE_GAME_TRADE' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_TRADE
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=519,657 size=190x28 text=Вернуть товар
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=519,622 size=190x28 text=Оплатить товар
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=519,692 size=190x28 text=Выход
+  .?AVeCGuiPanel2@@ '' id=65535 pos=10,10 size=365x240 text=Купить
+    .?AVgCInventoryList@@ '' id=65535 pos=27,54 size=311x162 text=-player purchase-
+    .?AVeCGuiPanel2@@ '' id=65535 pos=32,32 size=20x20
+    .?AVgCInvAmountPicbox@@ '' id=65535 pos=62,32 size=252x20 text=-einkaufswert-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=853,10 size=365x240 text=Продать
+    .?AVgCInventoryList@@ '' id=65535 pos=27,54 size=311x162 text=-player sale-
+    .?AVeCGuiPanel2@@ '' id=65535 pos=32,32 size=20x20
+    .?AVgCInvAmountPicbox@@ '' id=65535 pos=62,32 size=252x20 text=-verkaufswert-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=10,256 size=365x425 text=Торговец
+    .?AVgCInventoryList@@ '' id=65535 pos=27,60 size=311x338 text=-trader inventory-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=838,256 size=380x425
+    .?AVeCGuiPanel2@@ '' id=65535 pos=15,0 size=365x70
+      .?AVgCFilterButton@@ '' id=65535 pos=303,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=254,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=205,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=156,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=107,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=58,3 size=51x64
+      .?AVgCFilterButton@@ '' id=65535 pos=10,3 size=51x64
+    .?AVeCGuiPanel2@@ '' id=65535 pos=15,60 size=365x365
+      .?AVgCInventoryList@@ '' id=65535 pos=27,44 size=311x294 text=-player inventory-
+      .?AVgCInvAmountPicbox@@ '' id=65535 pos=62,22 size=252x20 text=-gold amount-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=32,22 size=20x20
+.?AVgCHudPage2@@ 'PAGE_GAME_LOG_C' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_LOG
+  .?AVeCGuiStatic2@@ '' id=65535 pos=237,53 size=890x662
+    .?AVeCGuiStatic2@@ '' id=65535 pos=20,16 size=36x37
+    .?AVgCPageCloseButton@@ '' id=1001 pos=839,20 size=32x32
+    .?AVeCGuiStatic2@@ '' id=65535 pos=19,47 size=851x598
+      .?AVeCGuiPanel2@@ '' id=667 pos=404,15 size=445x580 text=Карта
+        .?AVeCGuiPanel2@@ '' id=65535 pos=0,69 size=445x490
+          .?AVgCMapLabel@@ '' id=65535 pos=0,0 size=405x480
+        .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=445x58
+          .?AVeCGuiStatic2@@ '' id=45 pos=9,29 size=40x40
+          .?AVeCGuiStatic2@@ '' id=46 pos=394,29 size=40x40
+          .?AVgCFilterButton@@ '' id=23 pos=278,30 size=115x45 text=Задания
+          .?AVgCFilterButton@@ '' id=22 pos=163,30 size=115x45 text=Область
+          .?AVgCFilterButton@@ '' id=21 pos=48,30 size=115x45 text=Карта мира
+        .?AVeCGuiPanel2@@ '' id=65535 pos=0,58 size=445x22
+      .?AVgCLocIDLabel@@ '' id=65535 pos=281,-49 size=412x25 text=-questLog-
+      .?AVeCGuiPanel2@@ '' id=65535 pos=2,15 size=405x580 text=Обзор
+        .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=405x58
+          .?AVeCGuiStatic2@@ '' id=42 pos=7,29 size=40x40
+          .?AVeCGuiStatic2@@ '' id=43 pos=351,29 size=40x40
+          .?AVeCGuiStatic2@@ '' id=65535 pos=49,28 size=402x47
+            .?AVgCFilterButton@@ '' id=4 pos=301,1 size=100x45 text=Учителя
+            .?AVgCFilterButton@@ '' id=3 pos=201,1 size=100x45 text=Торговцы
+            .?AVgCFilterButton@@ '' id=2 pos=101,1 size=100x45 text=Выполнено
+            .?AVgCFilterButton@@ '' id=1 pos=1,1 size=100x45 text=Текущее
+          .?AVeCGuiPanel2@@ '' id=65535 pos=0,58 size=405x22
+          .?AVeCGuiPanel2@@ '' id=65535 pos=0,69 size=405x490
+            .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=365x57
+              .?AVeCGuiStatic2@@ '' id=65535 pos=298,13 size=20x20
+              .?AVeCGuiStatic2@@ '' id=65535 pos=11,12 size=20x20
+              .?AVgCFilterButton@@ '' id=11 pos=39,0 size=47x47
+              .?AVgCFilterButton@@ '' id=12 pos=91,0 size=47x47
+              .?AVgCFilterButton@@ '' id=13 pos=143,0 size=47x47
+              .?AVgCFilterButton@@ '' id=14 pos=195,0 size=47x47
+              .?AVgCFilterButton@@ '' id=15 pos=245,0 size=47x47
+            .?AVgCLogListCtrl@@ '' id=30 pos=0,57 size=365x215 text=log quest list
+            .?AVgCQuestLogFrame2@@ '' id=31 pos=0,265 size=365x215 text=-log quest info-
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_C' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS
+  .?AVeCScriptRadioButton@@ '' id=11 pos=258,710 size=164x23 text=Графика
+  .?AVeCScriptRadioButton@@ '' id=12 pos=430,710 size=164x23 text=Звук
+  .?AVeCScriptRadioButton@@ '' id=14 pos=774,710 size=164x23 text=Параметры игры
+  .?AVeCScriptRadioButton@@ '' id=13 pos=602,710 size=164x23 text=Управление
+  .?AVeCScriptRadioButton@@ '' id=15 pos=946,710 size=164x23 text=Производительность
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=763,653 size=153x41 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=447,653 size=153x41 text=Игра
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=605,652 size=153x64 text=Настройки
+  .?AVeCScriptRadioButton@@ '' id=1 pos=289,653 size=153x41 text=Продолжить
+  .?AVeCGuiStatic2@@ '' id=65535 pos=234,706 size=896x32
+  .?AVeCScriptRadioButton@@ '' id=5 pos=921,653 size=153x41 text=Выход
+.?AVgCHudPage2@@ 'PAGE_GAME_DIALOG_C' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_DIALOG
+  .?AVeCGuiPanel2@@ '' id=2 pos=0,668 size=1365x100
+    .?AVeCGuiStatic2@@ '' id=1001 pos=390,7 size=25x25
+    .?AVgCDialogListCtrl2@@ '' id=1 pos=247,10 size=870x85 text=ListCtrl
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=430,710 size=164x23 text=Звук
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=258,710 size=164x23 text=Графика
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=602,710 size=164x23 text=Управление
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=774,710 size=164x23 text=Параметры игры
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=946,710 size=164x23 text=Производительность
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=763,653 size=153x41 text=Авторы
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=447,653 size=153x41 text=Игра
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=289,653 size=153x41 text=Продолжить
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=921,653 size=153x41 text=Выход
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=606,652 size=153x63 text=Настройки
+  .?AVeCGuiStatic2@@ '' id=65535 pos=234,706 size=896x32
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_ACHIEVEMENT_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Достижения
+  .?AVgCAchievementBar@@ '' id=65535 pos=682,581 size=350x41 text=ProgressBar
+  .?AVgCAchievementBar@@ '' id=65535 pos=331,581 size=350x41 text=ProgressBar
+  .?AVgCAchievementList2@@ 'ACHIEVEMENT LISTCTRL' id=25 pos=332,176 size=698x410
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=4,24 size=795x470
+.?AVgCHudPage2@@ 'DLG_MENU_BACK_C' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=495,690 size=316x351
+  .?AVeCGuiStatic2@@ '' id=65535 pos=162,680 size=292x232
+  .?AVeCGuiStatic2@@ '' id=65535 pos=958,692 size=224x257
+  .?AVeCGuiStatic2@@ '' id=65535 pos=544,-6 size=216x92
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-550,692 size=2200x140
+  .?AVeCGuiStatic2@@ '' id=65535 pos=0,691 size=1365x140
+  .?AVeCGuiStatic2@@ '' id=65535 pos=466,27 size=464x167
+.?AVgCHudDialog2@@ 'MOD_WAIT_C' id=0 pos=0,0 size=1365x768 text=MOD_WAIT_C
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,90 size=300x30 text=Пожалуйста, подождите
+.?AVgCHudDialog2@@ 'MOD_ACTION_WAIT_C' id=0 pos=0,0 size=1365x768 text=MOD_ACTION_WAIT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVgCModalResultButton@@ '' id=65535 pos=148,160 size=140x32 text=-Ok-
+      .?AVgCPageCloseButton@@ '' id=65535 pos=1,0 size=32x32
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,36 size=300x125 text=-blah blah blah-
+.?AVgCHudDialog2@@ 'MOD_ACTION_AUTOSAVE_C' id=0 pos=0,0 size=1365x768 text=MOD_ACTION_AUTOSAVE
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVgCModalResultButton@@ '' id=65535 pos=148,160 size=140x32 text=-Ok-
+      .?AVgCPageCloseButton@@ '' id=65535 pos=1,0 size=32x32
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,36 size=300x125 text=-blah blah blah-
+.?AVgCHudPage2@@ 'PAGE_GAME_TALK' id=0 pos=0,0 size=1365x768 text=PAGE_GAME_TALK
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=1365x82
+    .?AVeCScriptStatic@@ '' id=65535 pos=9,41 size=1343x43 text=This is an incredibly long speech text. You know, one of those you don't really read because it's just too much to be bothered with... Nevertheless, some idiot wrote it and expects you to read all those words ....
+    .?AVeCScriptStatic@@ '' id=65535 pos=9,18 size=1343x24 text=Who's talking to me ???
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_LOAD' id=0 pos=0,0 size=1365x768 text=DLG_MENU_PAGE_LOAD
+  .?AVgCSavegameListCtrl2@@ '' id=65535 pos=332,176 size=698x410 text=Item 000
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Загрузить
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=4,24 size=795x470
+.?AVgCHudPage2@@ 'DLG_MENU_GAME_ACHIEVEMENT' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Достижения
+  .?AVgCAchievementBar@@ '' id=65535 pos=682,581 size=350x41 text=ProgressBar
+  .?AVgCAchievementBar@@ '' id=65535 pos=331,581 size=350x41 text=ProgressBar
+  .?AVgCAchievementList2@@ 'ACHIEVEMENT LISTCTRL' id=65535 pos=332,176 size=698x410
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=4,24 size=795x470
+.?AVgCHudPage2@@ 'PAGE_GAME_LOG' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiPanel2@@ '' id=65535 pos=627,0 size=688x673 text=Карта
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,80 size=688x583
+      .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=648x57
+        .?AVeCGuiStatic2@@ '' id=65535 pos=129,-40 size=259x109
+      .?AVgCMapLabel@@ '' id=65535 pos=0,57 size=648x506
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=688x58
+      .?AVgCFilterButton@@ '' id=65535 pos=300,30 size=140x45 text=Задания
+      .?AVgCFilterButton@@ '' id=65535 pos=160,30 size=140x45 text=Область
+      .?AVgCFilterButton@@ '' id=65535 pos=20,30 size=140x45 text=Карта мира
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,58 size=688x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-5,-52 size=36x36
+  .?AVgCPageCloseButton@@ '' id=1001 pos=1290,-53 size=32x37
+  .?AVgCLocIDLabel@@ '' id=65535 pos=451,-10 size=412x25 text=-questLog-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=627x673 text=Обзор
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=627x58
+      .?AVgCFilterButton@@ '' id=65535 pos=338,30 size=106x45 text=Учителя
+      .?AVgCFilterButton@@ '' id=65535 pos=232,30 size=106x45 text=Торговцы
+      .?AVgCFilterButton@@ '' id=65535 pos=126,30 size=106x45 text=Выполнено
+      .?AVgCFilterButton@@ '' id=65535 pos=20,30 size=106x45 text=Текущее
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,58 size=627x22
+    .?AVeCGuiPanel2@@ '' id=65535 pos=0,80 size=627x583
+      .?AVeCGuiPanel2@@ '' id=65535 pos=0,0 size=587x57
+        .?AVeCGuiStatic2@@ '' id=65535 pos=356,-27 size=132x81
+        .?AVgCFilterButton@@ '' id=65535 pos=0,0 size=47x47
+        .?AVgCFilterButton@@ '' id=65535 pos=57,0 size=47x47
+        .?AVgCFilterButton@@ '' id=65535 pos=114,0 size=47x47
+        .?AVgCFilterButton@@ '' id=65535 pos=171,0 size=47x47
+        .?AVgCFilterButton@@ '' id=65535 pos=228,0 size=47x47
+      .?AVgCLogListCtrl@@ '' id=65535 pos=0,57 size=587x300 text=log quest list
+      .?AVgCQuestLogFrame2@@ '' id=0 pos=0,357 size=587x206 text=-log quest info-
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-4,-23 size=1325x704
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_SETTINGS' id=0 pos=0,0 size=1365x768 text=DLG_MENU_OPTIONS_SETTINGS
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Параметры игры
+  .?AVgCSpinButton@@ '' id=65535 pos=931,368 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,398 size=16x22
+  .?AVgCSpinButton@@ '' id=1006 pos=678,368 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=1007 pos=678,398 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,368 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,398 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,367 size=307x24 text=Сообщения о достижениях
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,397 size=307x24 text=Режим Контроллера
+  .?AVgCSpinButton@@ '' id=65535 pos=931,339 size=16x22
+  .?AVgCSpinButton@@ '' id=1005 pos=678,339 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,339 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,338 size=307x24 text=Текст обучения
+  .?AVgCSpinButton@@ '' id=65535 pos=931,310 size=16x22
+  .?AVgCSpinButton@@ '' id=1004 pos=678,310 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,310 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,280 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,280 size=16x22
+  .?AVgCSpinButton@@ '' id=1003 pos=678,280 size=253x22 text=On/Off
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,308 size=307x24 text=Сложность игры
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,279 size=307x24 text=Отображение субтитров
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,180 size=250x25 text=Параметры игры
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,218 size=307x24 text=Инверсия вертикальной оси
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,248 size=307x24 text=Подсветка предметов
+  .?AVgCSpinButton@@ '' id=1001 pos=678,220 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=662,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=931,220 size=16x22
+  .?AVgCSpinButton@@ '' id=65535 pos=662,250 size=16x22
+  .?AVgCSpinButton@@ '' id=1002 pos=678,250 size=253x22 text=On/Off
+  .?AVgCSpinButton@@ '' id=65535 pos=931,250 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=315,428 size=250x25 text=Языки
+  .?AVgCSpinButton@@ '' id=65535 pos=931,498 size=16x22
+  .?AVgCSpinButton@@ '' id=1009 pos=678,498 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,498 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,497 size=310x24 text=Язык текста
+  .?AVgCSpinButton@@ '' id=65535 pos=931,468 size=16x22
+  .?AVgCSpinButton@@ '' id=1008 pos=678,468 size=253x22 text=Quality
+  .?AVgCSpinButton@@ '' id=65535 pos=662,468 size=16x22
+  .?AVeCGuiStatic2@@ '' id=65535 pos=353,467 size=310x24 text=Язык голоса
+  .?AVeCScriptRadioButton@@ '' id=1010 pos=662,528 size=285x28 text=Применить
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudPage2@@ 'DLG_OUTRO' id=0 pos=0,0 size=1365x768 text=DLG_OUTRO
+  .?AVgCCreditsLabel2@@ '' id=65535 pos=200,30 size=964x708 text=Static
+.?AVgCHudDialog2@@ 'MOD_ACTION_ACCEPT_C' id=0 pos=0,0 size=1365x768 text=MOD_ACTION_ACCEPT
+  .?AVeCGuiPanel2@@ '' id=65535 pos=457,279 size=450x210
+    .?AVgCModalResultButton@@ '' id=65535 pos=288,160 size=140x32 text=-nein-
+      .?AVgCPageCloseButton@@ '' id=65535 pos=-1,0 size=32x32
+    .?AVgCModalResultButton@@ '' id=65535 pos=68,160 size=140x32 text=-ja-
+      .?AVgCPageCloseButton@@ '' id=65535 pos=0,0 size=32x32
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,36 size=400x125 text=-blah blah blah-
+    .?AVeCScriptStatic@@ '' id=65535 pos=65,0 size=320x20 text=-aktion-
+.?AVgCHudPopUp2@@ 'POP_DIALOG' id=65535 pos=0,0 size=240x260 text=POP_DIALOG
+  .?AVgCDialogInfo@@ '' id=65535 pos=0,0 size=230x50 text=-header-
+  .?AVgCDialogInfo@@ '' id=65535 pos=0,50 size=230x50 text=-description
+  .?AVgCDialogInfo@@ '' id=65535 pos=0,100 size=230x50 text=-next level-
+  .?AVgCDialogInfo@@ '' id=65535 pos=0,150 size=230x50 text=-learn points-
+  .?AVgCDialogInfo@@ '' id=65535 pos=0,200 size=230x50 text=-gold costs-
+.?AVgCHudPopUp2@@ 'POP_CRAFTITEM' id=65535 pos=0,0 size=275x460 text=POP_CRAFTITEM
+  .?AVgCItemInfo@@ '' id=65535 pos=0,0 size=265x50 text=-header-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,50 size=265x50 text=-description-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,100 size=265x50 text=-modify skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,150 size=265x50 text=-damage-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,200 size=265x50 text=-required skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,250 size=265x50 text=-required mana-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,400 size=265x50 text=-gold value-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,300 size=265x50 text=-ingredients-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,350 size=265x50 text=-craft required skills-
+.?AVgCHudPage2@@ 'DLG_OUTRO_C' id=0 pos=0,0 size=1365x768 text=DLG_OUTRO
+  .?AVgCCreditsLabel2@@ '' id=65535 pos=200,30 size=964x708 text=Static
+.?AVgCHudPage2@@ 'PAGE_GAME_MAIN_C' id=0 pos=68,38 size=1228x691 text=PAGE_GAME_MAIN
+  .?AVgCSavePicbox2@@ '' id=65535 pos=298,394 size=620x64 text=Сохранение...
+  .?AVeCGuiPanel2@@ '' id=65535 pos=102,20 size=1024x92
+    .?AVgCCompassPicbox2@@ '' id=65535 pos=932,0 size=92x92
+  .?AVeCGuiPanel2@@ '' id=65535 pos=102,466 size=1024x92
+    .?AVgCTutorialLabel2@@ '' id=65535 pos=196,0 size=620x92
+  .?AVgCLockpickStatic2@@ '' id=65535 pos=102,-38 size=50x50 text=-lockpick info-
+  .?AVeCGuiPanel2@@ '' id=65535 pos=102,559 size=1024x130
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=381,85 size=238x21
+    .?AVgCStaticBitmap@@ '' id=20 pos=-4,42 size=46x46
+    .?AVgCStaticBitmap@@ '' id=21 pos=989,56 size=22x22
+    .?AVgCStaticBitmap@@ '' id=22 pos=967,41 size=22x22
+    .?AVgCStaticBitmap@@ '' id=23 pos=967,68 size=22x22
+    .?AVgCStaticBitmap@@ '' id=24 pos=945,56 size=22x22
+    .?AVgCQuickPicbox2@@ '' id=10 pos=1012,49 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=9 pos=962,91 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=8 pos=961,7 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=7 pos=912,51 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=6 pos=3,91 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=5 pos=52,51 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=4 pos=-48,51 size=32x32 text=888
+    .?AVgCQuickPicbox2@@ '' id=3 pos=3,7 size=32x32 text=888
+    .?AVgCEquipPicbox2@@ '' id=31 pos=720,54 size=32x32 text=888
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=218,53 size=32x32
+    .?AVgCEquipPicbox2@@ '' id=30 pos=732,66 size=46x46
+    .?AVgCEquipPicbox2@@ '' id=65535 pos=232,66 size=46x46
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=285,103 size=220x30
+    .?AVgCMiscProgressBar@@ '' id=65535 pos=504,103 size=221x30
+  .?AVgCMiscProgressBar@@ '' id=65535 pos=502,20 size=200x21
+  .?AVgCLootStatic2@@ '' id=65535 pos=77,73 size=800x200 text=-loot info-
+.?AVgCHudDialog2@@ 'MOD_ACCEPTTRADE' id=0 pos=0,0 size=1365x768 text=MOD_ACCEPTTRADE
+  .?AVeCGuiPanel2@@ '' id=65535 pos=507,279 size=350x210
+    .?AVgCModalResultButton@@ '' id=65535 pos=28,181 size=140x32 text=-ja-
+    .?AVgCModalResultButton@@ '' id=65535 pos=184,181 size=140x32 text=-nein-
+    .?AVgCLocIDLabel@@ '' id=65535 pos=65,0 size=220x20 text=-handel abschliessen-
+    .?AVeCScriptStatic@@ '' id=65535 pos=25,40 size=300x125 text=-blah blah blah-
+.?AVgCHudPopUp2@@ 'POP_INVITEM_C' id=65535 pos=0,0 size=275x460 text=POP_INVITEM
+  .?AVgCItemInfo@@ '' id=65535 pos=0,0 size=265x50 text=-header-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,50 size=265x50 text=-description-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,100 size=265x50 text=-modify skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,150 size=265x50 text=-damage-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,200 size=265x50 text=-required skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,250 size=265x50 text=-required mana-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,300 size=265x50 text=-ingredients-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,350 size=265x50 text=-craft required skills-
+  .?AVgCItemInfo@@ '' id=65535 pos=0,400 size=265x50 text=-gold value-
+.?AVgCHudPage2@@ 'DLG_MENU_OPTIONS_INPUT' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=522,139 size=310x24 text=Управление
+  .?AVeCScriptRadioButton@@ '' id=65535 pos=820,581 size=210x28 text=Сбросить
+  .?AVgCActionKeyListCtrl2@@ '' id=65535 pos=332,189 size=698x387 text=ListCtrl
+  .?AVeCGuiPanel2@@ '' id=65535 pos=282,140 size=800x500
+    .?AVeCGuiStatic2@@ '' id=65535 pos=3,23 size=795x470
+  .?AVeCGuiStatic2@@ '' id=65535 pos=378,372 size=228x213
+  .?AVeCGuiStatic2@@ '' id=65535 pos=490,240 size=376x336
+  .?AVeCGuiStatic2@@ '' id=65535 pos=298,168 size=172x168
+  .?AVeCGuiStatic2@@ '' id=65535 pos=854,164 size=220x236
+.?AVgCHudPage2@@ 'PAGE_LOADING' id=0 pos=0,0 size=1365x768 text=PAGE_LOADING
+  .?AVgCHintStatic@@ '' id=65535 pos=227,703 size=879x56
+  .?AVeCGuiStatic2@@ '' id=65535 pos=544,-6 size=216x92
+  .?AVeCGuiStatic2@@ '' id=65535 pos=466,27 size=464x167
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-567,-64 size=2200x136
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-586,693 size=2200x136
+  .?AVeCGuiStatic2@@ '' id=65535 pos=887,667 size=37x30
+  .?AVeCGuiStatic2@@ '' id=65535 pos=440,667 size=37x30
+  .?AVeCScriptProgressbar@@ '' id=65535 pos=472,670 size=420x23 text=Loading...
+  .?AVeCGuiStatic2@@ '' id=65535 pos=0,-62 size=1365x138
+  .?AVeCGuiStatic2@@ '' id=65535 pos=0,691 size=1365x140
+  .?AVgCHintStatic@@ '' id=65535 pos=0,0 size=1365x768
+.?AVgCHudPage2@@ 'DLG_MENU_BACK' id=0 pos=0,0 size=1365x768
+  .?AVeCGuiStatic2@@ '' id=65535 pos=495,690 size=316x351
+  .?AVeCGuiStatic2@@ '' id=65535 pos=162,680 size=292x232
+  .?AVeCGuiStatic2@@ '' id=65535 pos=958,692 size=224x257
+  .?AVeCGuiStatic2@@ '' id=65535 pos=544,-6 size=216x92
+  .?AVeCGuiStatic2@@ '' id=65535 pos=-550,692 size=2200x140
+  .?AVeCGuiStatic2@@ '' id=65535 pos=0,691 size=1365x140
+  .?AVeCGuiStatic2@@ '' id=65535 pos=466,27 size=464x167
+==== page 13: 1355 windows

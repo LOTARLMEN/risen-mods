@@ -9,8 +9,9 @@
 
 // Call from DllMain (patches the imports of Engine.dll and Risen.exe).
 bool InputCaptureInstall();
-// Game thread. Turning capture on frees the cursor inside the window; turning it off puts it back.
-void InputCaptureSet(HWND hwnd, bool on);
+// Game thread. Turning capture on frees the cursor inside the window; turning it off puts it back where it was
+// (unless restoreCursor is false: in the game's menus the cursor is visible and should stay where the user left it).
+void InputCaptureSet(HWND hwnd, bool on, bool restoreCursor = true);
 bool InputCaptured();
 // Call first in the subclassed window procedure: true means the message was swallowed, return *result.
 bool InputCaptureFilter(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp, LRESULT* result);

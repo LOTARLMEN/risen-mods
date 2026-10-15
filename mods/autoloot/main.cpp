@@ -40,12 +40,18 @@ static const char kDefaultIni[] =
     "; Also loot dead bodies / open chests that belong to nobody within the radius\r\n"
     "Bodies=0\r\n"
     "Chests=0\r\n"
+    "; With Bodies=1: also people knocked out in a non-lethal fight, when the game lets you search them\r\n"
+    "KnockedOut=1\r\n"
     "; 1 = only in front of you: a cone around the camera's view, ConeAngle degrees wide (things right at your feet\r\n"
     "; are always taken). 0 = the whole circle around you\r\n"
     "Cone=1\r\n"
     "ConeAngle=120\r\n"
     "; Also quest items (on the ground, in bodies and chests). Chests you unlocked yourself are always left to you.\r\n"
     "QuestItems=0\r\n"
+    "\r\n"
+    "[Indicator]\r\n"
+    "; Hand in the top-left corner while AutoLoot is on (needs the Risen Mods menu, menu.dll)\r\n"
+    "Show=1\r\n"
     "\r\n"
     "[Filter]\r\n"
     "; What AutoLoot picks up from the ground (QuickLoot always takes what you look at; bodies and chests are\r\n"
@@ -94,6 +100,7 @@ struct Config {
     int autoKey = 'F';
     float autoRadius = 300.0f;
     bool autoBodies = false;
+    bool autoDown = true; // knocked-out people too (with autoBodies)
     bool autoChests = false;
     bool autoCone = true;
     float coneAngle = 120.0f;
@@ -109,6 +116,7 @@ struct Config {
     float dumpRadius = 1500.0f;
     int effectTestKey = 0;
     bool emptyMark = true;
+    bool indicator = true; // hand icon (menu.dll draws it)
     wchar_t emptyText[48] = {};
 };
 
@@ -140,10 +148,12 @@ static void ConfigLoad(bool first)
     c.autoKey = IniKey("AutoLoot", "ToggleKey", 'F');
     c.autoRadius = Clamp(IniFloat("AutoLoot", "Radius", 300.0f), 100.0f, 3000.0f);
     c.autoBodies = IniInt("AutoLoot", "Bodies", 0) != 0;
+    c.autoDown = IniInt("AutoLoot", "KnockedOut", 1) != 0;
     c.autoChests = IniInt("AutoLoot", "Chests", 0) != 0;
     c.autoCone = IniInt("AutoLoot", "Cone", 1) != 0;
     c.coneAngle = Clamp(IniFloat("AutoLoot", "ConeAngle", 120.0f), 30.0f, 360.0f);
     c.autoQuest = IniInt("AutoLoot", "QuestItems", 0) != 0;
+    c.indicator = IniInt("Indicator", "Show", 1) != 0;
     c.takeGold = IniInt("Filter", "Gold", 1) != 0;
     c.takeAmmo = IniInt("Filter", "Ammo", 1) != 0;
     c.takeWeapons = IniInt("Filter", "Weapons", 1) != 0;
@@ -442,6 +452,17 @@ static bool IsDeadBody(const Entity& e)
     return g_game.isNpc(&e) && g_game.isDead(&e) && g_game.invValid(&e) && g_game.invStackCount(&e) > 0;
 }
 
+// Knocked out (non-lethal fight) and carrying something. Only QuickLoot takes from them, and only when the game
+// itself lets the player interact (the same check the focus makes before LMB opens the loot window).
+static bool IsDownBody(Entity& player, const Entity& e)
+{
+    if (!g_game.isNpc(&e) || g_game.isDead(&e) || !g_game.isDown(&e) || !g_game.invValid(&e) ||
+        g_game.invStackCount(&e) <= 0)
+        return false;
+    Entity other = e;
+    return g_game.canInteractWith(&player, &other);
+}
+
 // Chests seen locked. Once the player unlocks one (key, lockpick), it is theirs to open: AutoLoot used to empty
 // it the moment the lock opened, right under the open loot window.
 static std::unordered_map<void*, bool> g_wasLocked;
@@ -512,7 +533,8 @@ static void PickUp(Entity& player, Entity e, const char* who)
     Log("%s: %s x%lu (category %d) -> stack %d", who, name, amount, category, slot);
 }
 
-static void QuickLoot()
+// repeat = the key is held: the same as a press, but silent about what can't be looted (no log spam).
+static void QuickLoot(bool repeat)
 {
     Entity player;
     if (!g_config.quickLoot || !GameReady(&player))
@@ -522,7 +544,8 @@ static void QuickLoot()
     if (!target)
         return;
     if (int mode = CombatMode(player)) { // weapon drawn: no looting in a fight, the key is Action 2 there
-        Log("quickloot: skipped, combat mode %d", mode);
+        if (!repeat)
+            Log("quickloot: skipped, combat mode %d", mode);
         return;
     }
     char name[96], why[256];
@@ -534,7 +557,8 @@ static void QuickLoot()
             PickUp(player, target, "quickloot");
         return;
     }
-    bool body = IsDeadBody(target), chest = !body && g_config.quickChests && IsOpenChest(target);
+    bool down = IsDownBody(player, target);
+    bool body = down || IsDeadBody(target), chest = !body && g_config.quickChests && IsOpenChest(target);
     // A locked chest nobody owns, and the player has its key: open it with the key, like the game would.
     if (!body && !chest && g_config.quickChests && IsLocked(target) && !g_game.isNpc(&target) && !HasOwner(target) &&
         g_game.invValid(&target) && UnlockWithKey(player, target)) {
@@ -542,16 +566,20 @@ static void QuickLoot()
         chest = IsOpenChest(target);
     }
     if (!body && !chest) {
-        Log("quickloot: focus %s is not lootable (%s)", name, WhyNot(target, why, sizeof(why)));
+        if (!repeat)
+            Log("quickloot: focus %s is not lootable (%s)", name, WhyNot(target, why, sizeof(why)));
         return;
     }
+    if (repeat && !HasLoot(target))
+        return; // already emptied by the first press
     if (chest && !TheftAllowed(target, name))
         return;
     SparkleKind kind = ContainerSparkle(target, true);
     int64_t moved = ScriptAutoLoot(player, target), quest = LootQuestStacks(player, target);
     if (moved + quest > 0)
         Sparkle(EntityPosition(target), kind, kContainerSparkleSize);
-    Log("quickloot: %s %s -> %lld stacks, %lld quest", body ? "body" : "chest", name, moved, quest);
+    Log("quickloot: %s %s -> %lld stacks, %lld quest", down ? "knocked-out" : body ? "body" : "chest", name, moved,
+        quest);
 }
 
 // Items are only taken once they lie still: seen at the same spot on two ticks in a row (~0.25 s). Catches anything
@@ -631,7 +659,7 @@ static void AutoLootTick()
                 }
             }
         }
-        bool body = g_config.autoBodies && IsDeadBody(n.e);
+        bool body = g_config.autoBodies && (IsDeadBody(n.e) || (g_config.autoDown && IsDownBody(player, n.e)));
         bool chest = !body && g_config.autoChests && !g_wasLocked.count(n.e.e) && IsOpenChest(n.e) &&
                      !WouldBeTheft(n.e);
         if (!body && !chest)
@@ -686,41 +714,47 @@ static const HubItem kItems[] = {
     /* 8 */ {HubSlider, "AutoLoot", "Radius", "Radius", "Радиус", 300, 1.0f, 30.0f, 0.5f, 0.01f, "%.1f m", 6},
     /* 9 */ {HubCheckbox, "AutoLoot", "Bodies", "Also search dead bodies", "Обыскивать трупы", 0, 0, 0, 0, 0,
              nullptr, 6},
-    /*10 */ {HubCheckbox, "AutoLoot", "Chests", "Also empty open chests", "Опустошать открытые сундуки", 0, 0, 0, 0,
+    /*10 */ {HubCheckbox, "AutoLoot", "KnockedOut", "Also people knocked out", "И вырубленных в драке", 1, 0, 0, 0,
+             0, nullptr, 9, "Knocked out in a non-lethal fight, only when the game lets you search them",
+             "Побеждённых в драке не насмерть - только когда игра сама даёт их обыскать"},
+    /*11 */ {HubCheckbox, "AutoLoot", "Chests", "Also empty open chests", "Опустошать открытые сундуки", 0, 0, 0, 0,
              0, nullptr, 6, "Only chests that belong to nobody and are not locked",
              "Только ничьи и не запертые сундуки"},
-    /*11 */ {HubCheckbox, "AutoLoot", "Active", "On at game start", "Включён при запуске игры", 0, 0, 0, 0, 0,
+    /*12 */ {HubCheckbox, "AutoLoot", "Active", "On at game start", "Включён при запуске игры", 0, 0, 0, 0, 0,
              nullptr, 6},
-    /*12 */ {HubCheckbox, "AutoLoot", "Cone", "Only in front of you", "Только впереди", 1, 0, 0, 0, 0, nullptr, 6,
+    /*13 */ {HubCheckbox, "AutoLoot", "Cone", "Only in front of you", "Только впереди", 1, 0, 0, 0, 0, nullptr, 6,
              "A cone around where the camera looks; off = the whole circle. Things at your feet are always taken.",
              "Конус по направлению камеры; выключено = весь круг. То, что прямо под ногами, берётся всегда."},
-    /*13 */ {HubSlider, "AutoLoot", "ConeAngle", "Cone width", "Ширина конуса", 120, 30, 360, 5, 0, "%.0f°", 12},
-    /*14 */ {HubCheckbox, "AutoLoot", "QuestItems", "Also quest items", "Подбирать и квестовые предметы", 0, 0, 0, 0,
+    /*14 */ {HubSlider, "AutoLoot", "ConeAngle", "Cone width", "Ширина конуса", 120, 30, 360, 5, 0, "%.0f°", 13},
+    /*15 */ {HubCheckbox, "AutoLoot", "QuestItems", "Also quest items", "Подбирать и квестовые предметы", 0, 0, 0, 0,
              0, nullptr, 6, "On the ground, in bodies and chests. Chests you unlocked yourself are left to you.",
              "С земли, из трупов и сундуков. Сундуки, которые ты отпер сам, автолут не трогает."},
-    /*15 */ {HubHeader, nullptr, nullptr, "What AutoLoot picks up", "Что подбирает автолут"},
-    /*16 */ {HubNote, nullptr, nullptr, "Items on the ground. QuickLoot always takes what you look at.",
+    /*16 */ {HubCheckbox, "Indicator", "Show", "Hand in the corner while it is on", "Рука в углу, пока он включён", 1,
+             0, 0, 0, 0, nullptr, 6, "The status icon in the top-left corner (needs the Risen Mods menu)",
+             "Значок в левом верхнем углу (нужно меню Risen Mods)"},
+    /*17 */ {HubHeader, nullptr, nullptr, "What AutoLoot picks up", "Что подбирает автолут"},
+    /*18 */ {HubNote, nullptr, nullptr, "Items on the ground. QuickLoot always takes what you look at.",
              "Предметы на земле. Быстрый лут всегда берёт то, на что смотришь."},
-    /*17 */ {HubCheckbox, "Filter", "Gold", "Gold", "Золото", 1, 0, 0, 0, 0, nullptr, 6},
-    /*18 */ {HubCheckbox, "Filter", "Ammo", "Arrows and bolts", "Стрелы и болты", 1, 0, 0, 0, 0, nullptr, 6},
-    /*19 */ {HubCheckbox, "Filter", "Weapons", "Weapons", "Оружие", 1, 0, 0, 0, 0, nullptr, 6},
-    /*20 */ {HubCheckbox, "Filter", "Armor", "Armour", "Броня", 1, 0, 0, 0, 0, nullptr, 6},
-    /*21 */ {HubCheckbox, "Filter", "Consumables", "Potions, food, plants", "Зелья, еда, растения", 1, 0, 0, 0, 0,
+    /*19 */ {HubCheckbox, "Filter", "Gold", "Gold", "Золото", 1, 0, 0, 0, 0, nullptr, 6},
+    /*20 */ {HubCheckbox, "Filter", "Ammo", "Arrows and bolts", "Стрелы и болты", 1, 0, 0, 0, 0, nullptr, 6},
+    /*21 */ {HubCheckbox, "Filter", "Weapons", "Weapons", "Оружие", 1, 0, 0, 0, 0, nullptr, 6},
+    /*22 */ {HubCheckbox, "Filter", "Armor", "Armour", "Броня", 1, 0, 0, 0, 0, nullptr, 6},
+    /*23 */ {HubCheckbox, "Filter", "Consumables", "Potions, food, plants", "Зелья, еда, растения", 1, 0, 0, 0, 0,
              nullptr, 6},
-    /*22 */ {HubCheckbox, "Filter", "Magic", "Scrolls and runes", "Свитки и руны", 1, 0, 0, 0, 0, nullptr, 6},
-    /*23 */ {HubCheckbox, "Filter", "Written", "Letters, books, maps", "Письма, книги, карты", 1, 0, 0, 0, 0,
+    /*24 */ {HubCheckbox, "Filter", "Magic", "Scrolls and runes", "Свитки и руны", 1, 0, 0, 0, 0, nullptr, 6},
+    /*25 */ {HubCheckbox, "Filter", "Written", "Letters, books, maps", "Письма, книги, карты", 1, 0, 0, 0, 0,
              nullptr, 6},
-    /*24 */ {HubCheckbox, "Filter", "Misc", "Misc (trophies, ore, tools...)", "Разное (трофеи, руда, инструменты...)",
+    /*26 */ {HubCheckbox, "Filter", "Misc", "Misc (trophies, ore, tools...)", "Разное (трофеи, руда, инструменты...)",
              1, 0, 0, 0, 0, nullptr, 6},
-    /*25 */ {HubCheckbox, "Filter", "Other", "Everything else", "Всё остальное", 1, 0, 0, 0, 0, nullptr, 6},
-    /*26 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
-    /*27 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
+    /*27 */ {HubCheckbox, "Filter", "Other", "Everything else", "Всё остальное", 1, 0, 0, 0, 0, nullptr, 6},
+    /*28 */ {HubHeader, nullptr, nullptr, "Effect", "Эффект"},
+    /*29 */ {HubCheckbox, "Effect", "Enabled", "Sparkle where something was looted", "Искра там, где что-то залутано",
              1, 0, 0, 0, 0, nullptr, -1, "A short game effect at the item, body or chest",
              "Короткий игровой эффект у предмета, трупа или сундука"},
-    /*28 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 27},
-    /*29 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 27},
-    /*30 */ {HubHeader, nullptr, nullptr, "Empty", "Пустые"},
-    /*31 */ {HubCheckbox, "Empty", "Mark", "Mark empty chests and bodies", "Помечать пустые сундуки и трупы", 1, 0,
+    /*30 */ {HubSlider, "Effect", "Size", "Size", "Размер", 0.15f, 0.1f, 2.0f, 0.05f, 0, "%.2f", 29},
+    /*31 */ {HubCheckbox, "Effect", "Sound", "Effect sound", "Звук эффекта", 0, 0, 0, 0, 0, nullptr, 29},
+    /*32 */ {HubHeader, nullptr, nullptr, "Empty", "Пустые"},
+    /*33 */ {HubCheckbox, "Empty", "Mark", "Mark empty chests and bodies", "Помечать пустые сундуки и трупы", 1, 0,
              0, 0, 0, nullptr, -1, "\"(Empty)\" after the name of what you look at, when there is nothing to take",
              "\"(Пусто)\" после названия того, на что смотришь, если там нечего брать"},
 };
@@ -735,7 +769,7 @@ static HubPage g_page = {"autoloot", 20, "AutoLoot", "Автолут", nullptr, 
 
 static bool StatusQuery(char*, int)
 {
-    return g_config.autoLoot && g_autoActive;
+    return g_config.autoLoot && g_autoActive && g_config.indicator;
 }
 
 static const HubStatus kStatus = {"autoloot", 20, HubIconHand, StatusQuery};
@@ -744,7 +778,7 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg) {
     case WM_LOOT_QUICK:
-        QuickLoot();
+        QuickLoot(wp != 0);
         return 0;
     case WM_LOOT_AUTO_TOGGLE:
         if (g_config.autoLoot) {
@@ -767,6 +801,8 @@ static LRESULT CALLBACK HookedWndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
     }
     return CallOriginalWndProc(g_origProc, hwnd, msg, wp, lp);
 }
+
+constexpr DWORD kQuickRepeatMs = 250;
 
 struct KeyEdge {
     int key = 0;
@@ -793,11 +829,18 @@ static DWORD WINAPI Worker(LPVOID)
     Log("autoloot: ready (%s)", HubGet() ? "menu found" : "no menu.dll: ini only");
 
     KeyEdge quick, toggle, dump, fxTest;
+    DWORD quickLast = 0; // last QuickLoot while the key is held
     for (unsigned tick = 0; IsWindow(hwnd); ++tick) {
         bool focused = GetForegroundWindow() == hwnd;
         bool busy = HubBusy(); // the menu is open: its clicks and key rebinds are not ours
-        if (quick.Pressed(g_config.quickKey, focused) && !busy)
+        // Held: again every kQuickRepeatMs, whatever the focus is by then (one item after another).
+        if (quick.Pressed(g_config.quickKey, focused) && !busy) {
             PostMessageW(hwnd, WM_LOOT_QUICK, 0, 0);
+            quickLast = GetTickCount();
+        } else if (quick.wasDown && !busy && GetTickCount() - quickLast >= kQuickRepeatMs) {
+            PostMessageW(hwnd, WM_LOOT_QUICK, 1, 0);
+            quickLast = GetTickCount();
+        }
         if (toggle.Pressed(g_config.autoKey, focused) && !busy)
             PostMessageW(hwnd, WM_LOOT_AUTO_TOGGLE, 0, 0);
         if (dump.Pressed(g_config.dumpKey, focused) && !busy)
