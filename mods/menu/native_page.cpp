@@ -57,7 +57,10 @@ struct Api {
     void* (*proxyNew)(void* self, const void* name);
     int64_t (*proxyCall)(const void* self, void* selfEntity, void* otherEntity, int64_t param);
     bool (*guiOpen)(void* gui, int page);
+    void (*setPageMode)(void* gui, const int* mode, bool flag);
+    void (*newGame)(void* world);
     void* gui2;
+    void* world;
     const char* (*stringText)(const void* str);
     void* (*stringNew)(void* self, const char* text);
     const wchar_t* (*unicodeText)(const void* str);
@@ -70,7 +73,7 @@ struct Api {
 Api g;
 bool g_missing;
 
-constexpr int kPageMain = 13, kPageStart = 26, kPageOptions = 18, kPageSettings = 22;
+constexpr int kPageMain = 13, kPageGame = 14, kPageStart = 26, kPageOptions = 18, kPageSettings = 22;
 constexpr int kRows = 14; // row 0 = the mod selector
 constexpr int kRowTop = 180, kRowStep = 30;
 constexpr uint16_t kIdBase = 2100; // our spin buttons' IDs (the page's own are 1001..1010)
@@ -120,7 +123,10 @@ bool ApiInit()
     Resolve(engine, "Engine", g.proxyNew, "??0eCScriptProxyScript@@QEAA@AEBVbCString@@@Z");
     Resolve(engine, "Engine", g.proxyCall, "??ReCScriptProxyScript@@QEBA_JPEAVeCEntity@@0_J@Z");
     Resolve(script, "Script", g.guiOpen, "?Open@GUI2@@QEAA_NW4gEHudPage@@@Z");
+    Resolve(script, "Script", g.setPageMode, "?SetPageMode@GUI2@@QEAAXAEBW4gEPageMode@@_N@Z");
+    Resolve(script, "Script", g.newGame, "?NewGame@World@@QEAAXXZ");
     Resolve(script, "Script", g.gui2, "gui2");
+    Resolve(script, "Script", g.world, "world");
     Resolve(base, "SharedBase", g.stringText, "?GetText@bCString@@QEBAPEBDXZ");
     Resolve(base, "SharedBase", g.stringNew, "??0bCString@@QEAA@PEBD@Z");
     Resolve(base, "SharedBase", g.unicodeText, "?GetText@bCUnicodeString@@QEBAPEB_WXZ");
@@ -465,6 +471,69 @@ bool BuildTab()
     BringToFront(tab);
     g_ui.tab = tab;
     return true;
+}
+
+// Developer only, while bin\mods\test_start.dll is loaded (TODO 5.23): a "Test" button right of "New Game" in
+// DLG_MENU_GAME. Both buttons call the vanilla OnClick_NewGame; before it, test_start arms (Test) or disarms
+// (New Game) the test world. The row's 4 buttons of 205 px become 5 of 164 px on the same 896 px background.
+using TestArmFn = bool (*)(bool arm);
+
+TestArmFn TestArm()
+{
+    HMODULE m = GetModuleHandleA("test_start.dll");
+    return m ? reinterpret_cast<TestArmFn>(GetProcAddress(m, "RisenTestArm")) : nullptr;
+}
+
+struct TestUi {
+    void* page = nullptr; // page 14
+    void* button = nullptr;
+    bool failed = false;
+};
+
+TestUi g_test;
+
+void BuildTestButton(void* system)
+{
+    g_test = TestUi();
+    g_test.page = g.findPage(system, kPageGame);
+    std::vector<void*> row;
+    void* background = nullptr;
+    void* newGame = nullptr;
+    for (void* w : g_test.page ? Children(g_test.page) : std::vector<void*>()) {
+        Geometry geo = Geo(w);
+        if (geo.pos.y == 710 && geo.size.x == 205 && geo.size.y == 23 && Is(w, ".?AVeCScriptRadioButton@@")) {
+            row.push_back(w);
+            if (strcmp(OnClickName(w), "OnClick_NewGame") == 0)
+                newGame = w;
+        } else if (geo.pos.x == 234 + g_dx && geo.pos.y == 706 && geo.size.x == 896 && geo.size.y == 32) {
+            background = w;
+        }
+    }
+    if (row.size() != 4 || !background || !newGame) {
+        Log("native: game menu row not as expected (%zu buttons, background %p, New Game %p), no Test button",
+            row.size(), background, newGame);
+        g_test.failed = true;
+        return;
+    }
+    for (size_t i = 0; i < row.size(); ++i)
+        for (size_t j = i + 1; j < row.size(); ++j)
+            if (Geo(row[j]).pos.x < Geo(row[i]).pos.x)
+                std::swap(row[i], row[j]);
+    void* test = Clone(newGame, g_test.page);
+    if (!test || !SetOnClick(test, "RM_OnClick_Test") || !SetOnClick(newGame, "RM_OnClick_NewGame")) {
+        Log("native: Test button not created");
+        g_test.failed = true;
+        return;
+    }
+    SetText(test, Wide(Text("Test", "Тест")));
+    row.insert(std::find(row.begin(), row.end(), newGame) + 1, test);
+    constexpr int kWidth = 164, kGap = 8;
+    constexpr int kLeft = 234 + (896 - 5 * kWidth - 4 * kGap) / 2;
+    for (size_t i = 0; i < row.size(); ++i)
+        Place(row[i], kLeft + static_cast<int>(i) * (kWidth + kGap), 710, kWidth, 23);
+    BringToFront(test);
+    g_test.button = test;
+    Log("native: Test button added (dev, test_start.dll)");
 }
 
 bool BuildRow(Row& row, int r, void* header, void* label, void* left, void* value, void* right)
@@ -907,6 +976,20 @@ int64_t CallVanilla(const char* script, void* self, void* other, int64_t args)
     }
 }
 
+// What Script_Game OnClick_NewGame (+0x1547e0) does after "Start a new game?" was answered yes (keyboard/mouse
+// path: GUI2::ModalNewGame, then SetPageMode(7, true) and World::NewGame), without the question.
+int64_t StartNewGame()
+{
+    __try {
+        const int mode = 7;
+        g.setPageMode(g.gui2, &mode, true);
+        g.newGame(g.world);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        Log("native: new game exception");
+    }
+    return 0;
+}
+
 } // namespace
 
 void NativeTick()
@@ -952,6 +1035,21 @@ void NativeTick()
         BringToFront(g_ui.tab); // the clone lies under the row's background strip until clicked
     }
     optionsShown = options;
+    if (!g_test.failed && TestArm()) {
+        if (g_test.button && (g.findPage(system, kPageGame) != g_test.page || !HasChild(g_test.page, g_test.button))) {
+            Log("native: game menu was rebuilt, adding the Test button again");
+            g_test.button = nullptr;
+        }
+        if (!g_test.button)
+            BuildTestButton(system);
+        static bool gameShown;
+        bool game = g.isVisible(system, kPageGame);
+        if (game && !gameShown && g_test.button) {
+            SetText(g_test.button, Wide(Text("Test", "Тест")));
+            BringToFront(g_test.button);
+        }
+        gameShown = game;
+    }
     ReleaseInputAfterRebind();
     if (g_active) {
         if (!g.isVisible(system, kPageSettings)) {
@@ -996,6 +1094,19 @@ extern "C" __declspec(dllexport) int64_t RisenScriptEvent(const char* name, void
 {
     if (strcmp(name, "RM_Test") == 0)
         return 42;
+    bool test = strcmp(name, "RM_OnClick_Test") == 0;
+    if (test || strcmp(name, "RM_OnClick_NewGame") == 0) {
+        if (!ApiInit())
+            return 0;
+        TestArmFn arm = TestArm();
+        bool armed = arm && arm(test);
+        Log("native: %s clicked%s", test ? "Test" : "New Game", test && !armed ? ", test start NOT available" : "");
+        if (test && !armed)
+            return 0;
+        if (test)
+            return StartNewGame();
+        return CallVanilla("OnClick_NewGame", self, other, args);
+    }
     if (!g_built || !ApiInit())
         return 0;
     if (strcmp(name, "RM_OnClick_Mods") == 0) {

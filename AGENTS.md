@@ -22,6 +22,9 @@
   `scripts/risenmods/` — `bin/scripts/Script_RisenMods.dll`; `installer/` — установщик.
 - `rust/risen-formats/` — форматы архивов/мира/шаблонов, VFS, геометрия и коллизии;
   `rust/risen-cli/` — CLI `risen`. Логику форматов и геометрии держи в библиотеке, CLI — команды и вывод.
+- `notes/reference-implementations.md` — **начинай отсюда**: каталог «как сделано X» (хуки, кнопки и страницы
+  в меню игры, скрипты, INI/лог, правки мира) со ссылками на эталонный код. Повторяй найденный там приём, а не
+  исследуй заново; новый подтверждённый приём — добавь строкой туда же.
 - `notes/world-editing.md` — слои, секторы, установка/откат;
   `notes/vfs-rev2045.md` — реальные приоритеты VFS;
   `notes/geometry-placement.md` — ground/snap/contact и ограничения физики;

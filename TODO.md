@@ -1603,13 +1603,21 @@ World::NewGame +0x236810. DLG_MENU_GAME (id 14) button row y=710 (notes/ui-recon
       SharedBase.dll+0x7caa9 on graceful close at 11:09 and 11:26 (reports in crashes/); not a crash in play
 - [ ] Own test content in the test world: layer-create RisenMods_Test --world Testlevel_Plane, move test objects
       from the Sara scene (towers/boards/custom models) there, then roll back the Sara scene (5.21 item)
-- [ ] Move the TestWorld/skip code out of World Debug into its own dev mod (or the Test button's mod) before release;
-      World Debug README must not mention it while it's experimental
+- [x] Move the TestWorld/skip code out of World Debug into its own dev mod (2026-10-17: `mods/test-start`)
 - [ ] If a dev world loads: own world RisenMods_Test (.wrldatasc + sector + layer, flat ground/landscape patch,
       hero start, sky/weather/env, navigation) via CLI with backup/restore; check new-game scripts expecting World
-- [ ] NEXT SESSION: "Test" button in DLG_MENU_GAME next to "New Game" (user 2026-10-17; INI dev flag, hidden by default). Normal New Game keeps World: set the
-      engine command line token + intro/wake-up skips only for the Test click, restore after. After world ready:
-      optional teleport, 12:00 + clear weather, World Debug on
+- [x] "Test" button in DLG_MENU_GAME next to "New Game" (user 2026-10-17; USER CONFIRMED 11:40: no dialog, test
+      world, no intro/wake-up). Dev mod `mods/test-start` (no README = never packaged; `[Test] World=`) exports
+      RisenTestArm and owns the moved intro/wake-up skips (World Debug TestWorld experiment and the installed INI
+      line removed). menu.dll, only while test_start.dll is loaded, clones New Game as "Тест" (RM_OnClick_Test, row
+      5 x 164 px): arm + GUI2::SetPageMode(7, true) + World::NewGame = vanilla OnClick_NewGame's yes-path without
+      GUI2::ModalNewGame. Vanilla New Game is repointed to RM_OnClick_NewGame: disarm + vanilla OnClick_NewGame.
+      World name: IAT hook of GetCommandLineA at its only call site (GetDefaultWorldName +0x87bd96, called only by
+      NewGame), served once per armed click; the engine string is untouched. Installed menu.dll 11:38:43,
+      test_start.dll 11:35:13, world_debug.dll 11:35:15, Script_RisenMods.dll 11:35:15
+- [ ] Check by hand: vanilla New Game after a test start -> island with dialog + intro; Load/Save clicks don't
+      start a game; Test from the in-game Esc menu
+- [ ] After a test start: optional teleport, 12:00 + clear weather, World Debug on (ask user)
 - [ ] AutoTest=1: auto-press at DLG_MENU_MAIN; mode B: load a prepared test save
 
 ## Stage 6 — Release

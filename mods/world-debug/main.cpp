@@ -159,86 +159,6 @@ bool ClockLayoutValid(){
         !memcmp(reinterpret_cast<const uint8_t*>(a.setHour)+0x2c,hour,3)&&
         !memcmp(reinterpret_cast<const uint8_t*>(a.setMinute)+0x2c,minute,3);
 }
-// With TestWorld set, gCHUDFileManager::EndProgress (+0x87ab00) must not play
-// <voice language>_Intro.bik after a new game; only that one verified call site is skipped.
-using PlayVideoFn=void (*)(void*,const void*,bool);
-PlayVideoFn g_playVideo=nullptr;
-uintptr_t g_introReturn=0;
-void PlayVideo(void* app,const void* name,bool wait) {
-    if(reinterpret_cast<uintptr_t>(_ReturnAddress())==g_introReturn){Log("test world: new-game intro video skipped");return;}
-    g_playVideo(app,name,wait);
-}
-void SkipIntroVideo(HMODULE game) {
-    // call qword ptr [rip+0x241363] -> IAT eCApplication::PlayVideo, preceded by "_Intro.bik" lea.
-    auto code=reinterpret_cast<const uint8_t*>(game);
-    const uint8_t call[]={0xff,0x15,0x63,0x13,0x24,0x00},introName[]={0x48,0x8d,0x15,0xf6,0x17,0x40,0x00};
-    if(memcmp(code+0x87ac0f,call,sizeof(call))||memcmp(code+0x87abd3,introName,sizeof(introName))
-        ||strcmp(reinterpret_cast<const char*>(code+0xc7c3d0),"_Intro.bik")){Log("test world: unexpected intro code; video not skipped");return;}
-    const char kPlay[]="?PlayVideo@eCApplication@@QEAAXAEBVbCString@@_N@Z";
-    HMODULE engine=GetModuleHandleA("Engine.dll");
-    g_playVideo=engine?reinterpret_cast<PlayVideoFn>(GetProcAddress(engine,kPlay)):nullptr;
-    g_introReturn=reinterpret_cast<uintptr_t>(code+0x87ac15);
-    void* previous=g_playVideo?PatchImport(game,"Engine.dll",kPlay,reinterpret_cast<void*>(PlayVideo)):nullptr;
-    if(!previous){g_playVideo=nullptr;Log("test world: PlayVideo import unavailable; video not skipped");return;}
-    if(previous!=reinterpret_cast<void*>(g_playVideo))g_playVideo=reinterpret_cast<PlayVideoFn>(previous);
-    Log("test world: new-game intro video will be skipped");
-}
-// Rtn_Player (Script_Game +0x1af090) runs PS_Gamestart (lying hero, "where am I", stand up)
-// unless game variable "Gamestart" exists. In the test world that one check answers "exists".
-using ExistsVarFn=bool (*)(const void*);
-ExistsVarFn g_existsVar=nullptr;
-uintptr_t g_gamestartReturn=0;
-bool ExistsGameVariable(const void* name) {
-    if(reinterpret_cast<uintptr_t>(_ReturnAddress())==g_gamestartReturn) {
-        static bool logged=false;if(!logged){logged=true;Log("test world: wake-up scene PS_Gamestart skipped");}
-        return true;
-    }
-    return g_existsVar(name);
-}
-void SkipGamestartScene() {
-    HMODULE scriptGame=GetModuleHandleA("Script_Game.dll");
-    auto code=reinterpret_cast<const uint8_t*>(scriptGame);
-    // call qword ptr [rip+0x53ecd] -> IAT InfoSystem::ExistsGameVariable, argument "Gamestart".
-    const uint8_t call[]={0xff,0x15,0xcd,0x3e,0x05,0x00},name[]={0x48,0x8d,0x15,0x61,0xd5,0x0b,0x00};
-    if(!code||memcmp(code+0x1af175,call,sizeof(call))||memcmp(code+0x1af160,name,sizeof(name))
-        ||strcmp(reinterpret_cast<const char*>(code+0x26c6c8),"Gamestart")){Log("test world: unexpected Rtn_Player code; wake-up scene not skipped");return;}
-    const char kExists[]="?ExistsGameVariable@InfoSystem@@SA_NAEBVbCString@@@Z";
-    HMODULE script=GetModuleHandleA("Script.dll");
-    g_existsVar=script?reinterpret_cast<ExistsVarFn>(GetProcAddress(script,kExists)):nullptr;
-    g_gamestartReturn=reinterpret_cast<uintptr_t>(code+0x1af17b);
-    void* previous=g_existsVar?PatchImport(scriptGame,"Script.dll",kExists,reinterpret_cast<void*>(ExistsGameVariable)):nullptr;
-    if(!previous){g_existsVar=nullptr;Log("test world: ExistsGameVariable import unavailable; wake-up scene not skipped");return;}
-    if(previous!=reinterpret_cast<void*>(g_existsVar))g_existsVar=reinterpret_cast<ExistsVarFn>(previous);
-    Log("test world: wake-up scene will be skipped");
-}
-// Test-world probe (TODO 5.23): which command line the engine got and which world New Game
-// would load (gCHUDFileManager reads option "worldfile"). Read-only, logged once.
-void LogWorldNameProbe(HMODULE engine,HMODULE game){
-    void* (*app)();const void* (*line)(void*);void* (*files)();void* (*worldName)(const void*,void*);
-    if(!Resolve(engine,app,"?GetInstance@eCApplication@@SAAEAV1@XZ")||
-       !Resolve(engine,line,"?GetCommandLineA@eCApplication@@QEBAAEBVbCString@@XZ")||
-       !Resolve(game,files,"?GetInstance@gCHUDFileManager@@SAAEAV1@XZ")||
-       !Resolve(game,worldName,"?GetDefaultWorldName@gCHUDFileManager@@IEBA?AVbCString@@XZ"))return;
-    const void* cmd=line(app());void* text=nullptr;worldName(files(),&text);
-    const char* cmdText=a.stringText(cmd);const char* worldText=text?a.stringText(&text):nullptr;
-    Log("probe: engine command line '%s', new game world '%s'",cmdText?cmdText:"",worldText?worldText:"");
-    a.stringFree(&text);
-    // Experiment: Risen.exe hard-codes "-worldfile=World"; [Debug] TestWorld swaps that token in the
-    // engine's copy, which GetDefaultWorldName re-parses on every New Game.
-    char world[64];IniString("Debug","TestWorld","",world,sizeof(world));
-    if(!world[0]||!cmdText)return;
-    for(const char* c=world;*c;c++)if(!isalnum(static_cast<unsigned char>(*c))&&*c!='_'){Log("probe: bad TestWorld");return;}
-    const char* token=strstr(cmdText,"-worldfile=World");void* (*assign)(void*,const char*);
-    if(!token||(token[16]&&token[16]!=' ')||!Resolve(GetModuleHandleA("SharedBase.dll"),assign,"??4bCString@@QEAAAEAV0@PEBD@Z"))
-        {Log("probe: worldfile token not found; TestWorld ignored");return;}
-    char next[512];snprintf(next,sizeof(next),"%.*s-worldfile=%s%s",static_cast<int>(token-cmdText),cmdText,world,token+16);
-    assign(const_cast<void*>(cmd),next);text=nullptr;worldName(files(),&text);
-    worldText=text?a.stringText(&text):nullptr;
-    Log("probe: TestWorld set, command line '%s', new game world '%s'",a.stringText(cmd),worldText?worldText:"");
-    a.stringFree(&text);
-    SkipIntroVideo(game);
-    SkipGamestartScene();
-}
 bool ApiInit() {
     if(g_ready)return true;
     HMODULE script=GetModuleHandleA("Script.dll"),engine=GetModuleHandleA("Engine.dll"),
@@ -310,7 +230,6 @@ bool ApiInit() {
         !memcmp(static_cast<const uint8_t*>(a.weatherFind)+0x3e,weatherNameField,4);
     g_lightingReady=lightOk;
     Log("time/weather API: %s",lightOk?"resolved":"disabled");
-    if(ok)LogWorldNameProbe(engine,game);
     if(ok)g_rotationReady=CameraRotationInit(game);
     g_ready=ok;failed=!ok;
     Log("API: %s (exports only; no binary patches)",ok?"resolved":"disabled");

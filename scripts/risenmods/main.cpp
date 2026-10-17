@@ -34,6 +34,8 @@ static int64_t Forward(const char* name, void* unit, void* self, void* other, in
 RM_SCRIPT(RM_Test)
 RM_SCRIPT(RM_OnClick_Mods)
 RM_SCRIPT(RM_OnClick_Settings)
+RM_SCRIPT(RM_OnClick_Test)
+RM_SCRIPT(RM_OnClick_NewGame)
 RM_SCRIPT(RM_OnSpin_00)
 RM_SCRIPT(RM_OnSpin_01)
 RM_SCRIPT(RM_OnSpin_02)
@@ -82,7 +84,8 @@ static const Script kScripts[] = {
     RM_ENTRY(RM_OnClick_Item_03), RM_ENTRY(RM_OnClick_Item_04), RM_ENTRY(RM_OnClick_Item_05),
     RM_ENTRY(RM_OnClick_Item_06), RM_ENTRY(RM_OnClick_Item_07), RM_ENTRY(RM_OnClick_Item_08),
     RM_ENTRY(RM_OnClick_Item_09), RM_ENTRY(RM_OnClick_Item_10), RM_ENTRY(RM_OnClick_Item_11),
-    RM_ENTRY(RM_OnClick_Item_12), RM_ENTRY(RM_OnClick_Item_13),
+    RM_ENTRY(RM_OnClick_Item_12), RM_ENTRY(RM_OnClick_Item_13), RM_ENTRY(RM_OnClick_Test),
+    RM_ENTRY(RM_OnClick_NewGame),
 };
 constexpr int kScriptCount = sizeof(kScripts) / sizeof(kScripts[0]);
 
