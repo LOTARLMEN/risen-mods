@@ -35,7 +35,8 @@ it while the user is still playing; if unsure, ask.
   (first install enables World Debug; world-trace enables WorldTrace/DumpFirstChance).
 
 ## 4. Launch and read the log
-- `Start-Process "steam://rungameid/40300"`. Focus stealing and screenshots are off-limits.
+- `Start-Process "steam://rungameid/40300"`. No focus stealing. Frames of the game itself may be captured and inspected (user
+  2026-10-17; game window/frame only, never the desktop or other windows).
 - Shared log `bin\mods\RisenMods.log` (previous launch: `RisenMods.prev.log`). Poll until the markers appear:
   loader version line, `[<mod>] Risen <Mod> <version>`, `API: resolved`, hook `installed` lines, and no
   `EXCEPTION`/`CRASH`. A version mismatch shows as `disabled`/`skipped` lines - report it.

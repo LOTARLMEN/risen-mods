@@ -1492,6 +1492,13 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       backup\world-edits\22D5BFDD-E700-4264-BB46-F5146A7B381F -> 811942CC.... Also decide on the older loose
       edits (Game_Start layers, items.tab/focus.tab, It_Axe_RisenMods_Test.tple) and NoPhysical=false (ask user)
 - [ ] Release of world edits: the installer must patch [Root] NoPhysical=false in mountlist_packed.ini and undo it
+- [ ] CLI for agents (user 2026-10-17; ~1-2 sessions, before the live bridge):
+  - [ ] `--json` result for the changing commands (move, copy, spawn, delete, layer-create, sector-set, tab-set,
+        asset-install): created/changed GUIDs, old/new values, written files, backup id
+  - [ ] Rotation and scale in `move` (--yaw/--pitch/--roll or --rotate, --scale; native scale limits from
+        notes/geometry-placement.md) and a generic `set <guid> <property> <value>` with type checks
+  - [ ] `backups` / history: list world and asset backups with time, scope, files and dependency order, so an agent
+        knows what is installed and how to roll back (cf. the Sara scene chain in 5.21)
 - [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
       pipe, JSON commands) so any agent or our editor can find / move / spawn / delete entities in the running game
       while the user watches. Same verbs as risen-cli (find, show, move, spawn), resolve entities by GUID every
@@ -1640,10 +1647,23 @@ sessions; break one down into concrete items before starting it. Order = depende
       item): a dll mod with a local JSON API (named pipe / localhost socket), verbs like the CLI (find, show, move,
       spawn, delete, set time/weather, give item, teleport). Resolve entities by GUID every command, run on the
       game thread, check versions, log every command. Reuse World Debug code (selection, physics, clock, weather)
+  - Design rules (user 2026-10-17: the bridge must not flood the agent's context or waste tokens):
+    request/response only - the game never pushes data into the agent; compact JSON by default (near-entity
+    queries take a radius + limit, default ~20, fields GUID/name/position/distance; full properties only by an
+    explicit per-GUID command); changing commands answer in one line (ok, GUID, new value); frames only on
+    request, downscaled, one per visual check; verbose output goes to RisenMods.log / files, the agent greps it.
+    The bridge skill must state these rules for agents
+  - [ ] NEXT SESSION (user 2026-10-17): start the bridge v0.
+        v0 for our own development first (agent's proposal 2026-10-17, ~2-3 sessions): dev mod + named pipe +
+        tiny client (`risen live <cmd>` or a script); commands: status (world, hero position/rotation), teleport /
+        look direction, find entities near the hero (JSON, GUIDs), move/rotate by GUID live, time/weather (World
+        Debug), and **frame capture** to PNG via our D3D9 hook (backbuffer, game frame only - user 2026-10-17
+        allows the agent to look at game frames). Spawn from template needs RE -> v1
+  - [ ] "Bake": write a live change into the world files (risen-formats) so it survives a new game
 - [ ] 7.2 Safety layer of the bridge (agent's addition): allow-list of verbs, limits (spawn count, area, rate),
       undo of the last N commands, "live only" vs "bake into the world files", never touch saves without a backup.
       Needed before anyone but the owner sends commands
-- [ ] 7.3 MCP server + agent tooling: expose the bridge and the risen CLI as MCP tools, so Claude / GPT / any
+- [ ] 7.3 (optional, later - user 2026-10-17: no real difference to the CLI / a plain API) MCP server + agent tooling: expose the bridge and the risen CLI as MCP tools, so Claude / GPT / any
       agent can work in the running game from a normal chat ("spawn 5 wolves behind me", "build a tower here").
       Plus describe-scene tools (what is around the hero, templates by name) so the model can plan
 - [ ] 7.4 Own editor in Rust with a GUI on risen-formats (5.21 "risen-editor GUI" item): viewer first, then
