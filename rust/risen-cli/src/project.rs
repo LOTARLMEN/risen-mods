@@ -136,13 +136,15 @@ fn checked_path(root: &Path, relative: &str) -> Result<PathBuf> {
 
 pub fn scoped_path(root: &Path, relative: &str, scope: Scope) -> Result<PathBuf> {
     let rel = Path::new(relative);
+    // Extensions compare case-insensitively, as before asset scopes: old manifests may use any case.
+    let ext = relative.to_ascii_lowercase();
     let world = relative.starts_with("data/common/projects/") &&
-        [".lrent", ".sec", ".wrldatasc"].iter().any(|ext| relative.ends_with(ext));
+        [".lrent", ".sec", ".wrldatasc"].iter().any(|e| ext.ends_with(e));
     let asset = scope == Scope::Assets && (
         relative == "data/common/meshes/compiled_meshes.bin" ||
         relative == "data/common/physics/compiled_collision_meshes.bin" ||
-        relative.starts_with("data/common/meshes/") && relative.ends_with("._xmsh") ||
-        relative.starts_with("data/common/physics/") && relative.ends_with("._xcom"));
+        relative.starts_with("data/common/meshes/") && ext.ends_with("._xmsh") ||
+        relative.starts_with("data/common/physics/") && ext.ends_with("._xcom"));
     if !(world || asset) || relative.contains(['\\', ':'])
         || relative.split('/').any(|s| s.is_empty() || s == "." || s == ".." || s.ends_with(['.', ' ']))
         || rel.components().any(|c| !matches!(c, Component::Normal(_)))
@@ -277,7 +279,16 @@ fn restore_scoped(backup: &Path, force: bool, scope: Scope) -> Result<()> {
 fn replace_optional(path: &Path, bytes: &Option<Vec<u8>>) -> Result<()> {
     match bytes {
         Some(bytes) => atomic_write(path, bytes)?,
-        None => { if path.exists() { std::fs::remove_file(path)?; } }
+        None => {
+            if path.exists() { std::fs::remove_file(path)?; }
+            // Drop folders the install created (e.g. RisenMods/); remove_dir fails on non-empty ones.
+            let mut dir = path.parent();
+            while let Some(d) = dir {
+                if d.file_name().is_some_and(|n| ["common", "meshes", "physics", "projects", "World"].iter()
+                    .any(|stop| n.eq_ignore_ascii_case(stop))) || std::fs::remove_dir(d).is_err() { break; }
+                dir = d.parent();
+            }
+        }
     }
     Ok(())
 }
@@ -423,6 +434,8 @@ mod tests {
         restore_assets(&backup, false).unwrap();
         assert_eq!(std::fs::read(t.0.join(cache)).unwrap(), b"old cache");
         for i in [0,1,3] { assert!(!t.0.join(&changes[i].path).exists()); }
+        assert!(!t.0.join("data/common/meshes/RisenMods").exists());
+        assert!(t.0.join("data/common/meshes").is_dir());
         assert_eq!(std::fs::read(t.0.join("data/common/projects/other.lrent")).unwrap(), b"confirmed scene");
     }
     #[test]

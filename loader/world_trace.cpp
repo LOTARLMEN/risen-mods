@@ -212,15 +212,17 @@ void WorldTraceStart()
 unsigned WorldTraceReport(const CONTEXT& c, DiagnosticRange* ranges, unsigned capacity)
 {
     if (TryAcquireSRWLockShared(&g_lock)) {
-        ULONG64 first = g_sequence > kHistory ? g_sequence - kHistory + 1 : 1;
-        LogAlways("world trace: copied history %llu..%llu", first, g_sequence);
-        for (ULONG64 i = first; i <= g_sequence; ++i) {
-            const Event& e = g_history[(i - 1) % kHistory];
-            LogAlways("world trace #%llu tick=%llu thread=%lu %s object=%llx layer=%llx context=%llx file=%s touches=%lu",
-                e.sequence, e.tick, e.thread, e.phase, e.object, e.layer, e.context, e.file, e.touches);
-            if (e.owner.address) EntityLog("history", e.owner);
-        }
-        ReleaseSRWLockShared(&g_lock);
+        // A nested fault while logging must not leave the hook-side exclusive lock blocked.
+        __try {
+            ULONG64 first = g_sequence > kHistory ? g_sequence - kHistory + 1 : 1;
+            LogAlways("world trace: copied history %llu..%llu", first, g_sequence);
+            for (ULONG64 i = first; i <= g_sequence; ++i) {
+                const Event& e = g_history[(i - 1) % kHistory];
+                LogAlways("world trace #%llu tick=%llu thread=%lu %s object=%llx layer=%llx context=%llx file=%s touches=%lu",
+                    e.sequence, e.tick, e.thread, e.phase, e.object, e.layer, e.context, e.file, e.touches);
+                if (e.owner.address) EntityLog("history", e.owner);
+            }
+        } __finally { ReleaseSRWLockShared(&g_lock); }
     } else LogAlways("world trace: history lock busy; skipped without waiting");
     unsigned count = 0;
     auto add = [&](ULONG64 address, ULONG size) {

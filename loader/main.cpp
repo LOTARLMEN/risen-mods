@@ -48,7 +48,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
     LogStartSession(modsDirA);
     SYSTEMTIME now;
     GetLocalTime(&now);
-    Log("Risen mod loader 1.2 diagnostics, %04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
+    Log("Risen mod loader 1.2, %04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
     LogSystem();
     CrashLogInstall();
 

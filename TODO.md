@@ -1482,7 +1482,7 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
         9x9, gap -2 cm (replaces +20). Five files installed with verified backup while game closed:
         asset-edits/009F8EB3-0CB7-48B7-8486-EE6C7B6813FC (restore before F6C70FF8..., then 27976494...).
         Stage build/tests/asset-faces-20261016-110403/installed-test.json; no unrelated game changes.
-        Steam PID 23840/11:06:12, main menu 11:06:20. NEW GAME corrected-visual/walking/save-load
+        Steam PID 23840/11:06:12, main menu 11:06:20.
         User now confirms repaired models render filled and look normal (2026-10-16).
         Corrected custom collision/walking and save-load still await an explicit report.
         User permits agent to close game after completed tests; AGENTS updated.
@@ -1527,6 +1527,12 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       INI SHA256 preserved, other DLL/INI unchanged. Backup world-debug-20261015-162506.
       Startup 16:25:17 confirms 0.1.1 and speed=10; 16:25:25 API/modules resolved, main menu.
       User explicitly deferred hands-on speed retest to next session; resume here.
+- [ ] World Debug 0.2.0 time/weather — hands-on test pending (deployed 2026-10-17 10:33:35):
+      NUMPAD1 set F10 hour, NUMPAD2 cycle 06/12/18/00, NUMPAD6 next day, NUMPAD3 Sunny_Full / restore.
+      Exports + retail clock/weather field stores verified by check-world-debug.py; 39 control checks.
+      Check by hand: hour/day change visible, weather toggle and restore, disabling debug restores weather,
+      save with clear weather ON then load (weather must not stay forced), NPC schedules after a time jump.
+      Was implemented without TODO/log entries; recorded in the 2026-10-17 review.
 - [x] World Debug 0.1.2: camera movement/rotation and top-row - / = speed keys PASSED.
       USER CONFIRMED 2026-10-15 (recorded 19:19): "optimal speed, everything works", screenshot
       DEBUG CAM 819 cm/s. Installed INI FreecamSpeed=819.20 (8.192 m/s); log confirms repeated

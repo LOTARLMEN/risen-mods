@@ -25,6 +25,8 @@ fn source(stage: &Path, name: &str) -> Result<Vec<u8>> {
 }
 
 fn validate(path: &str, bytes: &[u8]) -> Result<()> {
+    let path = path.to_ascii_lowercase();
+    let path = path.as_str();
     if path.ends_with(".lrent") { Lrent::read(bytes)?; }
     else if path.ends_with(".sec") { ProjectFile::read(bytes)?; }
     else if path.ends_with(".wrldatasc") { WorldData::read(bytes)?; }

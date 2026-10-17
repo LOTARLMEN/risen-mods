@@ -131,9 +131,13 @@ bool CameraRotationInit(HMODULE game) {
         Log("freecam: unexpected rotation code (other game version?); camera disabled");return false;
     }
     g_rotateReturn=reinterpret_cast<uintptr_t>(code+0x7af604);
-    g_rotate=reinterpret_cast<RotateFn>(PatchImport(game,"Engine.dll",
-        "?RotateAngularRel@eCCameraBase@@QEAAXAEBVbCVector@@@Z",reinterpret_cast<void*>(RotateCamera)));
-    if(!g_rotate){Log("freecam: rotation import unavailable; camera disabled");return false;}
+    const char kRotate[]="?RotateAngularRel@eCCameraBase@@QEAAXAEBVbCVector@@@Z";
+    // Publish a callable original before the IAT points at RotateCamera.
+    HMODULE engine=GetModuleHandleA("Engine.dll");
+    g_rotate=engine?reinterpret_cast<RotateFn>(GetProcAddress(engine,kRotate)):nullptr;
+    void* previous=g_rotate?PatchImport(game,"Engine.dll",kRotate,reinterpret_cast<void*>(RotateCamera)):nullptr;
+    if(!previous){g_rotate=nullptr;Log("freecam: rotation import unavailable; camera disabled");return false;}
+    if(previous!=reinterpret_cast<void*>(g_rotate))g_rotate=reinterpret_cast<RotateFn>(previous);
     Log("freecam: rotation call/gains verified, player sensitivity match installed");return true;
 }
 
@@ -356,7 +360,9 @@ void Command(int action) {
         bool was=a.cameraActive(camera);a.toggleCamera(camera);g_ownsCamera=!was;
         if(!was)a.cameraSpeed(camera,g_camSpeed);
         if(was)Feedback("Freecam OFF");
-        else {char message[180];snprintf(message,sizeof(message),"Freecam ON: %.3g cm/s (speed keys: - / =)",g_camSpeed);Feedback(message);}
+        else {char slower[32],faster[32],message[180];
+            snprintf(message,sizeof(message),"Freecam ON: %.3g cm/s (speed keys: %s / %s)",g_camSpeed,
+                KeyName(g_camSlower,slower,sizeof(slower)),KeyName(g_camFaster,faster,sizeof(faster)));Feedback(message);}
         return;
     }
     if(action==CameraSlower||action==CameraFaster) {
@@ -410,7 +416,8 @@ void ConfigLoad() {
     if(!std::isfinite(g_targetHour)||g_targetHour<0.f||g_targetHour>=24.f)g_targetHour=12.f;
     g_liftCm=IniFloat("Debug","LiftCm",100.f);if(!std::isfinite(g_liftCm)||g_liftCm<1.f||g_liftCm>500.f)g_liftCm=100.f;
     g_camSpeed=IniFloat("Debug","FreecamSpeed",CAMERA_DEFAULT);
-    if(!std::isfinite(g_camSpeed)||g_camSpeed<CAMERA_MIN||g_camSpeed>CAMERA_MAX)g_camSpeed=CAMERA_DEFAULT;
+    if(!std::isfinite(g_camSpeed))g_camSpeed=CAMERA_DEFAULT;
+    else if(g_camSpeed<CAMERA_MIN)g_camSpeed=CAMERA_MIN;else if(g_camSpeed>CAMERA_MAX)g_camSpeed=CAMERA_MAX;
     // F10 callbacks and INI reloads run on the game thread. Apply immediately to an owned
     // freecam too: previously the slider only took effect after toggling the camera again.
     if(g_ready&&g_ownsCamera) {
@@ -458,7 +465,7 @@ bool Status(char* text,int size) {
     }
     if(g_ready&&Player(player)&&g_hasSelection) {
         Entity e=Selected(player);
-        if(e.e){snprintf(text,size,"DEBUG %s%s [%s]",g_ownsCamera?"CAM ":"",g_name,(a.flags(&e)&FROZEN)==FROZEN?"frozen":"physics");return true;}
+        if(e.e){snprintf(text,size,"DEBUG %s [%s]",g_name,(a.flags(&e)&FROZEN)==FROZEN?"frozen":"physics");return true;}
     }
     snprintf(text,size,"DEBUG %s%s",g_ownsCamera?"CAM ":"",g_feedback);return true;
 }

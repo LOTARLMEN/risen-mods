@@ -2,6 +2,7 @@
 
 #include <windows.h>
 #include <cstdio>
+#include <algorithm>
 #include <cstring>
 #include <dbghelp.h>
 
@@ -58,8 +59,38 @@ BOOL CALLBACK DumpCallback(void* parameter, PMINIDUMP_CALLBACK_INPUT input,
     return TRUE;
 }
 
+// Keep only the newest reports so a game with frequent handled faults can't fill the disk.
+// Runs on the worker at startup, never in DllMain or an exception handler.
+void PruneCrashes(unsigned keep)
+{
+    struct Item { FILETIME time; char name[MAX_PATH]; };
+    static Item items[512];
+    unsigned count = 0;
+    char pattern[MAX_PATH]; snprintf(pattern, sizeof(pattern), "%s\\*", g_directory);
+    WIN32_FIND_DATAA f;
+    HANDLE find = FindFirstFileA(pattern, &f);
+    if (find == INVALID_HANDLE_VALUE) return;
+    do {
+        if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+        const size_t n = strlen(f.cFileName);
+        auto ends = [&](const char* s) { size_t k = strlen(s); return n >= k && _stricmp(f.cFileName + n - k, s) == 0; };
+        if (!ends(".dmp") && !ends(".dmp.log") && !ends(".exception.log")) continue;
+        if (count < 512) { items[count].time = f.ftLastWriteTime; strcpy_s(items[count].name, f.cFileName); ++count; }
+    } while (FindNextFileA(find, &f));
+    FindClose(find);
+    if (count <= keep) return;
+    std::sort(items, items + count, [](const Item& a, const Item& b) { return CompareFileTime(&a.time, &b.time) > 0; });
+    unsigned removed = 0;
+    for (unsigned i = keep; i < count; ++i) {
+        char path[MAX_PATH]; snprintf(path, sizeof(path), "%s\\%s", g_directory, items[i].name);
+        if (DeleteFileA(path)) ++removed;
+    }
+    Log("crash dump: pruned %u old reports, kept %u", removed, keep);
+}
+
 DWORD WINAPI DumpWorker(void*)
 {
+    PruneCrashes(40);
     // Load DbgHelp outside DllMain and before any exception. Only this worker calls it.
     HMODULE library = LoadLibraryW(L"dbghelp.dll");
     auto writeDump = library ? reinterpret_cast<WriteDumpFn>(GetProcAddress(library, "MiniDumpWriteDump")) : nullptr;
@@ -105,10 +136,12 @@ void Dump(EXCEPTION_POINTERS* info, bool physics, bool unhandled, DiagnosticRang
     }
     if (!InterlockedCompareExchange(&g_dumpReady, 0, 0)) { LogAlways("crash dump: worker not ready"); return; }
     if (!unhandled && !IniInt("Diagnostics", "DumpFirstChance", 0)) return;
+    // Take the worker first: a skipped busy request must not consume the dump quota.
+    if (InterlockedCompareExchange(&g_dumpBusy, 1, 0)) { LogAlways("crash dump: worker busy; skipped"); return; }
     if (!unhandled && InterlockedIncrement(physics ? &g_physicsDumps : &g_dumpReports) > 3) {
+        InterlockedExchange(&g_dumpBusy, 0);
         LogAlways("crash dump: first-chance dump quota reached (text report retained)"); return;
     }
-    if (InterlockedCompareExchange(&g_dumpBusy, 1, 0)) { LogAlways("crash dump: worker busy; skipped"); return; }
     ResetEvent(g_done);
     g_job.context = *info->ContextRecord; g_job.exception = *info->ExceptionRecord;
     g_job.exception.ExceptionRecord = nullptr;
@@ -260,7 +293,12 @@ void CrashLogStartWorker()
     }
     g_request = CreateEventW(nullptr, FALSE, FALSE, nullptr);
     g_done = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    if (!g_request || !g_done) { LogAlways("crash dump: cannot create worker events (%lu)", GetLastError()); return; }
+    if (!g_request || !g_done) {
+        LogAlways("crash dump: cannot create worker events (%lu)", GetLastError());
+        if (g_request) CloseHandle(g_request);
+        if (g_done) CloseHandle(g_done);
+        g_request = g_done = nullptr; return;
+    }
     HANDLE worker = CreateThread(nullptr, 0, DumpWorker, nullptr, 0, nullptr);
     if (worker) CloseHandle(worker);
     else LogAlways("crash dump: cannot create worker (%lu)", GetLastError());

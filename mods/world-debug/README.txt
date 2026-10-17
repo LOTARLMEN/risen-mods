@@ -28,16 +28,12 @@ NUMPAD3 — ясная погода Sunny_Full / возврат предыдущ
 Час в настройке десятичный: 12.5 означает 12:30. Время продолжает идти обычным образом.
 Изменение времени/даты влияет на распорядок NPC и запоминается сохранением игры.
 Ясная погода не включается автоматически; отключение отладки/выход из мира возвращает погоду.
-Время и погода 0.2.0 проверены автоматически; ручной тест в игре ещё ожидается.
 
 Выключите AutoLoot перед выбором. Выбор сохраняется при отводе камеры, но предмет
 должен оставаться в пределах 20 м от героя. Инвентарь, экипировка, NPC и статические
 объекты без rigid body не изменяются. Индикатор DEBUG показывает выбранное имя
 и frozen/physics. При отключении инструментов камера возвращается к герою.
 Положение и физика предметов могут сохраниться в обычном сохранении игры.
-Выбор, подъём, физика и freecam проверены пользователем. Повторный тест скорости 0.1.1
-выявил ошибку состояния камеры; в 0.1.2 исправлена. Работа камеры и клавиш скорости
-подтверждена пользователем.
 Удаление: закройте игру и удалите world_debug.dll и world_debug.ini.
 
 ENGLISH
@@ -64,13 +60,10 @@ and restores the previous native mode/weights. For inspection, press NUMPAD1 + N
 All keys can be rebound. Hour is decimal (12.5 = 12:30); the clock keeps running normally.
 Time/date changes affect NPC schedules and persist in saves. Clear weather is never
 enabled automatically; disabling debugging/leaving the world restores weather.
-0.2.0 time/weather has automated checks; the in-game hands-on test is pending.
 
 Selection survives camera movement, using a fresh GUID lookup for every command.
 Items must remain within 20 m of the hero. Inventory/equipped items, NPCs and
 static objects without a rigid body are refused. The DEBUG indicator shows the
 selection and frozen/physics state. Disabling the tools returns the camera.
 Normal game saves can retain object position and physics changes.
-Selection, lift, physics and freecam were user-tested. The 0.1.1 speed retest exposed
-incorrect camera-state tracking, fixed in 0.1.2. Camera and speed controls were user-tested.
 Uninstall with the game closed: remove world_debug.dll and world_debug.ini.
