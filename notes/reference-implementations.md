@@ -52,4 +52,6 @@ long findings stay in the topic notes linked here.
 | Build → deploy → launch → read log | skill `risen-deploy-test`; `tools/deploy-world-debug.ps1` |
 | Start a quick test game | DLG_MENU_GAME → "Тест"/"Test" (needs `bin\mods\test_start.dll` + menu.dll): `[Test] World` from `test_start.ini`, no intro video, no wake-up scene. Normal "Новая игра" loads the island. |
 | Object/camera/time controls in game | `mods/world-debug/`, `notes/world-debug.md` |
+| Query / drive the running game from a shell | `mods/live-bridge/` (dev) + `risen live <verb>` (`rust/risen-cli/src/live.rs`): pipe `\\.\pipe\RisenLive`, one JSON line each way, verbs run in the window proc. `status` = world, hero pos/yaw (0 = +Z, 90 = +X), day/time; `teleport`/`look` |
+| Move / turn an entity with physics + navigation in sync | `Teleport`/`Look` in `mods/live-bridge/main.cpp` | Script `Entity::GetPose` → edit the row-major bCMatrix (X +0x00, at +0x20, translation +0x30) → `Entity::MoveTo(bCMatrix)` (world matrix + rigid body pose + nav reset + stop). Hero: camera follows, user-confirmed |
 | RE patch procedure | skill `risen-re-patch` |

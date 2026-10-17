@@ -19,6 +19,7 @@ use risen_formats::wrldatasc::WorldData;
 mod project;
 mod geometry;
 mod asset_bundle;
+mod live;
 
 const PROJECTS: &str = "data/common/projects";
 const TEMPLATES: &str = "data/common/templates";
@@ -483,6 +484,20 @@ enum Cmd {
         /// Print each file with unknown sites or unreached strings
         #[arg(long)]
         files: bool,
+    },
+    /// Send one command to the running game (dev mod live_bridge.dll) and print its one-line JSON reply:
+    /// `live ping`, `live status`, `live teleport x y z [yaw]`, `live look yaw` (`~` = relative: `~0 ~200 ~0`);
+    /// `live --raw '{"cmd":"status"}'` sends a request as is.
+    /// Exit code 1 when the reply has "ok":false
+    Live {
+        /// Bridge verb (ping, status, ...)
+        verb: Option<String>,
+        /// Verb arguments, passed to the bridge unparsed
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+        /// Send this JSON line instead of building one from verb + args
+        #[arg(long, conflicts_with = "verb")]
+        raw: Option<String>,
     },
 }
 
@@ -1403,6 +1418,20 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             st.report();
             if st.remap_failed > 0 || !st.complete_not_exact.is_empty() {
                 return Err("strings check failed".into());
+            }
+        }
+        Cmd::Live { verb, args, raw } => {
+            let line = match (raw, verb) {
+                (Some(raw), _) => raw,
+                (None, Some(verb)) => live::command_line(&verb, &args),
+                (None, None) => return Err("give a verb (ping, status, ...) or --raw '<json>'".into()),
+            };
+            let reply = live::request(&line)?;
+            println!("{reply}");
+            let ok = serde_json::from_str::<serde_json::Value>(&reply).ok()
+                .and_then(|v| v.get("ok").and_then(|o| o.as_bool()));
+            if ok != Some(true) {
+                return Err("bridge reported a failure".into());
             }
         }
         Cmd::TemplateCopy { template, name, out, dry_run } => {

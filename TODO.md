@@ -1659,6 +1659,40 @@ sessions; break one down into concrete items before starting it. Order = depende
         look direction, find entities near the hero (JSON, GUIDs), move/rotate by GUID live, time/weather (World
         Debug), and **frame capture** to PNG via our D3D9 hook (backbuffer, game frame only - user 2026-10-17
         allows the agent to look at game frames). Spawn from template needs RE -> v1
+        Breakdown (agent 2026-10-17; one step ~ half a session, each ends with an in-game check):
+    - [x] B0 DONE 2026-10-17 (live_bridge.dll 0.1.0 build 12:13:55, client `risen live`). World name =
+          eCProcessibleElement::GetFileBaseName on gCWorld (base at 0, +0x18 bytes checked; menu = G3_Startup);
+          yaw = atan2(at.x, at.z) from Entity::GetAtVector, 0 = +Z, 90 = +X - CONFIRMED by a straight walk with
+          the user (displacement 349 deg = yaw 349). Replies 0 ms. Not yet tested: timeout during loading.
+          Plan was: dev mod `mods/live-bridge` -> live_bridge.dll (no README = never packaged), WM block 0x5Axx.
+          Pipe thread `\\.\pipe\RisenLive` (local only, one client at a time), one JSON line in -> one line out;
+          request is posted to the game window (WM_APP+0x5A01), worker waits on an event (timeout ~2 s ->
+          `{"ok":false,"err":"timeout"}`); every command logged in one line. Verbs: `ping` (version, game build
+          check), `status` (world name, hero position + yaw, time of day, loaded/in-menu/dialog). Client:
+          `risen live <verb> [args]` in risen-cli (std file open of the pipe, no new crates), prints the reply
+          as is; `--raw '<json>'` for any request
+    - [x] B1 DONE 2026-10-17 (live_bridge.dll 0.2.0 build 12:22:31): `teleport x y z [yaw]`, `look yaw`, `~` =
+          relative (`~0 ~200 ~0`). Script Entity::MoveTo(bCMatrix) = SetToWorldMatrix + PSRigidBody::SetPose +
+          PSNavigation::ResetAll + StopMovement (vanilla Entity::Teleport uses it). bCMatrix row-major 64 bytes:
+          X axis +0x00, Z axis (at) +0x20, translation +0x30; pose translation cross-checked with GetPosition
+          (refuse on mismatch). Yaw rows: right (c,0,-s), up (0,1,0), at (s,0,c). USER CONFIRMED: look ~90 turns
+          right, lift 2 m falls back down, 10 m teleport with yaw 0 - camera follows, walking/jumping fine.
+          Open: `--ground` snap (needs a raycast export), camera pitch (the "looks down" item of 5.23)
+          Plan was: `teleport x y z [--yaw]`, `look yaw [pitch]`; check camera follows and no falling through the ground
+    - [ ] B2 Find: `near [--radius 2000] [--limit 20] [--kind item|npc|any] [--name substr]` -> compact list
+          GUID/name/x,y,z/distance sorted by distance; `show <guid>` -> fuller per-GUID info (template, flags,
+          position/rotation). RE: iterate entities of the scene / processing range (export to find)
+    - [ ] B3 Edit: `move <guid> x y z`, `rotate <guid> yaw [pitch roll]`, `freeze|release <guid>` - World Debug
+          Freeze/SetPosition code moved into shared/ (or the bridge calls world_debug exports); GUID resolved
+          every command; refuse NPC/hero/attached/out-of-range like World Debug unless `--force-npc` later
+          RE: rotation setter (SetWorldMatrix / PSRigidBody orientation) with physics sync
+    - [ ] B4 Time/weather: `time HH:MM`, `day +1`, `weather clear|restore|list` via world_debug exports
+          (RisenDebugSetHour/... added there) to avoid two owners of the weather state
+    - [ ] B5 Frame: `frame [--width 960]` -> PNG in build/live/frame-<time>.png, reply = path only. D3D9 hook:
+          GetRenderTargetData of the back buffer in onDraw when a capture is pending, downscale, write PNG on the
+          worker thread (stb_image_write or own minimal PNG). Check it chains with menu.dll's hook and ReShade
+    - [ ] B6 Skill `.agents/skills/risen-live-bridge/SKILL.md` (verbs, context rules above, examples) + row in
+          notes/reference-implementations.md + notes/live-bridge.md (protocol)
   - [ ] "Bake": write a live change into the world files (risen-formats) so it survives a new game
 - [ ] 7.2 Safety layer of the bridge (agent's addition): allow-list of verbs, limits (spawn count, area, rate),
       undo of the last N commands, "live only" vs "bake into the world files", never touch saves without a backup.
