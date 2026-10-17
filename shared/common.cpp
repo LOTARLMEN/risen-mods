@@ -169,6 +169,7 @@ static const struct { const char* name; int vk; } kKeyNames[] = {
     {"MOUSE2", VK_RBUTTON}, {"RMB", VK_RBUTTON}, {"MOUSE3", VK_MBUTTON}, {"MMB", VK_MBUTTON},
     {"MOUSE4", VK_XBUTTON1}, {"MOUSE5", VK_XBUTTON2},
     {"NUMPAD+", VK_ADD}, {"NUMPAD-", VK_SUBTRACT}, {"NUMPAD*", VK_MULTIPLY}, {"NUMPAD/", VK_DIVIDE},
+    {"-", VK_OEM_MINUS}, {"=", VK_OEM_PLUS}, {"_", VK_OEM_MINUS}, {"+", VK_OEM_PLUS},
 };
 
 int ParseKey(const char* raw)

@@ -27,9 +27,11 @@ try {
     # is explicitly enabled here; the DLL's source default remains disabled.
     if(!(Test-Path -LiteralPath (Join-Path $game $paths[1]))) {
         @('[Debug]','Enabled=1','SelectKey=NUMPAD7','PhysicsKey=NUMPAD5','LiftKey=NUMPAD9',
-          'FreecamKey=NUMPAD0','LiftCm=100','FreecamSpeed=30') | Set-Content -LiteralPath (Join-Path $game $paths[1]) -Encoding ascii
+          'FreecamKey=NUMPAD0','LiftCm=100','FreecamSpeed=300','FreecamSlowerKey=-','FreecamFasterKey==') | Set-Content -LiteralPath (Join-Path $game $paths[1]) -Encoding ascii
     }
     if((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath (Join-Path $game $paths[0])).Hash){throw 'Deployed DLL differs.'}
+    $iniRecord=$manifest | Where-Object {$_.path -eq $paths[1]}
+    if($iniRecord.existed -and (Get-FileHash -LiteralPath (Join-Path $game $paths[1])).Hash -ne $iniRecord.hash){throw 'Existing user INI changed.'}
     $after=@(Get-ChildItem (Join-Path $game 'bin') -Recurse -File | Where-Object {
         $_.Extension -in '.dll','.ini' -and $_.Name -notin 'world_debug.dll','world_debug.ini'
     } | ForEach-Object {'{0} {1}' -f $_.FullName,(Get-FileHash -LiteralPath $_.FullName).Hash})

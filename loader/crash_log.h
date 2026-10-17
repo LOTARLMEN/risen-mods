@@ -5,3 +5,4 @@
 
 // Installs the handlers. Call once from the loader, after LogStartSession.
 void CrashLogInstall();
+void CrashLogStartWorker();

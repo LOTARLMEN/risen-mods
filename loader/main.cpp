@@ -11,6 +11,7 @@
 
 #include "common.h"
 #include "crash_log.h"
+#include "world_trace.h"
 
 // Windows version as the kernel reports it (GetVersionEx lies to programs without a manifest).
 static void LogSystem()
@@ -47,7 +48,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
     LogStartSession(modsDirA);
     SYSTEMTIME now;
     GetLocalTime(&now);
-    Log("Risen mod loader 1.1, %04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
+    Log("Risen mod loader 1.2 diagnostics, %04d-%02d-%02d", now.wYear, now.wMonth, now.wDay);
     LogSystem();
     CrashLogInstall();
 
@@ -76,5 +77,7 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, LPVOID reserved)
     }
     if (names.empty())
         Log("no mods in %ls", modsDir.c_str());
+    CrashLogStartWorker();
+    WorldTraceStart();
     return TRUE;
 }

@@ -1,4 +1,49 @@
-# World Debug 0.1.1 — repeatable physics checks and native free camera
+# World Debug 0.1.2 — repeatable physics checks and native free camera
+
+**0.1.2 correction (2026-10-15):** user retested 0.1.1 and reported excessively fast
+camera rotation even at movement speed 0.1, almost no translation, and no usable acceleration.
+The 0.1.1 fix was insufficient: retail `GetDebugMode` (Game 0x7a8230) is `xor al,al; ret`,
+so the first Tick discarded camera ownership and subsequent slider changes were ignored.
+Use exported `IsExternalCamera` (0x7ac510), which reads +0x38, the flag changed by
+`OnToggleFreeFlyCam`. No camera/entity pointer is retained across frames.
+
+Top-row `-` / `=` (also `_` / `+`, Shift optional) halve/double movement speed immediately,
+only in an owned active freecam outside F10. Hold repeats after 400 ms, every 180 ms.
+F10 rebinds use `FreecamSlowerKey` / `FreecamFasterKey`; common key parser now names
+the OEM keys. Range 0.1..10000 cm/s, new default 300 cm/s; existing INI is preserved.
+Speed persists through the same INI and appears continuously beside DEBUG CAM.
+
+Mouse rotation now matches the player's ordinary camera input sensitivity, independently
+of translation speed. Native `gCCameraAdmin::OnAction`: normal input gain 0.075 DEGREES
+(0x7ac043; pitch 0x7ac145), freefly 0.025 RADIANS (0x7ac071 / 0x7ac17a).
+Normal yaw/pitch are converted to radians in the camera-type path (0x7bdf1b..0x7bdf58).
+Freefly feeds its angles straight to `eCCameraBase::RotateAngularRel` at 0x7af5fe.
+Normalize only that Game.dll IAT call by `(0.075 * pi/180) / 0.025 = 0.05235988`
+while this mod owns the camera, retaining native mouse sensitivity/inversion. No new
+rotation setting, no global mouse setting changed, no executable bytes patched.
+All other calls pass through unchanged. Rev.2045 call bytes, input gains, normal radians
+conversion and real state getter are checked before installation; mismatch disables freecam
+and logs the reason while item controls remain usable.
+
+`tools/check-world-debug.py` checks 32 API exports plus the rotation import, real state flag,
+retail stub and native rotation math against the installed binaries. A C++ regression harness
+(`tools/check-world-debug-controls.bat`) runs the actual commands/config/ticks with fake APIs
+and a scratch INI: 20 checks, including ownership across ticks, immediate speed changes,
+limits/persistence, ignored keys outside freecam, engine reset, disable/dialog/world exit.
+**Hands-on 0.1.2 PASSED (user report recorded 2026-10-15 19:19):** user reports
+"optimal speed, everything works" and supplies a screenshot showing DEBUG CAM 819 cm/s.
+Installed INI contains FreecamSpeed=819.20 (8.192 m/s). Log confirms repeated speed-key
+half/double adjustments and subsequent INI reloads preserving the values. Camera control
+issue closed; rebind/second-toggle/other edge cases were not individually described.
+
+**Installed 0.1.2:** full C++ build passed without errors/warnings. Only world_debug.dll
+build 2026-10-15 18:54:53 deployed with game closed; staged/deployed SHA256 identical.
+Existing INI preserved byte-for-byte at speed 0.1, unrelated DLL/INI hashes unchanged.
+Backup: backup/world-debug-20261015-185606/manifest.json. Steam launch log 18:56:28
+identifies 0.1.2 and 0.1 cm/s, keys 0xBD/0xBB; 18:56:35 confirms rotation checks/hook,
+API and scene/camera modules. Other installed DLLs remain October 12-14 builds.
+User completed the retest and chose 819.20 cm/s, now saved by the mod. Source default remains
+300 cm/s; user preference does not change shipped defaults. No package/commit/push.
 
 User requested developer controls after confirming physical-ground contact and save/load (2026-10-15).
 The shield was already resting, so that check did not show another fall. A separate DLL provides
@@ -12,7 +57,8 @@ The installed test INI explicitly enables them. Num Lock on, AutoLoot OFF:
 - NUMPAD5: freeze/release the selected item; releasing enables gravity and wakes it.
 - NUMPAD0: toggle native freefly camera. Use native movement/look controls and verify return.
 
-Settings expose all four keys, lift height 1..500 cm and camera speed 0.1..1000 cm/s (default 30).
+Settings expose the four action keys plus two speed keys, lift height 1..500 cm and
+camera movement speed 0.1..10000 cm/s (default 300).
 Speed changes in F10/INI apply immediately to an active owned camera. Ctrl+click the F10 number
 allows precise entry. 0.1 used 10..5000, default 300, and only applied speed on camera activation.
 NUMPAD8 was avoided:
@@ -40,8 +86,9 @@ adds 0x7e frozen axes, stops motion and sleeps. Release clears only 0x7e/0x80/0x
 flags, enables PhysicsEnabled, sets wake counter 1 and wakes. Lift uses PSRigidBody::SetPosition(Vec3),
 then wakes the frozen actor for the queued pose update. User confirmed the core tools work in game.
 
-Freecam calls gCCameraAdmin::OnToggleFreeFlyCam 0x7ac530 and SetFreeCamSpeed; GetDebugMode reads
-its state. The engine copies/restores the camera pose itself. User confirmed freecam works, with
+Freecam calls gCCameraAdmin::OnToggleFreeFlyCam 0x7ac530 and SetFreeCamSpeed; IsExternalCamera reads
+its state (the earlier GetDebugMode assumption was incorrect; see 0.1.2 above).
+The engine copies/restores the camera pose itself. User confirmed freecam works, with
 excessive speed the only reported issue. Disabling tools/leaving the world
 returns a camera owned by this mod; engine resets can also turn it off.
 
@@ -65,7 +112,8 @@ sub_7b20e0 passes that and +0xec (acceleration modifier) into sub_7af1c0. Transl
 direction and multiplies by GetFrameTimeInSeconds * speed; acceleration applies the native
 modifier only when its action is held. World positions use centimetres. Inspection captured in
 build/recon/debug-camera-speed{,-dispatch}.txt; runtime uses exports, no offsets or patches.
-**Pending:** user retest of slower movement and immediate F10 speed changes in 0.1.1.
+**0.1.1 retest FAILED (2026-10-15):** user reported fast rotation, almost no movement
+at 0.1 and inability to accelerate. Superseded by user-confirmed 0.1.2 above.
 
 0.1.1 full C++ build passed without errors/warnings; all 32 exports checked. Installed ONLY
 world_debug.dll build 2026-10-15 16:24:35 with game closed; existing INI SHA256 preserved,
