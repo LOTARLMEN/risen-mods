@@ -105,6 +105,24 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
+    /// Enable/disable registered sectors of a world (world list + .sec flags), with backup and
+    /// rollback like layer-create (undo: world-restore)
+    SectorSet {
+        #[arg(long, default_value = "World")]
+        world: String,
+        #[arg(long, num_args = 1..)]
+        enable: Vec<String>,
+        #[arg(long, num_args = 1..)]
+        disable: Vec<String>,
+        /// Disable every registered sector not listed in --enable
+        #[arg(long)]
+        only: bool,
+        /// Write a game-shaped staging tree here instead of installing into the game
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Restore a layer-create backup (game must be closed)
     WorldRestore {
         backup: PathBuf,
@@ -977,6 +995,20 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             }
             for c in &changes { println!("{} {} ({} bytes)", if c.replace { "update" } else { "create" }, c.path, c.bytes.len()); }
             if !dry_run {
+                if out_dir.is_none() && vfs.no_physical { return Err("NoPhysical=true: enable loose files or use --out-dir".into()); }
+                let root = out_dir.unwrap_or_else(|| vfs.root.clone());
+                std::fs::create_dir_all(&root)?;
+                let backup = project::apply(&root, &changes)?;
+                println!("BACKUP: {}", backup.display());
+                println!("RESTORE: risen world-restore \"{}\"", backup.display());
+            }
+        }
+        Cmd::SectorSet { world, enable, disable, only, out_dir, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let changes = project::plan_sectors(&vfs, &world, &enable, &disable, only)?;
+            for c in &changes { println!("update {} ({} bytes)", c.path, c.bytes.len()); }
+            if changes.is_empty() { println!("already in the requested state"); }
+            if !dry_run && !changes.is_empty() {
                 if out_dir.is_none() && vfs.no_physical { return Err("NoPhysical=true: enable loose files or use --out-dir".into()); }
                 let root = out_dir.unwrap_or_else(|| vfs.root.clone());
                 std::fs::create_dir_all(&root)?;

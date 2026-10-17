@@ -71,6 +71,82 @@ pub fn plan(vfs: &GameVfs, name: &str, world: &str, donor: &str) -> Result<Vec<C
     Ok(changes)
 }
 
+/// Enable/disable registered sectors: the world list (+ _local list) and each changed .sec's
+/// Enabled / EnabledOnStartup flags. `only` disables every registered sector not in `enable`.
+/// Unchanged files are left out.
+pub fn plan_sectors(vfs: &GameVfs, world: &str, enable: &[String], disable: &[String], only: bool) -> Result<Vec<Change>> {
+    let wname = if world.to_ascii_lowercase().ends_with(".wrl") { world.to_string() } else { format!("{world}.wrl") };
+    let w = ProjectFile::read(&vfs.read(vfs.find(PROJECTS, &wname)?)?)?;
+    let data_ref = w.world().and_then(|w| w.world_data_file).ok_or("world has no world-data filename")?;
+    let de = vfs.find(PROJECTS, w.archive.str(data_ref))?;
+    let desc = WorldData::read(&vfs.read(de)?)?;
+    let registered: Vec<String> = desc.sectors().iter().map(|s| s.name.clone()).collect();
+    let find = |n: &String| registered.iter().find(|r| r.eq_ignore_ascii_case(n)).cloned()
+        .ok_or_else(|| format!("sector {n} is not registered in {wname}"));
+    let mut wanted: Vec<(String, bool)> = Vec::new();
+    for n in enable { wanted.push((find(n)?, true)); }
+    for n in disable {
+        let n = find(n)?;
+        if wanted.iter().any(|(w, _)| w.eq_ignore_ascii_case(&n)) { return Err(format!("sector {n} is both enabled and disabled").into()); }
+        wanted.push((n, false));
+    }
+    if only {
+        for r in &registered { if !wanted.iter().any(|(w, _)| w.eq_ignore_ascii_case(r)) { wanted.push((r.clone(), false)); } }
+    }
+    if wanted.is_empty() { return Err("nothing to change: pass --enable/--disable".into()); }
+    let mut changes = Vec::new();
+    let mut sources = Vec::new();
+    for (name, on) in &wanted {
+        // Shipped lists name some sectors without a .sec; disabling them needs only the list.
+        let se = match vfs.find(PROJECTS, &format!("{name}.sec")) {
+            Ok(e) => e,
+            Err(VfsError::NotFound(_)) if !*on => continue,
+            Err(e) => return Err(e.into()),
+        };
+        let mut sector = ProjectFile::read(&vfs.read(se)?)?;
+        let strings = sector.archive.strings.clone();
+        let body = sector.root.body.as_mut().ok_or("empty sector")?;
+        let risen_formats::props::ClassData::Sector(s) = &mut body.data else { return Err(format!("{name}.sec is not a sector").into()); };
+        let mut changed = s.enabled != Some(*on as u8);
+        s.enabled = Some(*on as u8);
+        for p in &mut body.props.list {
+            if strings[p.name.0 as usize] == "EnabledOnStartup" {
+                if strings[p.ty.0 as usize] != "bool" || p.value.len() != 1 { return Err(format!("{name}.sec: invalid startup flag").into()); }
+                changed |= p.value[0] != *on as u8;
+                p.value[0] = *on as u8;
+            }
+        }
+        if changed {
+            let bytes = sector.write();
+            ProjectFile::read(&bytes)?;
+            changes.push(Change { path: se.path.clone(), bytes, replace: true });
+            sources.push(se);
+        }
+    }
+    let mut lists = vec![de];
+    let local = format!("{}_local.wrldatasc", de.path.strip_suffix(".wrldatasc").ok_or("world-data filename must end in .wrldatasc")?);
+    match vfs.find(PROJECTS, &local) {
+        Ok(e) => lists.push(e),
+        Err(VfsError::NotFound(_)) => {}
+        Err(e) => return Err(e.into()),
+    }
+    for e in lists {
+        let original = vfs.read(e)?;
+        let mut data = WorldData::read(&original)?;
+        // A _local list may omit sectors; gCWorld::OnRead treats a missing entry as disabled.
+        for (name, on) in &wanted { data.set_sector(name, *on)?; }
+        let bytes = data.write();
+        if bytes != original { changes.push(Change { path: e.path.clone(), bytes, replace: true }); sources.push(e); }
+    }
+    // The writer uses a game-shaped output tree, so do not silently ignore mount aliases.
+    for e in sources {
+        if !super::same_file(&e.loose, &vfs.root.join(&e.path)) {
+            return Err("project mounts with remapped physical paths are not supported for sector edits".into());
+        }
+    }
+    Ok(changes)
+}
+
 fn validate_name(name: &str) -> Result<()> {
     if name.is_empty() || name.len() > 64 || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
         || name.as_bytes()[0].is_ascii_digit()

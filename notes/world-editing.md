@@ -15,6 +15,19 @@ Custom mesh/terrain resource investigation: [asset editing feasibility and scrat
 The lossless parser preserves original comments, section order, line endings and unrelated data.
 Its add/update/remove methods affect only `[Sector.List]`.
 
+## Enable/disable sectors
+
+```powershell
+.\rust\target\release\risen.exe sector-set --world Testlevel_Plane --only --enable Testlevel_Plane_Intern_01 `
+  Testlevel_Plane_Meshes_01 Testlevel_Plane_Nav "SysDyn_{55A13CC5-D0EC-430F-A6BE-EF89459DB356}" --dry-run
+```
+
+Updates the world list (and a `_local` list if mounted) plus each changed `.sec` (`Enabled`,
+`EnabledOnStartup`); unchanged files are left out. `--only` disables every other registered sector.
+Some shipped lists name sectors without a `.sec`: those can be disabled (list only), not enabled.
+Same transaction/backup as `layer-create`; undo with `world-restore`. `--out-dir` stages a game-shaped tree.
+Used for the test world (TODO 5.23): Testlevel_Plane reduced to hero/camera, plane, navigation and sky/weather.
+
 ## Create a separate layer
 
 ```powershell

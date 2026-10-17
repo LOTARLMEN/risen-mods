@@ -1486,6 +1486,11 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
         User now confirms repaired models render filled and look normal (2026-10-16).
         USER CONFIRMED 2026-10-17: custom models work (walking/collision), save/load does not break them.
         User permits agent to close game after completed tests; AGENTS updated.
+- [ ] Roll back the old test scene near Sara (ONLY when the user agrees; plan: move test objects into the
+      5.23 test world). Order: asset-restore backup\asset-edits\009F8EB3-0CB7-48B7-8486-EE6C7B6813FC ->
+      F6C70FF8-01B9-47B5-9341-AEC311B40972 -> 27976494-684B-46D1-910B-A95331CDA177, then world-restore
+      backup\world-edits\22D5BFDD-E700-4264-BB46-F5146A7B381F -> 811942CC.... Also decide on the older loose
+      edits (Game_Start layers, items.tab/focus.tab, It_Axe_RisenMods_Test.tple) and NoPhysical=false (ask user)
 - [ ] Release of world edits: the installer must patch [Root] NoPhysical=false in mountlist_packed.ini and undo it
 - [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
       pipe, JSON commands) so any agent or our editor can find / move / spawn / delete entities in the running game
@@ -1562,6 +1567,53 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       Hands-on test passed; user's preferred 819.20 cm/s is already saved by the mod.
       No package/commit/push.
 
+## Stage 5.23 — Test world + dev "Test" button + autostart (user 2026-10-17; ~3 sessions, stage not yet confirmed)
+Goal: skip walking to Sara / cutscenes. Dev-only "Test" button in DLG_MENU_GAME starts a new game in a small own
+test world; normal New Game must keep loading `World`. Editing the original island start was ruled out.
+RE so far: projects.pak has dev worlds Testlevel, Testlevel_Physics, Testlevel_Plane, Work_Import_Meshes (.wrl +
+.wrldatasc). Game.dll gCHUDFileManager::GetDefaultWorldName (+0x87bd70) defaults to "World" and reads command-line
+option `worldfile` (bCCommandLine::Create(eCApplication::GetCommandLineA) / GetOptions). Related: NewGame +0x87afe0,
+PostNewGame +0x87c110, gCSaveGame::GetWorldName +0x5a5f70; Script_Game OnClick_NewGame +0x1547e0; Script
+World::NewGame +0x236810. DLG_MENU_GAME (id 14) button row y=710 (notes/ui-recon.md).
+- [x] Finish RE of GetDefaultWorldName and SharedBase bCCommandLine (2026-10-17): if the option map has key
+      "worldfile", its value replaces "World", else "World". SkipOptionDelimiter accepts '-' or '/', SkipValueDelimiter
+      ':' or '=' -> `-worldfile:Testlevel_Plane` / `/worldfile=Testlevel_Plane`. Case handling of the key not checked
+- [x] Experiment 2026-10-17: Steam launch `-worldfile:Testlevel_Plane` reaches the process, but New Game (user)
+      still started the island. World Debug probe (11:04): engine command line is
+      '-mnt=mountlist_packed.ini -projectfile=Projects -worldfile=World -nosplash' - Risen.exe hard-codes the
+      first part (string at file offset 0x241d0/0x24230) and passes through only known flags; GetDefaultWorldName
+      -> 'World'. Projects.prj lists all 5 worlds, gCProject::GetWorld matches no-case, no fallback to World
+      (unknown name -> "Could not find world", New Game does nothing). So the launch option is a dead end
+- [x] World Debug experiment `[Debug] TestWorld=` (2026-10-17, build 11:06:17, installed INI TestWorld=Testlevel_Plane):
+      at API init swaps the `-worldfile=World` token in the engine's command line string (eCApplication +0xB8)
+      via bCString::operator=; GetDefaultWorldName then returns the test world. USER CONFIRMED: New Game loads
+      Testlevel_Plane (flat grass, final-boss lava platform, monsters + NPCs fighting). The intro cutscene and
+      quest "find shipwreck survivors" still start. Other readers of the string not checked (fine so far).
+      Remove the TestWorld line from the installed INI to get the normal New Game back
+- [x] Test world = stripped Testlevel_Plane (2026-10-17, USER CONFIRMED: empty flat world, no intro video, no
+      wake-up scene, no start quest, controls/UI fine). New CLI `sector-set --world W [--enable ..] [--disable ..]
+      [--only] [--out-dir|--dry-run]`: world list (+_local) and .sec Enabled/EnabledOnStartup, unchanged files left
+      out, list-only sectors without .sec may be disabled; world-scope backup (undo world-restore). Installed: only
+      Intern_01 (hero/camera), Meshes_01 (plane), Nav, SysDyn (sky/clock/weather) enabled, 13 .sec + wrldatasc
+      loose files, backup backup\world-edits\640DD4F8-707B-4CEC-8E1E-8970B2922646. World `World` untouched.
+      World Debug with TestWorld set also patches two verified IAT call sites (log + skip on mismatch):
+      Game.dll EndProgress +0x87ac0f PlayVideo(<lang>_Intro.bik) is skipped; Script_Game Rtn_Player +0x1af175
+      ExistsGameVariable("Gamestart") returns true -> PS_Gamestart (lying hero, "where am I", start quest) skipped.
+      Hero starts without start-game items (not checked). Shutdown first-chance AV Game.dll+0x970cdb /
+      SharedBase.dll+0x7caa9 on graceful close at 11:09 and 11:26 (reports in crashes/); not a crash in play
+- [ ] Own test content in the test world: layer-create RisenMods_Test --world Testlevel_Plane, move test objects
+      from the Sara scene (towers/boards/custom models) there, then roll back the Sara scene (5.21 item)
+- [ ] Move the TestWorld/skip code out of World Debug into its own dev mod (or the Test button's mod) before release;
+      World Debug README must not mention it while it's experimental
+- [ ] If a dev world loads: own world RisenMods_Test (.wrldatasc + sector + layer, flat ground/landscape patch,
+      hero start, sky/weather/env, navigation) via CLI with backup/restore; check new-game scripts expecting World
+- [ ] NEXT SESSION: "Test" button in DLG_MENU_GAME next to "New Game" (user 2026-10-17; INI dev flag, hidden by default). Normal New Game keeps World: set the
+      engine command line token + intro/wake-up skips only for the Test click, restore after. After world ready:
+      optional teleport, 12:00 + clear weather, World Debug on
+- [ ] AutoTest=1: auto-press at DLG_MENU_MAIN; mode B: load a prepared test save
+
 ## Stage 6 — Release
+- [ ] Before release: diagnostics off by default (WorldTrace / DumpFirstChance); compact long 2026-10-16
+      DEVELOPMENT_LOG entries and TODO per skill risen-devlog
 - [x] README with install/uninstall steps (every mod, RU + EN)
 - [ ] Test full playthrough segments with saves (back up saves first)
