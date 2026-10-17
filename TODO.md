@@ -1145,12 +1145,146 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       confirmed in the new log. Contact/persistence now user-confirmed. No DLL deploy at this step;
       bin DLLs were October 12-14 builds. No commit/push.
 - [ ] Remaining geometry: pose-dependent animated bounds / skinning; particle runtime extents;
-      SpeedTree procedural geometry; collision-based contact/overlap checks using decoded ._xcom
-      and primitive colliders. NEXT: repeatable live debug controls (below), then analytic
-      curved moving undersides / broader contact and overlap queries. Ground defaults to visual
+      SpeedTree procedural geometry; broader motion solving and runtime collision semantics.
+      Repeatable live debug controls, analytic curved moving undersides and read-only full-geometry
+      contact/distance queries and full-geometry ground diagnostics DONE below.
+      Supported fixed-orientation downward sweeps/height correction DONE below.
+      Visible corrected placement/contact/save-load PASSED in the retest below; first load crash
+      recorded separately, no root-cause/fix claim. Ground defaults to visual
       triangles/five samples; --collision uses physical geometry with dense sampling.
       Slope/normal alignment and denser samples DONE and user-tested below. Do not label it an
       exact PhysX simulation. Existing rigid-body presence alone does not imply a freely falling body.
+- [x] Diagnose sampled ground through full geometry (2026-10-16):
+      `ground --collision --check-contact` queries the planned own colliders against full, unclipped
+      candidate support entity colliders before writing. Static support/ray/group policy retained;
+      candidate shapes outside the sampling footprint retained, original local geometry queried in f64.
+      --height uses analytic infinite-plane queries (original triangle edges/vertices, spheres/capsules).
+      --json requires --dry-run; reports matrices, sampled stats, requested vertical gap, intentional
+      embedding, per-candidate spatial distance/contact/shared points/shape indices and aggregates.
+      --contact-tolerance only controls near reporting. Touching and penetration are both contact;
+      no signed depth, general obstruction sweep, automatic correction or runtime physics claim.
+      96 workspace tests passed (one ignored helper), including a narrow bump between all 3x3
+      ground samples: sampled placement misses it, full collider query detects intersection.
+      Native board/steep slope/Chicken/ore CLI checks, standalone contact agreement, byte-identical
+      placement with/without diagnostics, dry-run/JSON/GUID/witnesses/tolerance/refusals passed.
+      Debug/release CLI built without warnings; release 2026-10-16 07:23:40. Final results:
+      build/tests/ground-contact-20261016-072359/result.json; existing contact CLI suite also passed
+      (build/tests/contact-20261016-072433/result.json). Game data/INI/DLL hashes unchanged.
+      No install/launch/hands-on test.
+      World Debug in bin remains 0.1.2 build 2026-10-15 18:54:53, other DLLs October 12-14.
+      No package/commit/push. Details and reproducible commands: notes/geometry-placement.md.
+- [x] Supported vertical sweeps/correction (2026-10-16):
+      `ground --collision --check-contact --correct-height` retains sampled orientation, searches
+      downward from original Y+max-rise to original Y-max-drop using 90% nearest spatial-distance
+      steps. Full prepared geometry, fixed orientation, first approached obstacle (including overhangs),
+      no monotone-overlap assumption or grid stepping. --sweep-tolerance default 0.01 cm, min 1e-6;
+      clear-side spatial tolerance, not vertical error. 512-query cap; side/grazing/initial-touch/overlap,
+      no-hit, invalid inputs or native precision failures refuse before writes. Valid sampled plan
+      remains a prerequisite; no general MTD/runtime physics solver or arbitrary-motion claim.
+      Candidate scan expands to full-body swept envelope (rotation radius with alignment), padded
+      for f32 broad-phase rounding. Original static support/ray/group/subtree exclusions retained.
+      Actual f32 zero-gap pose revalidated clear/near; signed gap applied vertically afterward,
+      final pose revalidated within original displacement limits, nonnegative gaps clear.
+      Negative gaps deliberately allow embedding; sub-tolerance negatives may remain clear.
+      JSON includes sampled/final matrices and correction bounds/tolerance/iterations/witnesses/Y.
+      Contact reporting tolerance stays independent. Child poses/nav/physics use existing setters.
+      103 workspace tests passed (one ignored helper), including missed narrow bump, thin and
+      disconnected surfaces, compounds/curves/slopes, overlap/wall/range/iteration/precision checks.
+      tools/test-height-correction.ps1 passed on native boards/Chicken/ore/landscape, signed gaps,
+      finer sweep and independent reporting tolerances, serialized contact, child matrices/nav,
+      unrelated entities/properties, repeat/dry-run, overhead-start and f32 precision refusals.
+      Stage: build/tests/height-correction-20261016-074030/result.json. Debug/release built without
+      warnings; release 2026-10-16 07:40:06. Game data/INI/DLL SHA256 unchanged; no install/launch
+      or hands-on test claimed. Bin World Debug 0.1.2 build 2026-10-15 18:54:53; other DLLs October 12-14.
+      Previous diagnostic-only CLI suite also passed (build/tests/ground-contact-20261016-074240/result.json),
+      including byte-identical legacy placement and matching game hashes.
+      No package/commit/push. Details/semantics: notes/geometry-placement.md.
+- [x] In-game corrected-placement check (2026-10-16, user confirmation recorded 08:14):
+      native paired bases/boards with narrow crate piers between all 3x3 sample X columns.
+      A [39] at x=-38500,z=-5800 uses sampled ground; pier [38] penetrates/protrudes through it.
+      B [44] at x=-37950,z=-5800 corrected upward 42.98258 cm; pier [43] distance 0.0020778 cm.
+      Bases [35]/[40], buried posts [36,37]/[41,42], native model/collider uniform scales only.
+      Both bases have top Y=139.49547, physical terrain samples 6.684817..50.530743 cm.
+      New objects static/climbable; 45 total entities. All 34 old non-root entities byte-identical;
+      native scale/contact/readback/dry-run and unrelated game data/INI/DLL SHA256 checks passed.
+      Only test .lrent installed with verified backup/world-restore:
+      backup/world-edits/22D5BFDD-E700-4264-BB46-F5146A7B381F (restore before 811942CC...).
+      Stage: build/tests/height-scene-20261016-075424/installed-test.json.
+      USER: spawned on structures; corrected view/pier and walking/jumping OK. After restart,
+      test-save load, save/load again, then freecam flight + save/load again all OK. Initial
+      reload crashed once (separate open item below); do not erase it or claim a crash fix.
+      Scene left installed; game launched via Steam. CLI still 07:40:06; scratch example built
+      07:54:45. World Debug in bin 0.1.2 build 2026-10-15 18:54:53, other DLLs October 12-14.
+      No package/commit/push. Details: notes/geometry-placement.md.
+- [ ] One initial save-load crash 2026-10-16 08:04:38: AV Engine.dll+0x652e0c,
+      eCCollisionShape_PS::OnExitProcessingRange touching-shape traversal during old-world
+      destruction under gCSaveGameManager::Load. Real crash confirmed by Windows event/minidump.
+      Not reproduced after restart, including repeated save/load before/after freecam; cause/owner
+      unknown (relevant heap memory absent from minidump). No patch or corrupt-save claim.
+      If it recurs, preserve fresh evidence before another launch and obtain a precise reproduction.
+      Evidence: build/tests/height-scene-20261016-075424/crash-20261016-080438/ plus retest log.
+      QuickSave.save in that folder is a later retest copy (mtime 08:11:16), not the initial save.
+      Diagnostic instrumentation installed 2026-10-16 08:46: loader 1.2 diagnostics,
+      build 08:45:00 (SHA256 verified against build/bin/version.dll). Only version.dll and
+      loader.ini changed; backup/manifest backup/world-trace-20261016-084612, exact scene
+      and previous session log preserved there. World Debug remains 0.1.2 / October 15 18:54:53,
+      user speed 204.80 preserved. Rev. 2045 module identities and all five vtable targets
+      matched on startup; dump worker ready, first actual layer-release records observed.
+      37 standalone checks passed plus independent parsing of three fresh selective-heap
+      dumps (ordinary/reserved-physics/unhandled paths); full C++ build passed.
+      Session read/write, layer release, context destruction, copied collision owner history,
+      touching objects and selective memory dumps + persistent log snapshots implemented.
+      Strong logging requested by user; cause/fix still open. USER CONFIRMED 08:48:
+      save and repeated load passed with diagnostics enabled. Actual session read/write and
+      test-layer release records observed; retest-RisenMods.log preserved in the backup.
+      Details: notes/crash-diagnostics.md. No package/commit/push.
+      Final diagnostic build 08:50:40 replaces 08:45:00; backup/manifest
+      backup/world-trace-20261016-085139 (restore before 084612). Full C++ build passed.
+      The user then exited manually; exceptions Game+970cdb / SharedBase+7caa9 at 08:48:37
+      occurred during shutdown, distinct from the original Engine+652e0c load crash.
+      Log and Windows dump preserved in 084612 backup. Live owner GUID/name/position capture
+      confirmed in that report, including corrected board GUID 138882AB-291F-43BF-81A0-CAAA63234FCE.
+      Worker was already unavailable at shutdown: final build detects shutdown, skips waiting
+      and preserves text directly as .exception.log. Forty standalone checks + three fresh
+      heap-marker dumps passed, including actual shutdown text file existence. Manual save/load
+      confirmation applies to the first 08:45 trace build; final shutdown-only change verified
+      standalone. Game left closed. Original load-crash cause and shutdown crash remain open.
+- [x] Curved moving colliders (2026-10-15 20:07): `ground --collision` now accepts spheres,
+      capsules and mixed polygon/curved bodies. Analytic lower/upper vertical intersections,
+      grid + segment/ring/extremum samples, world-pose resampling after tilt; native transform/filter
+      validation retained. Polygon-only bodies use the previous mesh path. No curved tessellation.
+      Centered cylinder quadratic improves precision at distant Y. Still sampled support/contact,
+      not continuous collision detection or PhysX; runtime character/animation changes not modeled.
+      All 80 workspace tests passed (one ignored helper); debug/release built, release CLI 20:02:35.
+      Read-only original-template corpus: 487 curved templates, 480 supported primitive bodies
+      (477 capsules / 3 spheres), 2880 rotated/scaled placements with horizontal-plane bottom and
+      repeatability checks; 7 disabled/filtered bodies skipped, no unexpected refusals.
+      tools/test-curved-ground.ps1 checked original Chicken capsule on physical landscape + plane,
+      original gold-ore sphere on plane, nav-position sync, property/other-entity preservation,
+      repeatability, dry-run, rise refusal and unchanged board control. Stage/result:
+      build/tests/curved-ground-20261015-200607/result.json. Game data/INI/DLL SHA256 unchanged;
+      nothing installed, game not launched, hands-on test not claimed. World Debug in bin remains
+      0.1.2 build 18:54:53; other mod DLLs October 12-14. No package/commit/push.
+- [x] Read-only `contact` (2026-10-15 23:05): own enabled colliders of two entities, indices/GUIDs,
+      --against / --target-layer / hypothetical --offset / --tolerance / --json. All pairs of
+      sphere/capsule/box/cooked convex/triangle mesh supported; analytic segment/triangle and
+      triangle/triangle distance/intersection, volume containment, reusable prepared triangle BVHs.
+      Native solids retain volume semantics; triangle meshes are two-sided thin surfaces even if
+      closed. Solid boundaries must be closed/oriented/nondegenerate/nonzero-volume; oriented solid
+      angle containment retains the original cooked hull's small facet deviations (ship 0.08672 cm).
+      f64 query transforms avoid extra world-vertex rounding; native scale/adaptation checks retained.
+      distance>=0; intersects includes touching at numerical zero 1e-8 cm. User tolerance is separate.
+      Fixed serialized poses only: no penetration depth/MTD, time sweep, physics group matrix, skin
+      width, runtime animation/body motion or full PhysX compatibility. Existing ground unchanged.
+      All 92 workspace tests passed (one ignored helper), including BVH vs unpruned search and
+      500 independent analytic sphere/box comparisons. All 637 XCOM resources / 1089 meshes
+      (2 convex) passed 2178 known-distance/intersection checks (contact_check example).
+      tools/test-contact.ps1 CLI tests passed: native box/capsule/sphere/XCOM, GUID/cross-layer,
+      offsets/tolerance/symmetry/witnesses/refusals. Inset board intersects terrain; +100 cm virtual
+      Y offset gives 96.93611555 cm separation. Stage: build/tests/contact-20261015-230425/result.json.
+      Debug/release built; release CLI 23:04:07. Game data/INI/DLL SHA256 unchanged, no install/launch
+      or hands-on test claimed. Bin World Debug remains 0.1.2 build 18:54:53, other DLLs October 12-14.
+      No package/commit/push. Details and current limits: notes/geometry-placement.md.
 - [x] Slope-aware `ground` (user 2026-10-15): implemented and user-tested on the stronger slope below.
       `--align` fits local +Y to a sampled height plane, keeps forward XZ heading/positive axis scales;
       `--samples 3..17` enables an NxN mesh-underside grid + model vertices (align default 7).
@@ -1286,6 +1420,72 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       No animation/player-coordinate patches. Physical runtime hit points can differ from visual samples.
       Release CLI still 13:39:24; 55 core tests previously passed (core unchanged in this step).
       DLLs in bin remain October 12-14 builds; no commit/push.
+- [ ] Asset/terrain editing feasibility (user 2026-10-16): investigate changing the landscape itself
+      (raise/lower terrain, change mesh shape), resizing existing models, cutting/trimming parts of a mesh,
+      and adding our own models. This extends the current entity placement tools; do not repeat completed RE.
+      Already available: read/export native visual meshes and cooked XCOM collision geometry; uniform native
+      model/collider scales were used in the corrected-placement scene above. No general scale CLI or mesh
+      writer/import pipeline yet; preserving an existing scale is not proof of arbitrary resizing support.
+      Check uniform/nonuniform scale limits separately for render geometry and native colliders; for cutting,
+      terrain changes and custom imports, identify the required ._xmsh/._xcom write/cooking path, materials/
+      textures, bounds, LOD and navigation updates. Use Baltram's rmtools/Rimy3D as prior art (see stage intro).
+      Record supported operations and restrictions; prepare a minimal independent layer/resource test with
+      backup/restore, then have the user check appearance, player collision and save/load before marking done.
+  - [x] Offline resource feasibility probe (2026-10-16): four authored static ._xmsh models with matching
+        freshly cooked triangle ._xcom: wedge ramp, baked nonuniform stretch, special-case closed shortened
+        wedge and a 3x3 terrain patch with raised centre. Native PhysX 2.8.4 accepts all four; authored,
+        visual, native and Rust physical triangles agree (32 total), expected top heights/bounds checked.
+        All 1666 original compiled_meshes.bin headers round-trip byte-identically; appended cache has
+        1670 headers, old entry bytes/string indices preserved. Native cache load/write layout confirmed
+        in current Engine.dll. tools/test-mesh-assets.ps1 passed; stage:
+        build/tests/asset-probe-20261016-095609/result.json. Game DLL/INI/world/resource/cache SHA256 unchanged.
+        No install/launch or hands-on claim. Procedural probe only: no arbitrary OBJ import, general cut
+        algorithm or original-island edits. Details, primary sources and next steps: notes/asset-editing.md.
+  - [x] Asset-aware install/restore + separate scene prepared/installed 2026-10-16 10:20:
+        CLI asset-install/asset-restore have a separate explicit backup scope; world-restore stays project-only
+        and reads old manifests. Validate formats/paths/baseline before writes, refuse stale loose state and
+        subsequent edits; verified preimages/installed snapshots, rollback on install AND restore failure.
+        Initial 107 workspace tests passed; final 10 CLI tests passed after extra restore-failure coverage
+        (108 active tests total). Release CLI build 10:19:10. Real isolated 13-file install/restore passed.
+        Found and included compiled_collision_meshes.bin: 637 original headers round-trip identically,
+        appended 641. Visual cache remains 1666 -> 1670. RisenMods_Assets_Test = root + four unit-scale,
+        static triangle-collider models near Sara: ramps X=-37400/-37000/-36600,Z=-6200; patch -36200,-6600.
+        Bases intentionally 20 cm above highest sampled terrain; not a grounding or island modification test.
+        Existing 45-entity layer and all unrelated game DLL/INI/world/resource/cache SHA256 unchanged.
+        Backup: backup/asset-edits/27976494-684B-46D1-910B-A95331CDA177 (use asset-restore).
+        Stage: build/tests/asset-probe-20261016-095221/bundle-20261016-102009/installed-test.json.
+        Steam launch 10:21:16, PID 17768; main menu confirmed 10:21:25, inspected startup without exception.
+        Bin DLLs unchanged: loader diagnostics 08:50:40, World Debug 0.1.2/October 15 18:54:53.
+        Installed INIs preserved, startup freecam speed 819.20. No package/commit/push.
+        Details/workflow: notes/asset-editing.md, tools/install-mesh-assets.ps1.
+  - [ ] First x64 hands-on asset test: appearance/material/culling and player collision in a NEW game,
+        then save/load; existing-save loading separately. Game is running with the separate scene installed;
+        startup success alone does not verify rendering or collision. Then move proven asset serialization/
+        import into Rust core/CLI; investigate original terrain seams, blends, LOD and navigation separately.
+        Retest 2026-10-16 10:55: screenshot/user report describes old crate towers (jumping/walking OK),
+        NOT the new wedge assets; do not mark custom resources passed. Native shutdown log confirms
+        all four new GUIDs loaded. User closed game; old test sector now disabled (world list + .sec),
+        its 45-entity .lrent preserved. New models relocated onto cleared tower area: three wedges at
+        X=-37850/-37450/-37050,Z=-4900; raised patch -37450,-4500. Unit scales, active triangle shapes,
+        GUIDs preserved; ground uses physical landscape, 7x7 samples and intentional +20 cm gap.
+        Only old .sec/world registry/custom .lrent changed; all other DLL/INI/resources/caches/layers unchanged.
+        Backup asset-edits/F6C70FF8-01B9-47B5-9341-AEC311B40972 (restore BEFORE 27976494...).
+        Stage build/tests/asset-isolated-20261016-105433/installed-test.json; relaunch Steam 10:56.
+        DLL builds unchanged. NEW GAME visibility/walking/jumping/save-load still pending.
+        First actual custom visual test FAILED (user screenshot 10:58): disappearing exterior faces,
+        hollow/transparent appearance and unwanted hovering. Root cause measured against native donor:
+        60/60 native triangles have cross(normal edges) dot vertex normal <0; our 32/32 were >0.
+        Generator now reverses only XMSH indices; physics winding/geometry, vertex normals/attributes,
+        headers/materials/bounds and both caches unchanged. Independent check now includes native
+        render winding, rejects old bad fixture and passes all fixed assets; generated fixed bytes
+        match installed repairs. Corrected placement: full-geometry vertical ground correction,
+        9x9, gap -2 cm (replaces +20). Five files installed with verified backup while game closed:
+        asset-edits/009F8EB3-0CB7-48B7-8486-EE6C7B6813FC (restore before F6C70FF8..., then 27976494...).
+        Stage build/tests/asset-faces-20261016-110403/installed-test.json; no unrelated game changes.
+        Steam PID 23840/11:06:12, main menu 11:06:20. NEW GAME corrected-visual/walking/save-load
+        User now confirms repaired models render filled and look normal (2026-10-16).
+        Corrected custom collision/walking and save-load still await an explicit report.
+        User permits agent to close game after completed tests; AGENTS updated.
 - [ ] Release of world edits: the installer must patch [Root] NoPhysical=false in mountlist_packed.ini and undo it
 - [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
       pipe, JSON commands) so any agent or our editor can find / move / spawn / delete entities in the running game
@@ -1316,7 +1516,10 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       (selection, lift/freeze/release and native freecam); camera speed was the only reported issue,
       still too fast at 10. Individual pickup/out-of-range refusal and debug-action save/load cases
       were not described separately. Earlier board contact/save-load test remains confirmed.
-- [ ] Retest freecam speed in World Debug 0.1.1: fixed F10/INI changes only taking effect on next
+- [x] Retest freecam speed in World Debug 0.1.1: FAILED, user 2026-10-15 reports very fast
+      rotation at 0.1, almost no translation, no usable acceleration. The earlier fix below was
+      insufficient: GetDebugMode is a constant-false retail stub; Tick discarded camera ownership.
+      Superseded by 0.1.2 below. Previous attempt: fixed F10/INI changes only taking effect on next
       camera toggle; now applied immediately to an active owned camera. Range 0.1..1000 cm/s,
       default 30 (was 300), precise Ctrl+click entry. Preserve user's installed speed 10 and all
       other INI settings on deployment. Details and build/deployment evidence: notes/world-debug.md.
@@ -1324,6 +1527,27 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       INI SHA256 preserved, other DLL/INI unchanged. Backup world-debug-20261015-162506.
       Startup 16:25:17 confirms 0.1.1 and speed=10; 16:25:25 API/modules resolved, main menu.
       User explicitly deferred hands-on speed retest to next session; resume here.
+- [x] World Debug 0.1.2: camera movement/rotation and top-row - / = speed keys PASSED.
+      USER CONFIRMED 2026-10-15 (recorded 19:19): "optimal speed, everything works", screenshot
+      DEBUG CAM 819 cm/s. Installed INI FreecamSpeed=819.20 (8.192 m/s); log confirms repeated
+      half/double changes and persistence. No individual report of rebind/second-toggle/edge cases.
+      IsExternalCamera now reads the actual freefly flag; ownership survives ticks and F10/INI
+      applies immediately. - (_) halves, = (+) doubles movement speed, hold repeats; F10 rebinds.
+      Range 0.1..10000 cm/s, default 300; installed user INI preserved. DEBUG CAM shows speed.
+      Ordinary camera uses 0.075 degrees/action, freefly 0.025 radians/action; normalize only
+      the verified native freefly RotateAngularRel IAT call to the player's normal sensitivity.
+      No rotation setting/global sensitivity change or executable-byte patch. Version mismatch
+      disables camera controls and logs why. See notes/world-debug.md for RE and validation.
+      20 command/config/tick regression checks passed with fake APIs + scratch INI; installed
+      native exports/state accessor/call/gains/radians path independently checked. Core camera
+      behavior now user-confirmed; individual edge cases remain covered only by automated checks.
+      Full C++ build passed without errors/warnings; deployed ONLY world_debug.dll build
+      2026-10-15 18:54:53 with the game closed. Existing INI byte-identical (speed=0.1);
+      other DLL/INI hashes unchanged. Backup world-debug-20261015-185606/manifest.json.
+      Steam launch confirmed: 18:56:28 version 0.1.2, 18:56:35 rotation checks/hook and API
+      resolved, scene/camera modules found. Other installed mod DLLs remain October 12-14.
+      Hands-on test passed; user's preferred 819.20 cm/s is already saved by the mod.
+      No package/commit/push.
 
 ## Stage 6 — Release
 - [x] README with install/uninstall steps (every mod, RU + EN)
