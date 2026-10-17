@@ -18,6 +18,7 @@ use risen_formats::wrldatasc::WorldData;
 
 mod project;
 mod geometry;
+mod asset_bundle;
 
 const PROJECTS: &str = "data/common/projects";
 const TEMPLATES: &str = "data/common/templates";
@@ -111,6 +112,18 @@ enum Cmd {
         #[arg(long)]
         force: bool,
     },
+    /// Install a validated staged static mesh/collision/world bundle with verified backup
+    AssetInstall {
+        manifest: PathBuf,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Restore an asset-install backup (refuses subsequent edits by default)
+    AssetRestore {
+        backup: PathBuf,
+        #[arg(long)]
+        force: bool,
+    },
     /// List the entities of a layer: name, position, property set classes
     Entities {
         /// Layer: a mounted name / path (Harbour_Town_NPC_01) or a .lrent file
@@ -135,6 +148,23 @@ enum Cmd {
         #[arg(long)]
         obj: Option<PathBuf>,
     },
+    /// Read-only closest distance/intersection between two entities' physical colliders
+    Contact {
+        layer: String,
+        entity: String,
+        #[arg(long)]
+        against: String,
+        #[arg(long)]
+        target_layer: Option<String>,
+        /// Hypothetical world translation of the first entity, in centimetres; writes nothing
+        #[arg(long, num_args=3, allow_negative_numbers=true)]
+        offset: Option<Vec<f32>>,
+        /// Report within_tolerance when the geometric distance is at most this value (cm)
+        #[arg(long, default_value_t=0.01)]
+        tolerance: f64,
+        #[arg(long)]
+        json: bool,
+    },
     /// Unlock an existing rigid body for gravity, or freeze its motion (selected entity only)
     Physics {
         layer: String,
@@ -157,20 +187,35 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Place an entity/subtree on visual static-mesh surfaces, or on an explicit horizontal plane
+    /// Place an entity/subtree on visual or physical surfaces, or an explicit horizontal plane
     Ground {
         layer: String,
         entity: String,
         /// Use solid colliders for the moving object and static supports (default: visual meshes)
         #[arg(long)]
         collision: bool,
-        /// Explicit plane height (cm); otherwise sample visible static mesh triangles
+        /// Diagnose the planned pose against full candidate colliders; does not correct placement
+        #[arg(long, requires = "collision")]
+        check_contact: bool,
+        /// Correct Y by a conservative downward sweep from the upper search limit
+        #[arg(long, requires_all = ["collision", "check_contact"])]
+        correct_height: bool,
+        /// Spatial stopping tolerance for height correction, independent of contact reporting (cm)
+        #[arg(long, default_value_t = 0.01, requires = "correct_height")]
+        sweep_tolerance: f64,
+        /// Print a read-only placement/contact report as JSON (requires --dry-run)
+        #[arg(long, requires_all = ["check_contact", "dry_run"])]
+        json: bool,
+        /// Near-contact reporting threshold (cm), independent of intersection classification
+        #[arg(long, default_value_t = 0.01, requires = "check_contact")]
+        contact_tolerance: f64,
+        /// Explicit plane height (cm); otherwise sample the selected visual/physical surfaces
         #[arg(long, allow_negative_numbers = true)]
         height: Option<f32>,
         /// Fit local +Y to the sampled surface, preserving horizontal heading and scale
         #[arg(long)]
         align: bool,
-        /// Dense underside grid per axis (3..17); --align defaults to 7, plus mesh vertices
+        /// Dense underside grid per axis (3..17); default 7 with --align/--collision, plus shape samples
         #[arg(long, value_parser = clap::value_parser!(u16).range(3..=17))]
         samples: Option<u16>,
         /// Refuse a steeper fitted surface when --align is used (degrees)
@@ -944,6 +989,23 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             project::restore(&backup, force)?;
             println!("restored {}", backup.display());
         }
+        Cmd::AssetInstall { manifest, dry_run } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            if vfs.no_physical { return Err("NoPhysical=true: enable loose files before installing an asset bundle".into()); }
+            if let Some(backup) = asset_bundle::install(&vfs.root, &manifest, dry_run)? {
+                println!("BACKUP: {}", backup.display());
+                println!("RESTORE: risen asset-restore \"{}\"", backup.display());
+            }
+        }
+        Cmd::AssetRestore { backup, force } => {
+            project::restore_assets(&backup, force)?;
+            println!("restored {}", backup.display());
+        }
+        Cmd::Contact { layer, entity, against, target_layer, offset, tolerance, json } => {
+            let vfs = GameVfs::open(game_dir(cli.game)?)?;
+            let offset=offset.map(|v|[v[0],v[1],v[2]]).unwrap_or([0.;3]);
+            geometry::contact(&vfs,&layer,&entity,&against,target_layer.as_deref(),offset,tolerance,json)?;
+        }
         Cmd::Physics { layer, entity, mode, out, dry_run } => {
             let vfs = GameVfs::open(game_dir(cli.game)?)?;
             geometry::physics(&vfs, &layer, &entity, &mode, out, dry_run)?;
@@ -952,9 +1014,9 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
             let vfs = GameVfs::open(game_dir(cli.game)?)?;
             geometry::climbable(&vfs, &layer, &entity, enabled, out, dry_run)?;
         }
-        Cmd::Ground { layer, entity, collision, height, align, samples, max_slope, surface_layer, world, max_drop, max_rise, gap, out, dry_run } => {
+        Cmd::Ground { layer, entity, collision, check_contact, correct_height, sweep_tolerance, json, contact_tolerance, height, align, samples, max_slope, surface_layer, world, max_drop, max_rise, gap, out, dry_run } => {
             let vfs = GameVfs::open(game_dir(cli.game)?)?;
-            geometry::ground(&vfs, &layer, &entity, collision, height, align, samples.map(usize::from), max_slope, surface_layer.as_deref(), &world, max_drop, max_rise, gap, out, dry_run)?;
+            geometry::ground(&vfs, &layer, &entity, collision, check_contact, correct_height, sweep_tolerance, json, contact_tolerance, height, align, samples.map(usize::from), max_slope, surface_layer.as_deref(), &world, max_drop, max_rise, gap, out, dry_run)?;
         }
         Cmd::Snap { layer, entity, against, target_layer, side, gap, center, out, dry_run } => {
             let vfs = GameVfs::open(game_dir(cli.game)?)?;

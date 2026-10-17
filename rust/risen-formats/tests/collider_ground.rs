@@ -270,7 +270,18 @@ fn resource_index_selects_the_correct_kind_and_unknown_relevant_resources_refuse
 }
 
 #[test]
-fn unsupported_native_scale_adaptation_and_curved_moving_bodies_refuse() {
+fn contact_shapes_preserve_native_solid_or_triangle_surface_semantics() {
+    let mut s=Vec::new();
+    for kind in [1,3,4,5,6] {
+        let o=ps(&mut s,kind,0,vec![]);
+        let found=collider::collision_shapes(&[&o],&s,&IDENTITY,false,None,|_|Ok(resource())).unwrap();
+        assert_eq!(found.len(),1);
+        assert_eq!(found[0].solid,kind!=1);
+    }
+}
+
+#[test]
+fn unsupported_native_scale_adaptation_and_mesh_merge_of_curves_refuse() {
     let mut s = Vec::new();
     let o = ps(&mut s, 3, 0, vec![]);
     let mut m = IDENTITY;

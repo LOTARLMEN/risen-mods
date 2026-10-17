@@ -1,5 +1,310 @@
 # Geometry, collision metadata and placement (Rust CLI)
 
+## Visible height-correction scene — manual test passed after restart (2026-10-16)
+
+Prepared by the scratch-only `height_correction_stage` example and
+`tools/install-height-correction-scene.ps1`. Native board/crate models and primitive colliders:
+two identical bases (board scale 1.2), two buried crate posts each (scale 2), a narrow crate pier
+(scale 0.6), and a normal-scale board. All new objects are static, climbable and root children.
+The narrow pier lies between the board's 3x3 sample X columns and native box vertices.
+No custom mesh, collider edits or animation/character patch. Ten appended entities, 45 total;
+the previous 34 non-root entities retain their exact bytes, IDs, properties and transforms.
+
+- A: base [35], posts [36]/[37], narrow pier [38], sampled board [39], x=-38500, z=-5800.
+- B: base [40], posts [41]/[42], narrow pier [43], corrected board [44], x=-37950, z=-5800.
+- Physical terrain samples 6.684817..50.530743 cm; equal base top Y=139.49547 cm. Posts extend
+  into the terrain, their tops meet the base undersides; both board orientations/properties match.
+- A's pier intersects the board and visibly protrudes through it. B's board is raised 42.98258 cm
+  and clears the pier by 0.0020778 cm in the serialized geometry query. Expected physical pier
+  height is 42.980484 cm. Contact equations, native scales, serialization, unrelated data and dry-run
+  checks passed. Old scene preserved; only the two new board poses differ from the initial fixture.
+
+Installed while the game was closed, changing only `RisenMods_NewLayer_Test.lrent`. Verified
+before/after backup, staged/installed byte identity and named VFS readback:
+`backup/world-edits/22D5BFDD-E700-4264-BB46-F5146A7B381F` (restore this before 811942CC...).
+All other checked game data/INI/DLL hashes matched at installation. Stage and manual-result record:
+`build/tests/height-scene-20261016-075424/installed-test.json`.
+CLI remains 2026-10-16 07:40:06; only the scratch example was built (07:54:45).
+World Debug in bin remains 0.1.2 build 2026-10-15 18:54:53; other DLLs October 12-14.
+No package/commit/push. Scene left installed; the user reported spawning on the constructions.
+
+USER CONFIRMED (recorded 08:14): corrected board/pier looks right, walking and jumping work
+without falling through. After a restart, loading the test save, saving/reloading again, then
+flying the camera and saving/reloading again all worked. This scene's visible placement,
+player contact and repeated persistence check PASSED, with the initial crash retained below.
+
+**Initial save-load crash remains unexplained:** at 08:04:38, the first reload of the just-created
+test quicksave crashed with AV 0xc0000005 at Engine.dll+0x652e0c. Windows Application Error 1000
+and the minidump confirm a real process crash. Stack: eCCollisionShape_PS::OnExitProcessingRange
+while iterating touching shapes -> geometry/entity/context destruction -> dynamic-layer release
+-> gCSaveGameManager::Load. This is old-world teardown during loading, not proof of a corrupt
+save or a particular new entity. The relevant heap objects are absent from the minidump; owner
+identification/root cause is unresolved. The first run used freecam, but later camera/save/load
+tests succeeded too; no camera-causation or fix is claimed. No DLL/binary patch applied.
+
+Evidence: `build/tests/height-scene-20261016-075424/crash-20261016-080438/` contains the initial
+log, ReShade log and Risen.exe.29668.dmp. Its QuickSave.save was copied during the retest and has
+mtime 08:11:16, so it is **not** a preserved copy of the initial 08:04 save. `retest-RisenMods.log`
+records the later run. If the crash recurs, preserve log/dump immediately and collect a precise
+reproduction before changing geometry or adding a native teardown workaround.
+
+## Supported vertical height correction (2026-10-16)
+
+```powershell
+.\rust\target\release\risen.exe ground RisenMods_NewLayer_Test 2 --collision --check-contact --correct-height --surface-layer Levelmesh_Landscape_COL --json --dry-run
+.\rust\target\release\risen.exe ground RisenMods_NewLayer_Test 33 --collision --check-contact --correct-height --align --samples 9 --max-rise 500 --surface-layer Levelmesh_Landscape_COL --gap -2 --json --dry-run
+```
+
+`--correct-height` requires `--collision --check-contact`. It retains the sampled orientation,
+then replaces Y using a downward full-geometry search. A successful sampled plan remains a
+prerequisite (including sample support, slope and displacement checks); this option does not
+recover failed sampling/alignment. Without this flag, the previous placement/diagnostic mode
+is retained. `--dry-run` writes no layer; ordinary output/install still uses verified backups.
+
+The reusable `risen-formats::sweep::{Target,downward}` starts at **original entity Y + max-rise**
+and descends toward **original Y - max-drop**, with fixed orientation and XZ. Targets can be
+prepared compound collider bodies or an infinite horizontal plane. Each step is 90% of the
+nearest full spatial distance. A translation smaller than that distance cannot reach a target,
+so thin surfaces and disconnected height intervals cannot be skipped by a coarse grid or by
+assuming a monotone overlap predicate. The first obstacle approached from above is selected,
+including an overhang; the algorithm does not choose an empty pocket beneath it.
+
+`--sweep-tolerance` defaults to **0.01 cm**, minimum 1e-6 cm. The search stops on the clear side,
+within this **spatial-distance** tolerance, with a downward-facing closest-point direction.
+This is not a bound on vertical error on a nearly vertical surface. The internal search normally
+uses half the tolerance to leave room for native rounding. Prepared moving geometry is translated
+from its original f64 coordinates and BVH bounds each iteration, without rebuilding the BVH or
+accumulating translation drift. Maximum 512 iterations; no approximate success on exhaustion.
+
+Candidate selection covers the full body's vertical swept envelope, not just foot-height samples;
+with alignment it uses a conservative rotation radius in all three axes. Selection is padded for
+f32 broad-phase rounding, while full queries retain the original geometry. An overhead crate
+outside the old foot search therefore still blocks an intersecting upper starting pose.
+Own children/moving subtree, rigid-body supports, disabled/ray-ignored shapes and unsupported
+support groups retain the existing ground exclusions. This is scoped static support geometry,
+not an all-world collision-group interaction query or live runtime body simulation.
+
+The zero-gap near-contact Y is rounded upward into f32 and the **actual native pose** is queried
+again. It must be clear and within the requested sweep tolerance. The requested `--gap` is then
+applied as a vertical translation: positive lifts along the already cleared path, negative allows
+deliberate embedding without a second collision-solving step. Gap magnitude smaller than the
+remaining tolerance can leave a clear pose. The final native pose must stay within the original
+drop/rise limits; nonnegative gaps must remain nonintersecting. Because zero-gap uses a small
+clear-side tolerance, it is not an exact zero-separation contact.
+
+Initial touching/overlap, close side/grazing geometry (closing direction Y <= 1e-4), no contact
+within the range, nonconvergence, invalid inputs or insufficient f32 precision refuse **before
+any file write**. Increasing max-rise can provide a clear upper start; the solver does not infer
+an MTD or escape from an initially intersecting body. Skin width, deformation/animation, physical
+stability, general motion and contact manifolds are not simulated. Repeat placement can differ
+slightly within the clear-side tolerance because the original upper search Y changes.
+
+JSON now includes `sampled_world_matrix`, final `planned_world_matrix`, `placement_corrected`,
+and `height_correction`: search bounds/method/tolerance, iterations, first candidate/witnesses,
+native zero-gap Y/distance, delta from sampled placement and requested post-sweep gap.
+`--contact-tolerance` continues to affect only contact reporting, independently of sweep tolerance.
+The sampled clearance statistic describes the sampled pose, not the corrected final pose.
+
+Validation: **103 workspace tests passed**, one ignored process helper. New tests cover correction
+of the narrow bump missed by all ground samples, first contact with thin/disconnected surfaces,
+compound boxes/analytic curves, planes/slopes, initial overlap/touch, close parallel walls,
+iteration/range/input refusals and prepared-BVH translation versus fresh poses.
+`tools/test-height-correction.ps1` passed on native board/steep-board/Chicken/ore/landscape:
+board distance 0.00154536 cm (6 queries), steep board 0.00450158 cm (7), capsule 0.00067521 cm.
+It also checked signed gaps, independent reporting tolerance, a finer sweep tolerance, output
+readback versus standalone contact, preserved unrelated entities/properties, child local/world
+matrices, navigation synchronization, repeatability, dry-run, overhead-start and native-precision
+refusals. Stage: `build/tests/height-correction-20261016-074030/result.json`.
+Debug/release built without warnings; release CLI 2026-10-16 07:40:06. Before/after game data/INI/DLL
+SHA256 matched. All outputs are scratch files; no install, launch or hands-on test claimed.
+The earlier diagnostic-only CLI suite also passed unchanged:
+`build/tests/ground-contact-20261016-074240/result.json`, including byte-identical placement
+with/without diagnostics and matching game hashes.
+Bin remains World Debug 0.1.2 build 2026-10-15 18:54:53, other DLLs October 12-14. No package/commit/push.
+
+The visible corrected-placement/contact/save-load scene has now passed the manual retest above.
+Broader motion solving, runtime geometry and physical semantics remain separate work; the single
+initial load crash is recorded above and needs a reproducible case before any claimed fix.
+
+## Full-geometry diagnostics after sampled ground placement (2026-10-16)
+
+```powershell
+.\rust\target\release\risen.exe ground RisenMods_NewLayer_Test 2 --collision --surface-layer Levelmesh_Landscape_COL --gap -2 --check-contact --dry-run
+.\rust\target\release\risen.exe ground RisenMods_NewLayer_Test 33 --collision --align --samples 9 --max-rise 500 --surface-layer Levelmesh_Landscape_COL --check-contact --json --dry-run
+```
+
+`--check-contact` requires `--collision` and diagnoses the **planned** pose before any layer write.
+Alone, it does not correct or reject a pose just because it touches/intersects a support. Existing placement,
+subtree/physics/navigation synchronization and verified backups still apply. Use `--dry-run` for a
+read-only check; without it, the usual `ground` output/install behavior applies. `--json` requires
+both `--check-contact` and `--dry-run`, and writes only a JSON report to stdout, never an output layer.
+
+The moving entity's own full collider list is queried against the complete enabled support collider
+list of each entity selected by ground's existing XZ/height search. Children, rigid-body support
+entities and objects outside that candidate search are excluded. Ground's static support group and
+ray-ignore filters still apply; this is not an all-world obstruction or runtime group-matrix check.
+Sampling can clip mesh triangles, but diagnostics prepare the original **unclipped** local shapes,
+preserve solid boxes/convexes versus two-sided triangle surfaces, and transform them in f64 through
+the same provider as `contact`. Unreadable/unsupported full candidate geometry refuses before writes.
+Full-list shape indices can differ from the regional sampling candidate indices.
+
+Each candidate reports spatial `distance_cm`, `intersects` (including touching), closest/shared points,
+shape indices and status `contact_or_overlap`, `near` or `separated`. `--contact-tolerance` defaults to
+0.01 cm and only changes the near-contact classification, never the intersection result or placement.
+JSON includes the original/planned matrices, sampled slope/normal/count/max clearance, requested
+vertical gap, deliberate embedding request, all candidate results, nearest distance and contact count.
+Distances are nonnegative spatial distances, **not** signed penetration depths or vertical gaps.
+Touching and penetrating cannot be distinguished by this query. A negative requested gap remains
+deliberate embedding, and no contact result is automatically called a placement failure.
+
+`--height` uses `contact::query_horizontal_plane` against an infinite two-sided plane. It checks each
+original triangle edge/vertex and each analytic capsule/sphere, without a proxy mesh or footprint
+grid. Disconnected mesh components on opposite sides of the plane alone are not an intersection.
+
+Validation: 96 workspace tests passed (one ignored process helper). The new regression places a
+box 0.2 cm above a flat floor while a narrow 1 cm bump lies between every 3x3 ground sample:
+sampled placement misses the bump, full geometry detects its intersection. Further tests cover
+plane distances/touching/crossing, sphere/capsule witnesses, disconnected shells/compound bodies,
+rotated/scaled/distant solids and nonfinite/out-of-native-range plane inputs.
+`tools/test-ground-contact.ps1` checks native board/steep-board/Chicken/ore geometry, standalone
+contact agreement, exact plain-versus-diagnostic layer bytes, JSON/GUID/witnesses/tolerance,
+dry-run and atomic refusals. The steep fixture needs `--max-rise 500` just as in its original test;
+the default 100 cm search cannot find all its higher terrain samples.
+Debug/release CLI built without warnings; release timestamp 2026-10-16 07:23:40. Final scratch
+results: `build/tests/ground-contact-20261016-072359/result.json`. The existing standalone contact
+suite also passed: `build/tests/contact-20261016-072433/result.json`. Both suites confirmed matching
+before/after game data/INI/DLL SHA256. No scene installed, game launch or hands-on test claimed.
+Bin still has World Debug 0.1.2 build 2026-10-15 18:54:53; other DLLs remain October 12-14.
+No package/commit/push.
+
+Supported vertical sweeps/correction are implemented above as an explicit option. Sampling still
+provides orientation; runtime physics, skin width, contact manifolds and general motion solving remain separate.
+
+## Read-only distance and intersection queries (2026-10-15 23:05)
+
+```powershell
+.\rust\target\release\risen.exe contact RisenMods_NewLayer_Test 2 --against 3
+.\rust\target\release\risen.exe contact RisenMods_NewLayer_Test 2 --against 113 --target-layer Levelmesh_Landscape_COL --offset 0 100 0 --json
+```
+
+`contact` measures the shortest spatial distance between the selected entities' own enabled physical
+colliders at their serialized poses. Selection accepts entity indices or GUIDs, including targets
+in another layer. Children are not merged into the query. `--offset X Y Z` translates only the first
+entity's query pose; it never writes a layer. Nonfinite inputs/negative tolerance, absent/disabled
+solid geometry, unreadable resources, native unsupported scale/adaptation and malformed solids refuse.
+
+All pairs of sphere/capsule, box, cooked convex and triangle mesh are supported, including compound
+shape lists. Curves use analytic segment distances and segment/triangle intersections; polygon
+pairs use triangle distance/intersection and solid containment. These tests cover full edges/faces,
+not a footprint grid. Two-sided triangle meshes remain thin surfaces, including a closed triangle
+mesh: being inside its shell alone is not intersection. Native boxes/convexes/curves are volumes.
+This surface/volume distinction also appears in [NVIDIA's geometry-query documentation](https://nvidia-omniverse.github.io/PhysX/physx/5.4.1/docs/GeometryQueries.html#overlaps).
+
+The original cooked convex triangulation is retained. One ship hull has a triangle support-plane
+deviation of 0.086720309 cm, so treating every triangle as an ideal convex supporting plane rejected
+a real asset. Solids instead require a closed, consistently oriented, nondegenerate boundary with
+nonzero volume; containment uses the summed oriented solid angle. No hull vertex adjustment or
+faceted curve substitution is made. This models the decoded triangle boundary; it does not claim
+bit-identical native cooked polygon-plane/contact behavior or validate arbitrary self-intersections.
+
+The reusable `risen-formats::contact::{Body,query}` prepares triangle BVHs once per body. Queries
+prune using AABB distance lower bounds and evaluate the remaining full geometry. Transforms and
+distance arithmetic use f64 from local f32 geometry/world matrices, avoiding a second f32 rounding
+of every transformed vertex. Existing native pose/resource/flag checks are retained in the CLI.
+
+Results:
+
+- `distance_cm` is nonnegative; intersecting bodies have zero distance. It is not penetration depth.
+- `intersects` includes touching, with a numerical-zero threshold of 1e-8 cm.
+- `within_tolerance` independently compares distance with `--tolerance` (default 0.01 cm).
+  A generous tolerance never changes the intersection classification.
+- `point_a`/`point_b` are closest points when separated, or a shared point when intersecting. A shared
+  point may lie inside a volume. `shape_a`/`shape_b` index the filtered enabled shape lists.
+- JSON reports units, hypothetical offset, enabled-shape volume flags and numeric-zero threshold.
+
+This is a fixed-pose geometric query. It neither sweeps a moving object through time nor computes
+MTD/contact manifolds. Physics group interactions, skin width, simulation, animation/character
+runtime collider changes and dynamic body positions from the running game are not reproduced.
+`ground` continues to use its existing sampling path; optional `--check-contact` diagnostics above
+query the resulting pose without changing its placement.
+
+Validation: all 92 workspace tests passed (one ignored process helper); debug/release built,
+release CLI 2026-10-15 23:04:07. New coverage includes primitive distances/witnesses/symmetry,
+thin face/edge/vertex crossings, coplanar triangles, degenerate surface triangles, solid containment
+versus shell containment, globally reversed solid winding, native hull facet deviations, compound
+shape selection, distant poses and invalid geometry. BVH results matched unpruned searches for
+200 segments and 20 mesh pairs; 500 sphere/box cases matched an independent clamping formula.
+
+```powershell
+cd rust
+cargo run --offline -p risen-formats --example contact_check -- ..\..\data\common\physics.pak
+```
+
+All 637 resources / 1089 meshes (including both convex solids) passed 2178 corpus checks. Each mesh
+was tested for intersection at a referenced vertex and known analytic sphere separation beyond
+its maximum-X vertex. This tests decoded geometry, not a native PhysX overlap oracle.
+
+`tools/test-contact.ps1`: box/box, box/physical landscape, capsule and sphere fixture queries,
+cross-layer/GUID selection, symmetry, offsets, tolerance, witness distances and invalid-input refusals
+passed. The installed inset board intersects the landscape; a hypothetical +100 cm Y offset gives
+96.93611555 cm separation. Scratch scene/result:
+`build/tests/contact-20261015-230425/result.json`. Before/after game data/INI/DLL SHA256 match.
+No scene installed, game launch or hands-on test claimed. World Debug in bin remains 0.1.2 build
+18:54:53; other DLLs remain October 12-14. No package/commit/push.
+
+Full-geometry diagnostics and supported vertical sweeps/correction are now implemented above.
+Arbitrary contact solving remains future work.
+
+## Curved moving collision bodies (2026-10-15 20:07)
+
+`ground --collision` now also accepts spheres, capsules and compound polygon/curved bodies.
+`Surface::vertical_range` supplies analytic lower and upper intersections for both sphere caps
+and the finite capsule cylinder. The cylinder quadratic is centered in Y as well as XZ to avoid
+cancellation at large coordinates. No faceted substitute is created for curved primitives.
+
+For curved bodies, sampling uses a world-XZ grid, segment stations, interior/silhouette rings and
+endpoint centers (including the exact global bottom/top). Every tilt iteration transforms and
+resamples the original shapes; it does not rotate a fixed local underside cloud. Native positive
+uniform scale, shape orientation/center and existing enabled/group/adaptation policies still apply.
+Polygon-only bodies retain the prior merged-mesh algorithm. Explicit horizontal-plane placement
+includes the actual global bottom within floating-point precision, including even grid sizes.
+
+Terrain remains sampled. Analytic shape intersections do not guarantee continuous contact across
+an arbitrary slope, bump or hole; an unsampled penetration can remain. `max_clearance` is the
+largest sampled vertical clearance, which can be large at a rounded silhouette even on a plane.
+Ground does not run the separate full-geometry contact query above or simulate PhysX. These are serialized collider
+poses; animation, character motion and runtime collider changes are not reproduced. The Chicken
+fixture below is an offline test of its authored capsule, not a runtime NPC-contact claim.
+
+Validation: all 80 workspace tests passed (one ignored process helper), debug/release built;
+release CLI 2026-10-15 20:02:35. Six new tests cover clipped lower hits/caps/cylinder and distant Y,
+offset/uniformly scaled spheres, even/odd grids, thin/rotated capsules, mixed-body bottoms,
+unchanged polygon-only results, slope alignment/repeatability, invalid shapes/poses/limits and
+missing support. One slope fixture independently checks the capsule's continuous plane clearance
+within 0.15 cm; that fixture tolerance is not a bound for other terrain or shapes.
+
+Read-only original-template corpus:
+
+```powershell
+cd rust
+cargo run --offline -p risen-formats --example curved_ground_check -- D:\SteamLibrary\steamapps\common\Risen
+```
+
+487 templates contain authored curved shapes. 480 supported primitive bodies (477 with capsules,
+3 with spheres) passed 2880 rotated/scaled plane placements, bottom-height and repeatability
+checks; template bytes remained unchanged. Seven disabled/filtered bodies were skipped.
+
+`tools/test-curved-ground.ps1` writes only under `build/tests/`. It checked the original Chicken
+capsule against an explicit plane and `Levelmesh_Landscape_COL`, and the original
+Object_Interact_Pick_Ore_Gold sphere against a plane. Chicken terrain result:
+(-37450,58.64496,-5700), tilt 5.262 degrees; repeat Y delta 0.0000305 cm. Navigation position
+followed the pose, all other reported properties/non-root entities were retained. Dry-run and
+rise-limit refusal wrote no output; the existing board control retained Y=65.28201.
+Stage: `build/tests/curved-ground-20261015-200607/result.json`, with matching before/after SHA256
+manifests for game data/INI/DLL. No game installation, launch or hands-on check in this step.
+World Debug in bin remains 0.1.2 build 18:54:53; other DLLs remain October 12-14 builds.
+No package/commit/push. Next: read-only continuous contact/overlap for explicitly supported pairs.
+
 ## Physical ground mode (2026-10-15)
 
 ```powershell
@@ -8,12 +313,12 @@
 ```
 
 `--collision` selects physical geometry for BOTH the moving entity and its supports. The moving
-entity must have enabled solid box, triangle-mesh or convex colliders. Dense local underside sampling
+entity must have enabled solid box, triangle-mesh, convex, sphere or capsule colliders. Dense underside sampling
 is enabled (default 7x7 grid plus collider vertices), even without --align; children follow through
 the existing atomic world-pose setter. The sampled collider vertices/underside replace the render
 model as the placement footprint. Support geometry includes actual XCOM meshes, oriented boxes and
-analytic spheres/capsules; curved supports are not tessellated. Curved MOVING colliders currently
-refuse because analytic underside sampling is not implemented. `--height` uses an explicit plane
+analytic spheres/capsules; curved supports are not tessellated. Curved moving bodies use the analytic
+sampling described above. `--height` uses an explicit plane
 with the physical moving geometry. Default ground and snap retain their previous behavior.
 
 Supports must be serialized enabled/collision-enabled entities without a rigid-body PS. Rendering
@@ -42,7 +347,7 @@ supported --surface-layer or --height. Missing physical support never falls back
 The existing two-sided, vertical, sampled grounding algorithm and its residual gaps remain: this
 is more appropriate input geometry, not exact continuous contact/overlap detection.
 
-74 workspace tests passed (one ignored helper). Eight new tests cover primitive poses/half-extents,
+Initial physical-ground checkpoint: 74 workspace tests passed (one ignored helper). Eight new tests cover primitive poses/half-extents,
 native serialization, analytic spherical/capsule intersections including tilt/range/distant positions,
 PS/shape filtering and invalid flags, resource index/kind, transformed physical bounds, unsupported
 scale/adaptation/curved moving geometry, and physical underside/support heights. Debug/release built;

@@ -3,6 +3,7 @@
 Run from `risen-mods`. The CLI finds the game in parent directories, or use `--game <folder>`.
 
 Latest work: [geometry, collision metadata, ground/snap and the installed contact test](geometry-placement.md).
+Custom mesh/terrain resource investigation: [asset editing feasibility and scratch probe](asset-editing.md).
 
 ```powershell
 .\rust\target\release\risen.exe world-sectors World --json

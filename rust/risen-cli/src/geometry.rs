@@ -19,18 +19,74 @@ impl<'a> CollisionCache<'a> {
         }
         Self{index,meshes:std::collections::HashMap::new()}
     }
+    fn load(&mut self,vfs:&GameVfs,name:&str)->Result<std::sync::Arc<CollisionMesh>,String> {
+        let key=name.to_ascii_lowercase();
+        if let Some(c)=self.meshes.get(&key){return Ok(c.clone());}
+        let entries=self.index.get(&key).ok_or_else(||format!("missing collision resource {name}"))?;
+        if entries.len()!=1 {return Err(format!("ambiguous collision resource {name}"));}
+        let c=std::sync::Arc::new(CollisionMesh::read(&vfs.read(entries[0]).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?);
+        self.meshes.insert(key,c.clone());Ok(c)
+    }
 }
 fn collision_surfaces(vfs:&GameVfs,cache:&mut CollisionCache<'_>,objects:&[&PropertyObject],strings:&[String],
     matrix:&[f32;16],support:bool,region:Option<[f32;6]>)->Result<Vec<Surface>,Box<dyn std::error::Error>> {
-    Ok(collider::surfaces(objects,strings,matrix,support,region,|name| {
-        let key=name.to_ascii_lowercase();
-        if let Some(c)=cache.meshes.get(&key){return Ok(c.clone());}
-        let entries=cache.index.get(&key).ok_or_else(||format!("missing collision resource {name}"))?;
-        if entries.len()!=1 {return Err(format!("ambiguous collision resource {name}"));}
-        let entry=entries[0];
-        let c=std::sync::Arc::new(CollisionMesh::read(&vfs.read(entry).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?);
-        cache.meshes.insert(key,c.clone());Ok(c)
-    })?)
+    Ok(collider::surfaces(objects,strings,matrix,support,region,|name|cache.load(vfs,name))?)
+}
+
+/// Retain local f32 geometry and evaluate its full pose in f64, with the native world checks first.
+fn collision_body(vfs:&GameVfs,cache:&mut CollisionCache<'_>,objects:&[&PropertyObject],strings:&[String],
+    world:[f32;16],support:bool)->Result<(risen_formats::contact::Body,Vec<bool>),Box<dyn std::error::Error>>
+{
+    collider::collision_shapes(objects,strings,&world,support,None,|n|cache.load(vfs,n))?;
+    let shapes=collider::collision_shapes(objects,strings,&IDENTITY,support,None,|n|cache.load(vfs,n))?;
+    let volumes=shapes.iter().map(|s|s.solid).collect();
+    Ok((risen_formats::contact::Body::new(&shapes,world)?,volumes))
+}
+
+fn contact_report(q:&risen_formats::contact::Contact,tolerance:f64)->Value {
+    json!({"distance_cm":q.distance_cm,"intersects":q.intersects,
+        "status":if q.intersects {"contact_or_overlap"} else if q.distance_cm<=tolerance {"near"} else {"separated"},
+        "within_tolerance":q.distance_cm<=tolerance,"point_a":q.point_a,"point_b":q.point_b,
+        "shape_a":q.shape_a,"shape_b":q.shape_b})
+}
+
+pub(super) fn contact(vfs:&GameVfs,source:&str,spec:&str,against:&str,target_layer:Option<&str>,
+    offset:[f32;3],tolerance:f64,json_output:bool)->Result<(),Box<dyn std::error::Error>>
+{
+    use risen_formats::contact::{Body,query};
+    if !offset.iter().all(|v|v.is_finite()) || !tolerance.is_finite() || tolerance<0. {
+        return Err("contact offset/tolerance must be finite; tolerance must be nonnegative".into());
+    }
+    let a=open_layer_for_edit(vfs,source)?;
+    let b=open_layer_for_edit(vfs,target_layer.unwrap_or(source))?;
+    let ai=a.entity_index(spec)?;let bi=b.entity_index(against)?;
+    let mut cache=CollisionCache::new(vfs);
+    let mut prepare=|layer:&EditLayer,i:usize,offset:[f32;3]|->Result<(Body,Vec<bool>),Box<dyn std::error::Error>> {
+        let e=&layer.lrent.entities()[i];
+        if e.enabled==0 || e.collision_enabled==0 {return Err("selected entity collision is disabled".into());}
+        let mut world=e.world_matrix;
+        for k in 0..3 {world[12+k]+=offset[k];}
+        if !world.iter().all(|v|v.is_finite()) {return Err("contact offset overflows the world pose".into());}
+        let objects:Vec<_>=e.property_sets.iter().map(|s|&s.object).collect();
+        collision_body(vfs,&mut cache,&objects,layer.lrent.strings(),world,false)
+    };
+    let (ab,av)=prepare(&a,ai,offset)?;let (bb,bv)=prepare(&b,bi,[0.;3])?;
+    let result=query(&ab,&bb);
+    let report=json!({"entity_a":a.describe(ai),"entity_b":b.describe(bi),"offset_cm":offset,
+        "distance_cm":result.distance_cm,"intersects":result.intersects,"tolerance_cm":tolerance,
+        "within_tolerance":result.distance_cm<=tolerance,"point_a":result.point_a,"point_b":result.point_b,
+        "shape_a":result.shape_a,"shape_b":result.shape_b,"solid_shapes_a":av,"solid_shapes_b":bv,
+        "units":"cm","query":"serialized_collision_geometry","mesh_faces":"two_sided",
+        "intersect_zero_cm":1e-8});
+    if json_output {println!("{}",serde_json::to_string_pretty(&report)?);}else{
+        println!("contact {} against {}",a.describe(ai),b.describe(bi));
+        if offset!=[0.;3] {println!("hypothetical first-entity offset {offset:?} cm (read-only)");}
+        println!("distance {:.6} cm; intersects (including touching): {}; within {tolerance} cm: {}",
+            result.distance_cm,result.intersects,result.distance_cm<=tolerance);
+        println!("closest/shared points {:?} / {:?}; shapes {} / {}",result.point_a,result.point_b,result.shape_a,result.shape_b);
+        println!("serialized geometry, two-sided mesh surfaces; excludes physics group interactions, skin width and runtime motion");
+    }
+    Ok(())
 }
 
 fn entity_bounds(vfs: &GameVfs, layer: &Lrent, i: usize) -> Result<[f32; 6], Box<dyn std::error::Error>> {
@@ -127,9 +183,17 @@ pub(super) fn snap(vfs: &GameVfs, source: &str, spec: &str, against: &str, targe
     Ok(())
 }
 
-pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:bool, height: Option<f32>, align: bool, samples: Option<usize>, max_slope: f32, surface_layer: Option<&str>,
+pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:bool, check_contact:bool, correct_height:bool, sweep_tolerance:f64,
+    json_output:bool, contact_tolerance:f64,
+    height: Option<f32>, align: bool, samples: Option<usize>, max_slope: f32, surface_layer: Option<&str>,
     world: &str, drop: f32, rise: f32, gap: f32, out: Option<PathBuf>, dry: bool) -> Result<(), Box<dyn std::error::Error>>
 {
+    if correct_height && (!sweep_tolerance.is_finite() || sweep_tolerance<risen_formats::sweep::MIN_TOLERANCE_CM) {
+        return Err("sweep tolerance must be finite and at least 1e-6 cm".into());
+    }
+    if !contact_tolerance.is_finite() || contact_tolerance<0. {
+        return Err("contact tolerance must be finite and nonnegative".into());
+    }
     if ![drop, rise, gap].iter().all(|v| v.is_finite()) || drop < 0. || rise < 0. || height.is_some_and(|y| !y.is_finite()) {
         return Err("placement distances must be finite; drop/rise must be nonnegative".into());
     }
@@ -138,29 +202,47 @@ pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:boo
     let mut cache=CollisionCache::new(vfs);
     let dense = collision_mode || align || samples.is_some();
     let world_matrix = layer.lrent.entities()[i].world_matrix;
+    let mut physical_world = Vec::new();
+    let mut physical_body = Vec::new();
     let dense_mesh = if dense {
         let e = &layer.lrent.entities()[i];
         let objects: Vec<_> = e.property_sets.iter().map(|s| &s.object).collect();
         if collision_mode {
             if e.enabled==0 || e.collision_enabled==0 {return Err("moving entity collision is disabled".into());}
-            // Local geometry is sampled by the existing dense placement algorithm; world pose
-            // validation is also performed for native scale compatibility.
-            collision_surfaces(vfs,&mut cache,&objects,layer.lrent.strings(),&world_matrix,false,None)?;
-            Some(collider::merge_meshes(collision_surfaces(vfs,&mut cache,&objects,layer.lrent.strings(),&IDENTITY,false,None)?)?)
+            // Validate the actual world pose for native scale compatibility; retain analytic
+            // primitives in local space so they can be resampled after an alignment rotation.
+            physical_world=collision_surfaces(vfs,&mut cache,&objects,layer.lrent.strings(),&world_matrix,false,None)?;
+            physical_body=collision_surfaces(vfs,&mut cache,&objects,layer.lrent.strings(),&IDENTITY,false,None)?;
+            if physical_body.is_empty() { return Err("no enabled solid collider on the moving entity".into()); }
+            None
         } else {Some(static_mesh(vfs, &objects, layer.lrent.strings())?.ok_or("missing static placement mesh")?.1)}
     } else { None };
-    let bounds=if collision_mode {dense_mesh.as_ref().unwrap().transformed(&world_matrix)?.bounds().ok_or("empty moving collider")?}
+    let bounds=if collision_mode {collider::bounds(&physical_world).ok_or("empty moving collider")?}
         else {entity_bounds(vfs,&layer.lrent,i)?};
     let geometry_label=if collision_mode {"collision"}else{"visual"};
     let mut search_bounds = bounds;
     if align {
         // A tilted tall or offset model can extend beyond its original XZ bounds. Use a sphere
         // around the entity origin to conservatively include all candidate surfaces after rotation.
-        let radius = dense_mesh.as_ref().unwrap().vertices.iter().map(|&p| {
+        let vertices = if collision_mode {
+            physical_body.iter().flat_map(|shape| match shape {
+                Surface::Mesh(m)=>m.vertices.clone(),
+                Surface::Capsule{..}=>{
+                    let b=shape.bounds().unwrap();
+                    (0..8).map(|i|std::array::from_fn(|k|b[k+if i&(1<<k)==0 {0}else{3}])).collect()
+                }
+            }).collect::<Vec<_>>()
+        } else { dense_mesh.as_ref().unwrap().vertices.clone() };
+        let radius = vertices.iter().map(|&p| {
             let p = transform_vector(p, &world_matrix);
             p[0].hypot(p[1]).hypot(p[2])
         }).max_by(f32::total_cmp).ok_or("empty mesh")?;
         for k in [0,2] { search_bounds[k]=world_matrix[12+k]-radius; search_bounds[3+k]=world_matrix[12+k]+radius; }
+        if correct_height {
+            // Include the full body's vertical path after a possible alignment rotation, so an
+            // overhead/side obstacle cannot disappear merely because it lies above foot samples.
+            search_bounds[1]=world_matrix[13]-radius;search_bounds[4]=world_matrix[13]+radius;
+        }
         if !search_bounds.iter().all(|v|v.is_finite()) { return Err("ground search bounds overflow".into()); }
     }
     let moving: std::collections::HashSet<_> = layer.lrent.context().ok_or("missing context")?.checked_subtree(i)?.iter()
@@ -168,6 +250,9 @@ pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:boo
     let mut surfaces = Vec::new();
     let mut names = Vec::new();
     let mut skipped = Vec::new();
+    // Sampling may clip triangle lists; diagnostics retain each candidate's complete collider list
+    // and native solid/surface semantics, including shapes outside the sampled footprint.
+    let mut contact_supports = Vec::new();
     let d = if let Some(y) = height { y + gap - bounds[1] } else {
         let mut scan = |l: &Lrent, label: &str, surfaces: &mut Vec<Surface>, names: &mut Vec<String>, skipped: &mut Vec<String>| {
             for (j, e) in l.entities().iter().enumerate().skip(1) {
@@ -176,14 +261,36 @@ pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:boo
                     if e.enabled==0 || e.collision_enabled==0 {continue;}
                     let objects:Vec<_>=e.property_sets.iter().map(|s|&s.object).collect();
                     if objects.iter().any(|o|o.class(l.strings())=="eCRigidBody_PS"){continue;}
-                    let mut region=search_bounds;region[1]=bounds[1]-drop;region[4]=bounds[1]+rise;
+                    let mut region=search_bounds;
+                    region[1]=if correct_height {search_bounds[1]}else{bounds[1]}-drop;
+                    region[4]=if correct_height {search_bounds[4]}else{bounds[1]}+rise;
+                    if correct_height {
+                        // Broad-phase surfaces are transformed in f32, while the sweep is f64.
+                        // Pad only candidate selection so boundary rounding cannot hide a shape.
+                        for k in 0..3 {
+                            let pad=region[k].abs().max(region[k+3].abs()).max(1.)*8.*f32::EPSILON;
+                            region[k]-=pad;region[k+3]+=pad;
+                        }
+                    }
+                    if !region.iter().all(|v|v.is_finite()) {
+                        skipped.push(format!("{label} [{j}]: sweep search bounds overflow"));continue;
+                    }
                     match collision_surfaces(vfs,&mut cache,&objects,l.strings(),&e.world_matrix,true,Some(region)) {
-                        Ok(found)=>for (shape,mut surface) in found.into_iter().enumerate() {
+                        Ok(found)=>{
+                          let first=surfaces.len();
+                          for (shape,mut surface) in found.into_iter().enumerate() {
                             let Some(b)=surface.bounds() else {continue;};
-                            if b[0]>search_bounds[3] || b[3]<search_bounds[0] || b[2]>search_bounds[5] || b[5]<search_bounds[2]
-                                || b[1]>bounds[1]+rise || b[4]<bounds[1]-drop {continue;}
+                            if b[0]>region[3] || b[3]<region[0] || b[2]>region[5] || b[5]<region[2]
+                                || b[1]>region[4] || b[4]<region[1] {continue;}
                             if let Surface::Mesh(mesh)=&mut surface {clip_surface(mesh,search_bounds);}
                             surfaces.push(surface);names.push(format!("{label} [{j}] collider {shape}"));
+                          }
+                          if check_contact && surfaces.len()>first {
+                            match collision_body(vfs,&mut cache,&objects,l.strings(),e.world_matrix,true) {
+                                Ok((body,solid))=>contact_supports.push((format!("{label} [{j}]"),e.id.text(),body,solid)),
+                                Err(err)=>skipped.push(format!("{label} [{j}] full contact geometry: {err}")),
+                            }
+                          }
                         },
                         Err(err)=>skipped.push(format!("{label} [{j}]: {err}")),
                     }
@@ -229,8 +336,10 @@ pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:boo
                 scan(&l, &e.path, &mut surfaces, &mut names, &mut skipped);
             }
         }
-        println!("{geometry_label}-surface search: {} static candidates, {} unavailable", surfaces.len(), skipped.len());
-        for name in &names { println!("  surface candidate: {name}"); }
+        if !json_output {
+            println!("{geometry_label}-surface search: {} static candidates, {} unavailable", surfaces.len(), skipped.len());
+            for name in &names { println!("  surface candidate: {name}"); }
+        }
         for s in &skipped { eprintln!("unavailable surface: {s}"); }
         // Incomplete candidates could hide a higher support. Require an explicit, complete surface
         // layer or a plane instead of silently settling through an unreadable mesh.
@@ -241,20 +350,119 @@ pub(super) fn ground(vfs: &GameVfs, source: &str, spec: &str, collision_mode:boo
             d
         }
     };
+    let mut sampled_report=Value::Null;
     if dense {
-        let plan = risen_formats::placement::ground_plan_on(dense_mesh.as_ref().unwrap(), world_matrix, &surfaces,
-            height, drop, rise, gap, align, samples.unwrap_or(7), max_slope)?;
-        println!("ground {}: sampled tilt {:.3} degrees, normal {:?}, {} model/grid samples, gap {gap} cm",
+        let plan = if collision_mode {
+            risen_formats::placement::ground_colliders_on(&physical_body, world_matrix, &surfaces,
+                height, drop, rise, gap, align, samples.unwrap_or(7), max_slope)?
+        } else {
+            risen_formats::placement::ground_plan_on(dense_mesh.as_ref().unwrap(), world_matrix, &surfaces,
+                height, drop, rise, gap, align, samples.unwrap_or(7), max_slope)?
+        };
+        if !json_output {
+          println!("ground {}: sampled tilt {:.3} degrees, normal {:?}, {} model/grid samples, gap {gap} cm",
             layer.describe(i), plan.slope_degrees, plan.normal, plan.samples);
         println!("vertical offset {} cm; largest sampled underside clearance above requested gap {:.3} cm ({geometry_label} geometry)",
             plan.world_matrix[13]-world_matrix[13], plan.max_clearance);
+        }
+        sampled_report=json!({"slope_degrees":plan.slope_degrees,"normal":plan.normal,
+            "samples":plan.samples,"max_clearance_above_requested_gap_cm":plan.max_clearance});
         layer.lrent.set_world_matrix(i, plan.world_matrix)?;
     } else {
         if !d.is_finite() { return Err("ground offset overflows".into()); }
         println!("ground {}: vertical offset {d} cm, gap {gap} cm", layer.describe(i));
         layer.lrent.translate(i, [0., d, 0.])?;
     }
-    println!("  -> {:?}", layer.lrent.entities()[i].position());
+    let sampled_world_matrix=layer.lrent.entities()[i].world_matrix;
+    let mut correction_report=Value::Null;
+    if correct_height {
+        use risen_formats::sweep::{self,Target};
+        let e=&layer.lrent.entities()[i];
+        let objects:Vec<_>=e.property_sets.iter().map(|s|&s.object).collect();
+        let (body,_)=collision_body(vfs,&mut cache,&objects,layer.lrent.strings(),sampled_world_matrix,false)?;
+        let targets:Vec<_>=if let Some(y)=height {vec![Target::HorizontalPlane(y as f64)]}
+            else {contact_supports.iter().map(|(_,_,b,_)|Target::Body(b)).collect()};
+        let lower=world_matrix[13] as f64-drop as f64;
+        let upper=world_matrix[13] as f64+rise as f64;
+        let base=sampled_world_matrix[13] as f64;
+        // Leave half the user tolerance for f32 serialization, then revalidate that actual pose.
+        let swept=sweep::downward(&body,&targets,upper-base,lower-base,
+            (sweep_tolerance*0.5).max(sweep::MIN_TOLERANCE_CM))?;
+        let round_up=|y:f64|->Result<f32,Box<dyn std::error::Error>> {
+            let mut native=y as f32;
+            if (native as f64)<y {native=native.next_up();}
+            if !native.is_finite() {return Err("height correction exceeds native coordinate range".into());}
+            Ok(native)
+        };
+        let zero_y=round_up(base+swept.offset_y_cm)?;
+        let mut zero_world=sampled_world_matrix;zero_world[13]=zero_y;
+        let (zero_body,_)=collision_body(vfs,&mut cache,&objects,layer.lrent.strings(),zero_world,false)?;
+        let (_,zero_contact)=sweep::nearest(&zero_body,&targets)?;
+        if zero_contact.intersects || zero_contact.distance_cm>sweep_tolerance || zero_y as f64>upper {
+            return Err("height correction cannot represent a clear near-contact pose within f32 precision/search limits".into());
+        }
+        let mut final_world=zero_world;final_world[13]=round_up(zero_y as f64+gap as f64)?;
+        if (final_world[13] as f64)<lower || final_world[13] as f64>upper {
+            return Err("height correction plus requested gap exceeds original --max-drop/--max-rise limits".into());
+        }
+        let (final_body,_)=collision_body(vfs,&mut cache,&objects,layer.lrent.strings(),final_world,false)?;
+        let (_,final_contact)=sweep::nearest(&final_body,&targets)?;
+        if gap>=0. && final_contact.intersects {
+            return Err("nonnegative-gap height correction intersects a candidate after native pose validation".into());
+        }
+        correction_report=json!({"method":"conservative_downward_distance_advance","tolerance_cm":sweep_tolerance,
+            "tolerance_kind":"spatial_distance_not_vertical_error","iterations":swept.iterations,
+            "max_iterations":sweep::MAX_ITERATIONS,"start_world_y_cm":upper,"end_world_y_cm":lower,
+            "hit_candidate":swept.target,"hit":contact_report(&swept.contact,contact_tolerance),
+            "zero_gap_world_y_cm":zero_y,"zero_gap_distance_cm":zero_contact.distance_cm,
+            "delta_from_sampled_cm":final_world[13] as f64-base,
+            "gap_applied_after_sweep_cm":gap,"native_pose_validated":true});
+        if !json_output {
+            println!("height corrected by {:.6} cm from sampled pose; {} sweep queries, zero-gap distance {:.6} cm; requested vertical gap {gap} cm",
+                final_world[13] as f64-base,swept.iterations,zero_contact.distance_cm);
+        }
+        layer.lrent.set_world_matrix(i,final_world)?;
+    }
+    if check_contact {
+        use risen_formats::contact::{query,query_horizontal_plane};
+        let e=&layer.lrent.entities()[i];
+        let objects:Vec<_>=e.property_sets.iter().map(|s|&s.object).collect();
+        let (body,solid)=collision_body(vfs,&mut cache,&objects,layer.lrent.strings(),e.world_matrix,false)?;
+        let mut results=Vec::new();
+        if let Some(y)=height {
+            let mut r=contact_report(&query_horizontal_plane(&body,y as f64)?,contact_tolerance);
+            r["plane_height_cm"]=json!(y);
+            results.push(r);
+        } else {
+            for (name,guid,support,volumes) in &contact_supports {
+                let mut r=contact_report(&query(&body,support),contact_tolerance);
+                r["entity"]=json!(name);r["guid"]=json!(guid);r["solid_shapes"]=json!(volumes);
+                results.push(r);
+            }
+        }
+        if results.is_empty() {return Err("no complete candidate bodies for ground contact diagnostics".into());}
+        let nearest=results.iter().map(|r|r["distance_cm"].as_f64().unwrap()).fold(f64::INFINITY,f64::min);
+        let count=results.iter().filter(|r|r["intersects"]==true).count();
+        let report=json!({"entity":layer.describe(i),"guid":e.id.text(),"units":"cm",
+            "original_world_matrix":world_matrix,"sampled_world_matrix":sampled_world_matrix,"planned_world_matrix":e.world_matrix,
+            "vertical_offset_cm":e.world_matrix[13]-world_matrix[13],"requested_vertical_gap_cm":gap,
+            "intentional_embedding_requested":gap<0.,"sampled":sampled_report,"solid_shapes":solid,
+            "contact":{"query":"full_serialized_candidate_colliders","scope":if correct_height {
+                    "selected_entity_own_shapes_against_swept_static_candidates"
+                }else{"selected_entity_own_shapes_against_ground_support_candidates"},
+                "mesh_faces":"two_sided","intersect_zero_cm":1e-8,"tolerance_cm":contact_tolerance,
+                "nearest_distance_cm":nearest,"contact_or_overlap_count":count,"candidates":results},
+            "placement_corrected":correct_height,"height_correction":correction_report,"dry_run":dry});
+        if json_output {println!("{}",serde_json::to_string_pretty(&report)?);} else {
+            println!("full-geometry ground check: nearest distance {nearest:.6} cm; {count} candidates touching or overlapping");
+            for r in report["contact"]["candidates"].as_array().unwrap() {
+                println!("  {}: {}, distance {:.6} cm; points {} / {}",r["entity"].as_str().unwrap_or("horizontal plane"),
+                    r["status"].as_str().unwrap(),r["distance_cm"].as_f64().unwrap(),r["point_a"],r["point_b"]);
+            }
+            println!("touching and penetration are not distinguished; distance is spatial, requested gap is vertical");
+        }
+    }
+    if !json_output {println!("  -> {:?}", layer.lrent.entities()[i].position());}
     if !dry { save_placement(vfs, &layer, out)?; }
     Ok(())
 }

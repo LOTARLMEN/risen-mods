@@ -4,3 +4,4 @@ build/
 dist/
 notes/exports/
 rust/target/
+__pycache__/

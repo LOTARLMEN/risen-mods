@@ -18,6 +18,12 @@ pub enum Surface {
         radius: f32,
     }, // a == b is a sphere
 }
+/// Preserve native volume semantics: boxes/convexes are solids, cooked triangle meshes are shells.
+#[derive(Debug, Clone)]
+pub struct Shape {
+    pub surface: Surface,
+    pub solid: bool,
+}
 pub trait VerticalSurface {
     fn surface_y(&self, x: f32, z: f32, bottom: f32, top: f32) -> Option<f32>;
 }
@@ -28,15 +34,26 @@ impl VerticalSurface for Mesh {
 }
 impl VerticalSurface for Surface {
     fn surface_y(&self, x: f32, z: f32, bottom: f32, top: f32) -> Option<f32> {
+        self.vertical_range(x, z, bottom, top).map(|(_, high)| high)
+    }
+}
+impl Surface {
+    /// Both boundary intersections of a vertical segment, used for analytic undersides too.
+    pub fn vertical_range(&self, x: f32, z: f32, bottom: f32, top: f32) -> Option<(f32, f32)> {
+        if ![x, z, bottom, top].iter().all(|v| v.is_finite()) || bottom > top {
+            return None;
+        }
         match self {
-            Self::Mesh(m) => m.surface_y(x, z, bottom, top),
+            Self::Mesh(m) => m.vertical_range(x, z, bottom, top),
             Self::Capsule { a, b, radius } => {
                 // Infinite vertical line against a finite cylinder plus its spherical caps.
                 // Use centered f64 arithmetic to retain precision at distant world coordinates.
                 let a = a.map(f64::from);
                 let b = b.map(f64::from);
                 let radius = *radius as f64;
-                let p = [x as f64, 0., z as f64];
+                // Center Y as well as XZ: the quadratic otherwise loses precision far above zero.
+                let origin_y = (a[1] + b[1]) * 0.5;
+                let p = [x as f64, origin_y, z as f64];
                 let axis = std::array::from_fn::<_, 3, _>(|k| b[k] - a[k]);
                 let length = dot(axis, axis).sqrt();
                 let mut hits = Vec::new();
@@ -79,15 +96,16 @@ impl VerticalSurface for Surface {
                         ] {
                             let along = qu + y * u[1];
                             if along >= -1e-7 && along <= length + 1e-7 {
-                                hits.push(y);
+                                hits.push(y + origin_y);
                             }
                         }
                     }
                 }
-                hits.into_iter()
+                let hits: Vec<_> = hits.into_iter()
                     .filter(|&y| y.is_finite() && y >= bottom as f64 && y <= top as f64)
-                    .max_by(f64::total_cmp)
-                    .map(|y| y as f32)
+                    .collect();
+                Some((*hits.iter().min_by(|a,b| a.total_cmp(b))? as f32,
+                    *hits.iter().max_by(|a,b| a.total_cmp(b))? as f32))
             }
         }
     }
@@ -100,6 +118,27 @@ fn point(p: [f32; 3], m: &[f32; 16]) -> [f32; 3] {
     std::array::from_fn(|k| v[k] + m[12 + k])
 }
 impl Surface {
+    pub fn transformed(&self, world: &[f32; 16]) -> Result<Self, String> {
+        let uniform = scale(world)?;
+        let out = match self {
+            Self::Mesh(m) => {
+                m.validate().map_err(|e| e.to_string())?;
+                if m.triangles.is_empty() { return Err("empty solid mesh collider".into()); }
+                Self::Mesh(m.transformed(world).map_err(|e| e.to_string())?)
+            }
+            Self::Capsule { a, b, radius } => {
+                if !a.iter().chain(b).all(|v|v.is_finite()) || !radius.is_finite() || *radius <= 0. {
+                    return Err("invalid curved collider".into());
+                }
+                Self::Capsule { a: point(*a, world), b: point(*b, world), radius: radius * uniform }
+            }
+        };
+        if !out.bounds().is_some_and(crate::bounds::valid_box) {
+            return Err("invalid transformed collider bounds".into());
+        }
+        Ok(out)
+    }
+
     pub fn bounds(&self) -> Option<[f32; 6]> {
         match self {
             Self::Mesh(m) => m.bounds(),
@@ -117,7 +156,7 @@ impl Surface {
 
 /// Positive uniform scale and a rigid orientation, as supported by the native creation path.
 /// Triangle meshes cannot be scaled by Rev.2045 (Engine 0x65774d); refuse instead of inventing one.
-fn scale(m: &[f32; 16]) -> Result<f32, String> {
+pub(crate) fn scale(m: &[f32; 16]) -> Result<f32, String> {
     if !m.iter().all(|v| v.is_finite())
         || [m[3], m[7], m[11]] != [0.; 3]
         || (m[15] - 1.).abs() > 1e-3
@@ -224,6 +263,13 @@ pub fn surfaces(
     region: Option<[f32; 6]>,
     mut load: impl FnMut(&str) -> Result<Arc<CollisionMesh>, String>,
 ) -> Result<Vec<Surface>, String> {
+    Ok(collision_shapes(objects,strings,world,support,region,&mut load)?.into_iter().map(|s|s.surface).collect())
+}
+
+pub fn collision_shapes(
+    objects: &[&PropertyObject], strings: &[String], world: &[f32;16], support: bool,
+    region: Option<[f32;6]>, mut load: impl FnMut(&str)->Result<Arc<CollisionMesh>,String>,
+) -> Result<Vec<Shape>,String> {
     let mut result = Vec::new();
     for ps in objects
         .iter()
@@ -347,7 +393,7 @@ pub fn surfaces(
                 continue;
             }
             scale(world)?;
-            result.push(surface);
+            result.push(Shape { surface, solid: matches!(s.kind,3|4|5|6) });
         }
     }
     Ok(result)

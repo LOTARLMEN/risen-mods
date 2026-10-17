@@ -123,27 +123,49 @@ pub fn ensure_game_closed(root: &Path) -> Result<()> {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Manifest { root: PathBuf, files: Vec<BackupFile> }
+struct Manifest { root: PathBuf, #[serde(default)] scope: Scope, files: Vec<BackupFile> }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Scope { #[default] World, Assets }
 #[derive(Serialize, Deserialize)]
 struct BackupFile { path: String, existed: bool }
 
+#[cfg(test)]
 fn checked_path(root: &Path, relative: &str) -> Result<PathBuf> {
+    scoped_path(root, relative, Scope::World)
+}
+
+pub fn scoped_path(root: &Path, relative: &str, scope: Scope) -> Result<PathBuf> {
     let rel = Path::new(relative);
-    if !relative.starts_with("data/common/projects/")
+    let world = relative.starts_with("data/common/projects/") &&
+        [".lrent", ".sec", ".wrldatasc"].iter().any(|ext| relative.ends_with(ext));
+    let asset = scope == Scope::Assets && (
+        relative == "data/common/meshes/compiled_meshes.bin" ||
+        relative == "data/common/physics/compiled_collision_meshes.bin" ||
+        relative.starts_with("data/common/meshes/") && relative.ends_with("._xmsh") ||
+        relative.starts_with("data/common/physics/") && relative.ends_with("._xcom"));
+    if !(world || asset) || relative.contains(['\\', ':'])
+        || relative.split('/').any(|s| s.is_empty() || s == "." || s == ".." || s.ends_with(['.', ' ']))
         || rel.components().any(|c| !matches!(c, Component::Normal(_)))
-        || ![".lrent", ".sec", ".wrldatasc"].iter().any(|ext| relative.to_ascii_lowercase().ends_with(ext))
     { return Err(format!("unsafe world-edit path: {relative}").into()); }
     let mut path = root.to_path_buf();
     for part in rel.components() {
         path.push(part);
         match std::fs::symlink_metadata(&path) {
-            Ok(meta) if meta.file_type().is_symlink() => return Err(format!("refusing symlink: {}", path.display()).into()),
+            Ok(meta) if is_reparse(&meta) => return Err(format!("refusing symlink/reparse point: {}", path.display()).into()),
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => return Err(e.into()),
         }
     }
     Ok(path)
+}
+
+pub fn is_reparse(meta: &std::fs::Metadata) -> bool {
+    #[cfg(windows)] {
+        use std::os::windows::fs::MetadataExt;
+        return meta.file_attributes() & 0x400 != 0;
+    }
+    #[cfg(not(windows))] { meta.file_type().is_symlink() }
 }
 
 fn read_optional(path: &Path) -> Result<Option<Vec<u8>>> {
@@ -179,15 +201,25 @@ pub fn apply(root: &Path, changes: &[Change]) -> Result<PathBuf> {
 }
 
 fn apply_with(root: &Path, changes: &[Change], mut write: impl FnMut(&Path, &[u8]) -> Result<()>) -> Result<PathBuf> {
+    apply_scoped_with(root, changes, Scope::World, None, &mut write)
+}
+
+pub fn apply_assets(root: &Path, changes: &[Change], expected: &[Option<Vec<u8>>]) -> Result<PathBuf> {
+    apply_scoped_with(root, changes, Scope::Assets, Some(expected), atomic_write)
+}
+
+fn apply_scoped_with(root: &Path, changes: &[Change], scope: Scope, expected: Option<&[Option<Vec<u8>>]>,
+    mut write: impl FnMut(&Path, &[u8]) -> Result<()>) -> Result<PathBuf> {
     ensure_game_closed(root)?;
     let root = std::fs::canonicalize(root)?;
-    let paths: Vec<_> = changes.iter().map(|c| checked_path(&root, &c.path)).collect::<Result<_>>()?;
+    let paths: Vec<_> = changes.iter().map(|c| scoped_path(&root, &c.path, scope)).collect::<Result<_>>()?;
     let before: Vec<_> = paths.iter().map(|p| read_optional(p)).collect::<Result<_>>()?;
+    if expected.is_some_and(|e| e != before) { return Err("installed loose files differ from the staged baseline; rebuild the bundle".into()); }
     for (i, change) in changes.iter().enumerate() {
         if !change.replace && before[i].is_some() { return Err(format!("{} already exists", paths[i].display()).into()); }
         if changes[..i].iter().any(|c| c.path.eq_ignore_ascii_case(&change.path)) { return Err("duplicate output path".into()); }
     }
-    let backup = root.join("risen-mods/backup/world-edits").join(unique());
+    let backup = root.join(if scope == Scope::Assets { "risen-mods/backup/asset-edits" } else { "risen-mods/backup/world-edits" }).join(unique());
     std::fs::create_dir_all(&backup)?;
     for (i, change) in changes.iter().enumerate() {
         if let Some(bytes) = &before[i] {
@@ -199,7 +231,7 @@ fn apply_with(root: &Path, changes: &[Change], mut write: impl FnMut(&Path, &[u8
         std::fs::write(&after, &change.bytes)?;
         if std::fs::read(&after)? != change.bytes { return Err("installed snapshot verification failed".into()); }
     }
-    let manifest = Manifest { root, files: changes.iter().zip(&before).map(|(c, b)| BackupFile { path: c.path.clone(), existed: b.is_some() }).collect() };
+    let manifest = Manifest { root, scope, files: changes.iter().zip(&before).map(|(c, b)| BackupFile { path: c.path.clone(), existed: b.is_some() }).collect() };
     std::fs::write(backup.join("manifest.json"), serde_json::to_vec_pretty(&manifest)?)?;
     ensure_game_closed(&manifest.root)?;
     let mut applied = 0;
@@ -231,12 +263,35 @@ fn apply_with(root: &Path, changes: &[Change], mut write: impl FnMut(&Path, &[u8
 }
 
 pub fn restore(backup: &Path, force: bool) -> Result<()> {
+    restore_scoped(backup, force, Scope::World)
+}
+
+pub fn restore_assets(backup: &Path, force: bool) -> Result<()> {
+    restore_scoped(backup, force, Scope::Assets)
+}
+
+fn restore_scoped(backup: &Path, force: bool, scope: Scope) -> Result<()> {
+    restore_scoped_with(backup, force, scope, replace_optional)
+}
+
+fn replace_optional(path: &Path, bytes: &Option<Vec<u8>>) -> Result<()> {
+    match bytes {
+        Some(bytes) => atomic_write(path, bytes)?,
+        None => { if path.exists() { std::fs::remove_file(path)?; } }
+    }
+    Ok(())
+}
+
+fn restore_scoped_with(backup: &Path, force: bool, scope: Scope,
+    mut write: impl FnMut(&Path, &Option<Vec<u8>>) -> Result<()>) -> Result<()> {
     let m: Manifest = serde_json::from_slice(&std::fs::read(backup.join("manifest.json"))?)?;
+    if m.scope != scope { return Err(format!("backup scope is {:?}; use the matching restore command", m.scope).into()); }
     let root = std::fs::canonicalize(&m.root)?;
     ensure_game_closed(&root)?;
     let mut files = Vec::new();
     for (i, file) in m.files.iter().enumerate() {
-        let path = checked_path(&root, &file.path)?;
+        let path = scoped_path(&root, &file.path, scope)?;
+        if m.files[..i].iter().any(|f| f.path.eq_ignore_ascii_case(&file.path)) { return Err("duplicate path in backup".into()); }
         let before = if file.existed { Some(std::fs::read(backup.join(format!("{i}.before")))?) } else { None };
         let current = read_optional(&path)?;
         if current == before { continue; }
@@ -246,12 +301,29 @@ pub fn restore(backup: &Path, force: bool) -> Result<()> {
         files.push((path, before, current));
     }
     ensure_game_closed(&root)?;
-    for (path, before, expected) in files.into_iter().rev() {
-        if read_optional(&path)? != expected { return Err(format!("{} changed during restore", path.display()).into()); }
-        match before {
-            Some(bytes) => atomic_write(&path, &bytes)?,
-            None => { if path.exists() { std::fs::remove_file(&path)?; } }
+    let mut restored = Vec::new();
+    let result = (|| -> Result<()> {
+        for i in (0..files.len()).rev() {
+            let (path, before, expected) = &files[i];
+            if read_optional(path)? != *expected { return Err(format!("{} changed during restore", path.display()).into()); }
+            write(path, before)?; restored.push(i);
+            if read_optional(path)? != *before { return Err("restored file verification failed".into()); }
         }
+        Ok(())
+    })();
+    if let Err(error) = result {
+        let mut failures = Vec::new();
+        for i in restored.into_iter().rev() {
+            let (path, before, expected) = &files[i];
+            let rollback = (|| -> Result<()> {
+                if read_optional(path)? != *before { return Err("file changed after restore".into()); }
+                replace_optional(path, expected)?;
+                if read_optional(path)? != *expected { return Err("restore rollback verification failed".into()); }
+                Ok(())
+            })();
+            if let Err(e) = rollback { failures.push(format!("{}: {e}", path.display())); }
+        }
+        return Err(format!("{error}; restore rollback failures: {failures:?}; backup: {}", backup.display()).into());
     }
     Ok(())
 }
@@ -326,6 +398,77 @@ mod tests {
         assert_eq!(std::fs::read(t.0.join("data/common/projects/World.wrldatasc")).unwrap(), b"later edit");
         restore(&backup, true).unwrap();
         assert_eq!(std::fs::read(t.0.join("data/common/projects/World.wrldatasc")).unwrap(), b"original");
+    }
+    #[test]
+    fn asset_transaction_restores_cache_removes_new_resources_and_keeps_world_scope_separate() {
+        let t = Temp::new();
+        let cache = "data/common/meshes/compiled_meshes.bin";
+        t.file(cache, b"old cache");
+        t.file("data/common/projects/other.lrent", b"confirmed scene");
+        let changes = [
+            Change { path: "data/common/meshes/RisenMods/test._xmsh".into(), bytes: b"mesh".to_vec(), replace: false },
+            Change { path: "data/common/physics/RisenMods/test._xcom".into(), bytes: b"collision".to_vec(), replace: false },
+            Change { path: cache.into(), bytes: b"new cache".to_vec(), replace: true },
+            change("New.sec", b"sector", false),
+        ];
+        let expected = [None, None, Some(b"old cache".to_vec()), None];
+        assert!(apply(&t.0, &changes).is_err());
+        let backup = apply_assets(&t.0, &changes, &expected).unwrap();
+        assert!(restore(&backup, false).is_err());
+        t.file(cache, b"later cache edit");
+        assert!(restore_assets(&backup, false).is_err());
+        assert!(t.0.join(&changes[0].path).is_file()); // preflight refused before any removal
+        t.file(cache, b"new cache");
+        restore_assets(&backup, false).unwrap();
+        restore_assets(&backup, false).unwrap();
+        assert_eq!(std::fs::read(t.0.join(cache)).unwrap(), b"old cache");
+        for i in [0,1,3] { assert!(!t.0.join(&changes[i].path).exists()); }
+        assert_eq!(std::fs::read(t.0.join("data/common/projects/other.lrent")).unwrap(), b"confirmed scene");
+    }
+    #[test]
+    fn assets_refuse_stale_baseline_and_rollback_mixed_paths_on_failure() {
+        let t = Temp::new();
+        let cache = "data/common/meshes/compiled_meshes.bin";
+        t.file(cache, b"old");
+        let changes = [
+            Change { path: cache.into(), bytes: b"new".to_vec(), replace: true },
+            Change { path: "data/common/meshes/RisenMods/a._xmsh".into(), bytes: b"mesh".to_vec(), replace: false },
+            change("New.sec", b"sector", false),
+        ];
+        assert!(apply_assets(&t.0, &changes, &[None,None,None]).is_err());
+        assert!(!t.0.join("risen-mods").exists());
+        let mut n = 0;
+        let error = apply_scoped_with(&t.0, &changes, Scope::Assets, Some(&[Some(b"old".to_vec()),None,None]), |p,b| {
+            n += 1; if n == 3 { return Err("injected asset write failure".into()); } atomic_write(p,b)
+        }).unwrap_err();
+        assert!(error.to_string().contains("rollback failures: []"));
+        assert_eq!(std::fs::read(t.0.join(cache)).unwrap(), b"old");
+        assert!(!t.0.join(&changes[1].path).exists());
+        assert!(!t.0.join(&changes[2].path).exists());
+    }
+    #[test]
+    fn asset_scope_rejects_other_file_types_aliases_and_traversal() {
+        let t = Temp::new();
+        for path in ["bin/Risen.exe", "data/common/meshes/a.dll", "data/common/meshes/other.bin",
+            "data/common/physics/a._xmsh", "data/common/meshes/../physics/a._xcom",
+            "data/common/meshes/a._xmsh:stream", "data/common/meshes//a._xmsh",
+            "data/common/meshes/./a._xmsh", "data/common/meshes/a. /b._xmsh"] {
+            assert!(scoped_path(&t.0, path, Scope::Assets).is_err(), "{path}");
+        }
+    }
+    #[test]
+    fn failed_asset_restore_reinstates_files_already_removed() {
+        let t = Temp::new();
+        let changes = [change("New.sec", b"sector", false),
+            Change { path: "data/common/meshes/new._xmsh".into(), bytes: b"mesh".to_vec(), replace: false }];
+        let backup = apply_assets(&t.0, &changes, &[None,None]).unwrap();
+        let mut n = 0;
+        let error = restore_scoped_with(&backup, false, Scope::Assets, |p,b| {
+            n+=1; if n==2 { return Err("injected restore failure".into()); } replace_optional(p,b)
+        }).unwrap_err();
+        assert!(error.to_string().contains("restore rollback failures: []"));
+        for c in &changes { assert_eq!(std::fs::read(t.0.join(&c.path)).unwrap(), c.bytes); }
+        restore_assets(&backup,false).unwrap();
     }
     #[test]
     fn collisions_traversal_and_reserved_names_are_refused() {

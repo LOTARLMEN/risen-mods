@@ -125,6 +125,93 @@ pub fn ground_plan_on<S: crate::collider::VerticalSurface>(mesh: &Mesh, world: [
     local.dedup();
     if local.len() < 3 { return Err("not enough model support samples".into()); }
     let original_bounds = mesh.transformed(&world).map_err(|e| e.to_string())?.bounds().unwrap();
+    ground_sampled_plan(world, original_bounds, surfaces, plane, drop, rise, gap, align, max_slope,
+        |pose| Ok((local.iter().map(|&p| point(p,pose)).collect(), lower.iter().map(|&p| point(p,pose)).collect())))
+}
+
+/// Physical grounding with analytic curved moving shapes. Polygon-only bodies keep the existing
+/// mesh sampling path. Curved bodies are resampled vertically after each change in orientation.
+/// This still samples the footprint; it does not provide continuous contact or simulate PhysX.
+pub fn ground_colliders_on<S: crate::collider::VerticalSurface>(body: &[crate::collider::Surface],
+    world: [f32;16], surfaces: &[S], plane: Option<f32>, drop:f32, rise:f32, gap:f32,
+    align:bool, samples:usize, max_slope:f32) -> Result<GroundPlan,String>
+{
+    use crate::collider::{self, Surface};
+    if body.is_empty() { return Err("no enabled solid collider on the moving entity".into()); }
+    if body.iter().all(|s| matches!(s, Surface::Mesh(_))) {
+        return ground_plan_on(&collider::merge_meshes(body.to_vec())?, world, surfaces, plane,
+            drop,rise,gap,align,samples,max_slope);
+    }
+    if !(3..=17).contains(&samples) || ![drop,rise,gap,max_slope].iter().all(|v|v.is_finite())
+        || drop < 0. || rise < 0. || !(0.0..90.0).contains(&max_slope)
+        || plane.is_some_and(|v|!v.is_finite()) {
+        return Err("invalid dense grounding inputs".into());
+    }
+    let transformed = body.iter().map(|s|s.transformed(&world)).collect::<Result<Vec<_>,_>>()?;
+    let bounds = collider::bounds(&transformed).ok_or("empty moving collider")?;
+    ground_sampled_plan(world,bounds,surfaces,plane,drop,rise,gap,align,max_slope,
+        |pose| collider_samples(body,pose,samples))
+}
+
+type GroundSamples = (Vec<[f32;3]>, Vec<[f32;3]>);
+
+fn collider_samples(body:&[crate::collider::Surface], pose:&[f32;16], samples:usize)
+    -> Result<GroundSamples,String>
+{
+    use crate::collider::Surface;
+    let mut lower = Vec::new();
+    let mut all = Vec::new();
+    for local in body {
+        let shape = local.transformed(pose)?;
+        let bounds = shape.bounds().ok_or("empty moving collider")?;
+        let mut xz = Vec::new();
+        for ix in 0..samples { for iz in 0..samples {
+            xz.push([bounds[0]+(bounds[3]-bounds[0])*ix as f32/(samples-1) as f32,
+                bounds[2]+(bounds[5]-bounds[2])*iz as f32/(samples-1) as f32]);
+        } }
+        match &shape {
+            Surface::Mesh(m) => {
+                xz.extend(m.vertices.iter().map(|p|[p[0],p[2]]));
+                all.extend(&m.vertices);
+            }
+            Surface::Capsule { a,b,radius } => {
+                // Segment stations and a circular silhouette keep long/thin or offset capsules
+                // represented even when an AABB grid misses most of their projected footprint.
+                // End centers also include the exact global bottom/top of the rounded shape.
+                for i in 0..samples {
+                    let t=i as f32/(samples-1) as f32;
+                    let center:[f32;3]=std::array::from_fn(|k|a[k]+(b[k]-a[k])*t);
+                    xz.push([center[0],center[2]]);
+                    for j in 0..16 {
+                        let angle=j as f32*std::f32::consts::TAU/16.;
+                        // One interior ring and the silhouette; intersections remain analytic.
+                        for fraction in [0.5,1.] {
+                            xz.push([center[0]+radius*fraction*angle.cos(),center[2]+radius*fraction*angle.sin()]);
+                        }
+                    }
+                }
+            }
+        }
+        for [x,z] in xz {
+            if let Some((low,high))=shape.vertical_range(x,z,-f32::MAX,f32::MAX) {
+                lower.push([x,low,z]);
+                all.push([x,low,z]);
+                all.push([x,high,z]);
+            }
+        }
+    }
+    for points in [&mut all,&mut lower] {
+        points.sort_by(|a,b|a[0].total_cmp(&b[0]).then(a[1].total_cmp(&b[1])).then(a[2].total_cmp(&b[2])));
+        points.dedup();
+        if points.len()<3 { return Err("not enough physical underside samples".into()); }
+    }
+    Ok((all,lower))
+}
+
+fn ground_sampled_plan<S: crate::collider::VerticalSurface>(world:[f32;16],original_bounds:[f32;6],
+    surfaces:&[S],plane:Option<f32>,drop:f32,rise:f32,gap:f32,align:bool,max_slope:f32,
+    sample:impl Fn(&[f32;16])->Result<GroundSamples,String>) -> Result<GroundPlan,String>
+{
     let bottom = original_bounds[1]-drop;
     let top = original_bounds[1]+rise;
     if !bottom.is_finite() || !top.is_finite() { return Err("ground search overflows".into()); }
@@ -151,7 +238,8 @@ pub fn ground_plan_on<S: crate::collider::VerticalSurface>(mesh: &Mesh, world: [
         let heading = unit(heading)?;
         let mut converged = false;
         for _ in 0..12 {
-            let hits: Vec<_> = lower.iter().map(|&p| terrain(point(p,&target))).collect::<Result<_,_>>()?;
+            let (_,lower)=sample(&target)?;
+            let hits: Vec<_> = lower.iter().map(|&p| terrain(p)).collect::<Result<_,_>>()?;
             let next = plane_normal(&hits)?;
             let slope = next[1].clamp(-1.,1.).acos().to_degrees();
             if slope > max_slope as f64 { return Err(format!("surface slope {slope:.2} exceeds limit {max_slope} degrees")); }
@@ -166,9 +254,9 @@ pub fn ground_plan_on<S: crate::collider::VerticalSurface>(mesh: &Mesh, world: [
         }
         if !converged { return Err("surface tilt did not converge; use a smaller object or explicit plane".into()); }
     }
+    let (local,_)=sample(&target)?;
     let mut delta = f32::NEG_INFINITY;
     for &p in &local {
-        let p=point(p,&target);
         let difference=terrain(p)?[1]+gap-p[1];
         delta=delta.max(difference);
     }
@@ -176,8 +264,8 @@ pub fn ground_plan_on<S: crate::collider::VerticalSurface>(mesh: &Mesh, world: [
     target[13]+=delta;
     if !target.iter().all(|v|v.is_finite()) { return Err("ground pose overflows".into()); }
     let mut clearance = 0.0f32;
+    let (_,lower)=sample(&target)?;
     for &p in &lower {
-        let p=point(p,&target);
         clearance=clearance.max(p[1]-terrain(p)?[1]-gap);
     }
     Ok(GroundPlan { world_matrix: target, normal: normal.map(|v|v as f32),
