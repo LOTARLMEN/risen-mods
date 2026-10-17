@@ -1631,3 +1631,29 @@ World::NewGame +0x236810. DLG_MENU_GAME (id 14) button row y=710 (notes/ui-recon
       DEVELOPMENT_LOG entries and TODO per skill risen-devlog
 - [x] README with install/uninstall steps (every mod, RU + EN)
 - [ ] Test full playthrough segments with saves (back up saves first)
+
+## Stage 7 — Vision: Risen as a live, agent-moddable game (ideas, user 2026-10-17; not planned in detail yet)
+Goal (user): make Risen popular again, e.g. with streamers who play it; give players and developers tools to change
+the game, up to "tell an agent what you want to see and it happens in the running game". Each block is several
+sessions; break one down into concrete items before starting it. Order = dependencies.
+- [ ] 7.1 Live bridge in the game (base for everything below; already planned as the 5.21 "LIVE world editing"
+      item): a dll mod with a local JSON API (named pipe / localhost socket), verbs like the CLI (find, show, move,
+      spawn, delete, set time/weather, give item, teleport). Resolve entities by GUID every command, run on the
+      game thread, check versions, log every command. Reuse World Debug code (selection, physics, clock, weather)
+- [ ] 7.2 Safety layer of the bridge (agent's addition): allow-list of verbs, limits (spawn count, area, rate),
+      undo of the last N commands, "live only" vs "bake into the world files", never touch saves without a backup.
+      Needed before anyone but the owner sends commands
+- [ ] 7.3 MCP server + agent tooling: expose the bridge and the risen CLI as MCP tools, so Claude / GPT / any
+      agent can work in the running game from a normal chat ("spawn 5 wolves behind me", "build a tower here").
+      Plus describe-scene tools (what is around the hero, templates by name) so the model can plan
+- [ ] 7.4 Own editor in Rust with a GUI on risen-formats (5.21 "risen-editor GUI" item): viewer first, then
+      editing; can talk to the live bridge (edit in the editor, see it in the game)
+- [ ] 7.5 Stream integration: chat commands (Twitch / YouTube / VK Play chat), donations (DonationAlerts,
+      Streamlabs webhooks) and channel points -> a queue -> an LLM turns the request into bridge commands ->
+      7.2 limits -> the game; in-game overlay shows who asked for what. Streamer controls: on/off, budget per
+      donation tier, moderation / approval, cooldowns, viewer voting
+- [ ] 7.6 Content for the community: ready "events" (monster wave, weather storm, treasure drop, NPC duel) that
+      chat or donations can trigger without an LLM; a gallery of user mods / world edits made with the tools
+- [ ] 7.7 Open questions: which platforms first (Twitch vs YouTube vs VK Play); LLM cost and latency per request
+      and who pays (streamer's own API key?); offline / local model option; how to distribute (installer
+      component, separate "Risen Live" package); talk to a streamer friend about what they would actually use
