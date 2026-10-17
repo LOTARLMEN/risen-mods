@@ -1,4 +1,4 @@
-Risen World Debug 0.2.0
+Risen World Debug 0.2.2
 
 РУССКИЙ
 Инструменты разработчика для Steam Risen x64 Rev.2045. Нужен загрузчик Risen Mods;

@@ -36,6 +36,8 @@ bool g_lightingReady=false,g_weatherOwned=false;
 struct WeatherRecord {char name[128];float weight;};
 WeatherRecord g_weatherSaved[128]{};
 int g_weatherCount=0,g_weatherMode=0;
+// State forced by the clear-weather key; live_bridge can pick another one (RisenDebugForceWeather).
+char g_forcedWeather[96]="Sunny_Full";
 constexpr float CAMERA_DEFAULT=300.f,CAMERA_MIN=.1f,CAMERA_MAX=10000.f;
 float g_liftCm=100.f,g_camSpeed=CAMERA_DEFAULT;
 const char kIni[]=
@@ -328,14 +330,14 @@ void LightingCommand(int action) {
                 Feedback("Invalid weather state; no changes applied");return;
             }
             snprintf(g_weatherSaved[i].name,sizeof(g_weatherSaved[i].name),"%s",name);g_weatherSaved[i].weight=weight;
-            if(strcmp(name,"Sunny_Full")==0)sunny=i;
+            if(strcmp(name,g_forcedWeather)==0)sunny=i;
         }
-        if(sunny<0){Feedback("Sunny_Full weather state unavailable");return;}
+        if(sunny<0){char message[180];snprintf(message,sizeof(message),"%s weather state unavailable",g_forcedWeather);Feedback(message);return;}
         g_weatherMode=mode;g_weatherCount=count;
         // Same mode/weights as native CON_Weather, through exported setters only.
         a.setWeatherMode(weather,2);
         for(int i=0;i<count;++i)a.setWeatherWeight(a.weatherAt(weather,i),i==sunny?1.f:0.f);
-        g_weatherOwned=true;Feedback("Weather: Sunny_Full ON (press again to restore)");return;
+        g_weatherOwned=true;char message[180];snprintf(message,sizeof(message),"Weather: %s ON (press again to restore)",g_forcedWeather);Feedback(message);return;
     }
     if(action==NextDay){
         uint32_t day=*a.clockDay(clock),year=*a.clockYear(clock);
@@ -521,9 +523,43 @@ DWORD WINAPI Worker(void*) {
 }
 // Called by test_start.dll (game thread) when a test start finished loading.
 extern "C" __declspec(dllexport) void RisenDebugTestStart(){g_testStart=true;}
+// Called by live_bridge.dll on the game thread. World Debug stays the only owner of the forced weather, so
+// disabling debugging still restores it. Clear weather on/off; returns 1 on, 0 off, -1 refused (message says why).
+extern "C" __declspec(dllexport) int RisenDebugClearWeather(int on,char* message,int size){
+    if(!ApiInit()||!g_lightingReady){snprintf(message,size,"time/weather API unavailable (see log)");return -1;}
+    if(!g_enabled){snprintf(message,size,"World Debug is off: enable it in F10 (a test start enables it)");return -1;}
+    if((on!=0)!=g_weatherOwned)LightingCommand(ClearWeather);
+    snprintf(message,size,"%s",g_feedback);return g_weatherOwned?1:0;
+}
+// Force one weather state by name (live_bridge, game thread); 1 forced, -1 refused. The clear-weather key and
+// RisenDebugClearWeather keep using this name until the next call; restoring works as usual.
+extern "C" __declspec(dllexport) int RisenDebugForceWeather(const char* name,char* message,int size){
+    if(!ApiInit()||!g_lightingReady){snprintf(message,size,"time/weather API unavailable (see log)");return -1;}
+    if(!g_enabled){snprintf(message,size,"World Debug is off: enable it in F10 (a test start enables it)");return -1;}
+    if(!name||!*name||strlen(name)>=sizeof(g_forcedWeather)){snprintf(message,size,"bad weather state name");return -1;}
+    if(g_weatherOwned)RestoreWeather();
+    char previous[sizeof(g_forcedWeather)];memcpy(previous,g_forcedWeather,sizeof(previous));
+    snprintf(g_forcedWeather,sizeof(g_forcedWeather),"%s",name);
+    LightingCommand(ClearWeather);
+    if(!g_weatherOwned)memcpy(g_forcedWeather,previous,sizeof(previous)); // unknown name: keep the old default
+    snprintf(message,size,"%s",g_feedback);return g_weatherOwned?1:-1;
+}
+// Weather catalogue as a JSON object {"mode":N,"forced":bool,"states":[{"name":..,"w":..},..]}; false if unavailable.
+extern "C" __declspec(dllexport) bool RisenDebugWeatherList(char* out,int size){
+    if(!ApiInit()||!g_lightingReady||size<64)return false;
+    void* weather=Module(a.weatherVtable);if(!weather)return false;
+    int count=a.weatherCount(weather);if(count<0||count>128)return false;
+    int n=snprintf(out,size,"{\"mode\":%d,\"forced\":%s,\"states\":[",a.weatherMode(weather),g_weatherOwned?"true":"false");
+    for(int i=0;i<count&&n<size-160;++i){void* state=a.weatherAt(weather,i);
+        const char* name=state?a.stringText(a.weatherName(state)):nullptr;char clean[96]{};
+        for(int j=0;name&&name[j]&&j<95;++j)clean[j]=name[j]=='"'||name[j]=='\\'||name[j]<0x20?'_':name[j];
+        n+=snprintf(out+n,size-n,"%s{\"name\":\"%s\",\"w\":%.2f}",i?",":"",clean,state?a.weatherWeight(state):0.f);
+    }
+    snprintf(out+n,size-n,"]}");return true;
+}
 BOOL WINAPI DllMain(HINSTANCE instance,DWORD reason,LPVOID) {
     if(reason==DLL_PROCESS_ATTACH) {
-        DisableThreadLibraryCalls(instance);ModInit(instance,"world_debug");Log("Risen World Debug 0.2.0");
+        DisableThreadLibraryCalls(instance);ModInit(instance,"world_debug");Log("Risen World Debug 0.2.2");
         g_page.iniPath=IniPath(kIni);ConfigLoad();
         if(HANDLE thread=CreateThread(nullptr,0,Worker,nullptr,0,nullptr))CloseHandle(thread);
     }

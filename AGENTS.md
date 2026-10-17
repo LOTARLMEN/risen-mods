@@ -30,7 +30,8 @@
   `notes/geometry-placement.md` — ground/snap/contact и ограничения физики;
   `notes/asset-editing.md` — пробные собственные модели, cooking/cache и ещё не проверенные в игре возможности;
   `notes/world-debug.md` — управление объектами/камерой;
-  `notes/crash-diagnostics.md` — текущая диагностика загрузки/выгрузки мира.
+  `notes/crash-diagnostics.md` — текущая диагностика загрузки/выгрузки мира;
+  `notes/live-bridge.md` — live bridge: команды запущенной игре через `risen live`, горячая перезагрузка команд.
 - Старый редактор и его исходники находятся вне проекта: `D:\RisenModding\ed_new\Risen Editor`
   и `D:\RisenModding\ed_src\RisenEditor-master`. Его сериализация содержит известные ошибки:
   проверяй по native RE/корпусу, не копируй предположения без проверки. Свой GUI пока в плане.
@@ -99,4 +100,5 @@
 - В `.agents/skills/<name>/SKILL.md` — пошаговые процедуры; открывай нужный перед задачей:
   `risen-deploy-test` (сборка → bin → запуск и лог), `risen-crash-triage` (вылеты, улики, дампы),
   `risen-world-edit` (правки мира/ассетов через CLI, установка/откат), `risen-re-patch` (RE и безопасные хуки),
-  `risen-release` (релиз), `risen-devlog` (формат TODO и дневника).
+  `risen-release` (релиз), `risen-devlog` (формат TODO и дневника),
+  `risen-live-bridge` (состояние и правки запущенной игры через `risen live`, обновление команд без перезапуска).

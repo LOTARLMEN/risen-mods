@@ -1542,6 +1542,9 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
 - [ ] World Debug 0.2.0 time/weather (deployed 2026-10-17 10:33:35). USER 2026-10-17: NUMPAD3 makes the
       sky clearer but rather overcast; rain/thunderstorm never appear. Time keys not reported separately.
   - [ ] Catch/trigger rain and thunderstorm (user wish: call them sometimes, or at least be able to catch them).
+        FOUND 2026-10-17: the catalogue (26 states in Testlevel_Plane) has Stormy, Stormy_Rain, Foggy, Foggy_Rain,
+        Sunny_Half(_02), Gyrger_*, Dungeon_*; forcing Stormy_Rain (mode 2, weight 1) gives rain + thunderstorm,
+        USER CONFIRMED via `risen live weather Stormy_Rain`. Left: a key / F10 choice or timed random weather.
         First log the full eCWeatherAdmin catalogue (names + blend factors + mode) per world and over time;
         check whether rain/storm states exist outside the game start, where precipitation/lightning come from
         (weather state vs separate effect/script, e.g. a Sunny_Full-like state per weather), and whether
@@ -1679,19 +1682,43 @@ sessions; break one down into concrete items before starting it. Order = depende
           right, lift 2 m falls back down, 10 m teleport with yaw 0 - camera follows, walking/jumping fine.
           Open: `--ground` snap (needs a raycast export), camera pitch (the "looks down" item of 5.23)
           Plan was: `teleport x y z [--yaw]`, `look yaw [pitch]`; check camera follows and no falling through the ground
-    - [ ] B2 Find: `near [--radius 2000] [--limit 20] [--kind item|npc|any] [--name substr]` -> compact list
+    - [x] B2 DONE 2026-10-17 (0.3.2): `near [--radius cm] [--limit n] [--kind item|npc|object] [--name part] [--all]`,
+          `show <guid>`. Game gCWorld::EnumEntities(cb, ctx, 1) = every layer of the enabled sectors, statics too
+          (World: 19783 entities, 0 ms). GUID = virtual GetID, slot found at init in the eCEntity and
+          eCDynamicEntity vtables (41); printed like risen-formats format_guid. Default filter: Script
+          IsProcessingRangeEntered (loaded but not spawned entities - e.g. Testlevel_Plane's NPCs of disabled
+          sectors - are outside it; USER CONFIRMED nothing stands there) and no carried items (GetOwner /
+          IsAttachedToSlot: Hero_Head_Player, It_Armor_Player); --all shows everything. show adds dynamic,
+          processing, carried, rotation rows (scale included), distance
+          Plan was: `near [--radius 2000] [--limit 20] [--kind item|npc|any] [--name substr]` -> compact list
           GUID/name/x,y,z/distance sorted by distance; `show <guid>` -> fuller per-GUID info (template, flags,
           position/rotation). RE: iterate entities of the scene / processing range (export to find)
-    - [ ] B3 Edit: `move <guid> x y z`, `rotate <guid> yaw [pitch roll]`, `freeze|release <guid>` - World Debug
+    - [x] B3 DONE 2026-10-17 (0.4.0): `move <guid> x y z` (~ relative to the entity), `rotate <guid> <yaw|~d>`
+          (around world Y, tilt and scale kept) via Entity::MoveTo. Refused: hero, carried, not spawned,
+          > 100 m. USER CONFIRMED in World (Sara scene, crate Obj_Dec_Crate_01 scale 0.6): lifted 1 m twice,
+          rotated 45 deg, the user jumped onto it at the new place (collision follows). Live only; save/load
+          of a moved object not tested. Open: freeze/release, pitch/roll, NPCs (allowed, not tested)
+          Plan was: `move <guid> x y z`, `rotate <guid> yaw [pitch roll]`, `freeze|release <guid>` - World Debug
           Freeze/SetPosition code moved into shared/ (or the bridge calls world_debug exports); GUID resolved
           every command; refuse NPC/hero/attached/out-of-range like World Debug unless `--force-npc` later
           RE: rotation setter (SetWorldMatrix / PSRigidBody orientation) with physics sync
-    - [ ] B4 Time/weather: `time HH:MM`, `day +1`, `weather clear|restore|list` via world_debug exports
+    - [x] B4 DONE 2026-10-17 (bridge 0.5.1 + World Debug 0.2.2): `time HH:MM` (clock setters in the bridge),
+          `weather on|off|list|<state>` via world_debug exports RisenDebugClearWeather / RisenDebugForceWeather /
+          RisenDebugWeatherList (World Debug stays the only weather owner; needs debugging on). USER CONFIRMED:
+          21:30 evening, back to 12:00; Stormy_Rain = dark sky, rain, thunderstorm; Foggy = fog; off restores.
+          Sunny_Full vs native weather look the same in Testlevel_Plane. `day +1` not done (NUMPAD6 exists)
+          Plan was: `time HH:MM`, `day +1`, `weather clear|restore|list` via world_debug exports
           (RisenDebugSetHour/... added there) to avoid two owners of the weather state
+    - [x] Hot reload (user idea 2026-10-17): host live_bridge.dll 0.6.0 (pipe, hand-over, `reload`) + verbs
+          bin\mods\live\live_verbs.dll (mods/live-verbs, all verbs). The host loads a shadow copy, so the file can
+          be replaced while the game runs; `risen live reload` swaps it on the game thread. CONFIRMED: 0.6.0 ->
+          0.6.1 swapped in a running game, then look ~180 worked (user saw the turn). build.bat deploy puts
+          live_verbs into bin\mods\live. Hooks (frame capture) still belong to the host -> restart.
+          Later idea: same host/payload split for World Debug or a loader-level unload protocol for all mods
     - [ ] B5 Frame: `frame [--width 960]` -> PNG in build/live/frame-<time>.png, reply = path only. D3D9 hook:
           GetRenderTargetData of the back buffer in onDraw when a capture is pending, downscale, write PNG on the
           worker thread (stb_image_write or own minimal PNG). Check it chains with menu.dll's hook and ReShade
-    - [ ] B6 Skill `.agents/skills/risen-live-bridge/SKILL.md` (verbs, context rules above, examples) + row in
+    - [x] B6 DONE 2026-10-17: skill risen-live-bridge, notes/live-bridge.md, AGENTS.md map. Was: skill (verbs, context rules above, examples) + row in
           notes/reference-implementations.md + notes/live-bridge.md (protocol)
   - [ ] "Bake": write a live change into the world files (risen-formats) so it survives a new game
 - [ ] 7.2 Safety layer of the bridge (agent's addition): allow-list of verbs, limits (spawn count, area, rate),

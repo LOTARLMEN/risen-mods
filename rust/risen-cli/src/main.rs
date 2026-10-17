@@ -486,7 +486,11 @@ enum Cmd {
         files: bool,
     },
     /// Send one command to the running game (dev mod live_bridge.dll) and print its one-line JSON reply:
-    /// `live ping`, `live status`, `live teleport x y z [yaw]`, `live look yaw` (`~` = relative: `~0 ~200 ~0`);
+    /// `live ping`, `live status`, `live teleport x y z [yaw]`, `live look yaw` (`~` = relative: `~0 ~200 ~0`),
+    /// `live near [--radius cm] [--limit n] [--kind item|npc|object] [--name part]`, `live show <guid>`,
+    /// `live move <guid> x y z`, `live rotate <guid> yaw`,
+    /// `live time HH:MM`, `live weather on|off|list|<state>` (weather needs World Debug on),
+    /// `live reload` (load a new bin\mods\live\live_verbs.dll without restarting the game);
     /// `live --raw '{"cmd":"status"}'` sends a request as is.
     /// Exit code 1 when the reply has "ok":false
     Live {

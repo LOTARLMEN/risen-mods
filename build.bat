@@ -40,7 +40,10 @@ cl %CFLAGS% installer\*.cpp /Fobuild\obj\installer\ build\obj\installer\installe
 if /i "%~1"=="deploy" (
     copy /y build\bin\version.dll ..\bin\version.dll >nul || exit /b 1
     if not exist ..\bin\mods mkdir ..\bin\mods
-    for %%F in (build\bin\mods\*.dll) do if /i not "%%~nF"=="startup_trace" if /i not "%%~nF"=="ui_lab" copy /y %%F ..\bin\mods\ >nul || exit /b 1
+    for %%F in (build\bin\mods\*.dll) do if /i not "%%~nF"=="startup_trace" if /i not "%%~nF"=="ui_lab" if /i not "%%~nF"=="live_verbs" copy /y %%F ..\bin\mods\ >nul || exit /b 1
+    rem live_verbs.dll is loaded by live_bridge.dll from bin\mods\live (hot reload), never by the loader.
+    if not exist ..\bin\mods\live mkdir ..\bin\mods\live
+    copy /y build\bin\mods\live_verbs.dll ..\bin\mods\live\ >nul || exit /b 1
     copy /y build\bin\scripts\Script_RisenMods.dll ..\bin\scripts\ >nul || exit /b 1
     echo deployed to ..\bin
 )
