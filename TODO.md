@@ -1458,7 +1458,7 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
         Bin DLLs unchanged: loader diagnostics 08:50:40, World Debug 0.1.2/October 15 18:54:53.
         Installed INIs preserved, startup freecam speed 819.20. No package/commit/push.
         Details/workflow: notes/asset-editing.md, tools/install-mesh-assets.ps1.
-  - [ ] First x64 hands-on asset test: appearance/material/culling and player collision in a NEW game,
+  - [x] First x64 hands-on asset test: appearance/material/culling and player collision in a NEW game,
         then save/load; existing-save loading separately. Game is running with the separate scene installed;
         startup success alone does not verify rendering or collision. Then move proven asset serialization/
         import into Rust core/CLI; investigate original terrain seams, blends, LOD and navigation separately.
@@ -1484,7 +1484,7 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
         Stage build/tests/asset-faces-20261016-110403/installed-test.json; no unrelated game changes.
         Steam PID 23840/11:06:12, main menu 11:06:20.
         User now confirms repaired models render filled and look normal (2026-10-16).
-        Corrected custom collision/walking and save-load still await an explicit report.
+        USER CONFIRMED 2026-10-17: custom models work (walking/collision), save/load does not break them.
         User permits agent to close game after completed tests; AGENTS updated.
 - [ ] Release of world edits: the installer must patch [Root] NoPhysical=false in mountlist_packed.ini and undo it
 - [ ] Future (user: "это прорыв"): LIVE world editing through a dll mod - an in-game bridge (local socket / named
@@ -1527,7 +1527,14 @@ our tools/pak_list.py for the pak directory. Old editor stays usable as a viewer
       INI SHA256 preserved, other DLL/INI unchanged. Backup world-debug-20261015-162506.
       Startup 16:25:17 confirms 0.1.1 and speed=10; 16:25:25 API/modules resolved, main menu.
       User explicitly deferred hands-on speed retest to next session; resume here.
-- [ ] World Debug 0.2.0 time/weather — hands-on test pending (deployed 2026-10-17 10:33:35):
+- [ ] World Debug 0.2.0 time/weather (deployed 2026-10-17 10:33:35). USER 2026-10-17: NUMPAD3 makes the
+      sky clearer but rather overcast; rain/thunderstorm never appear. Time keys not reported separately.
+  - [ ] Catch/trigger rain and thunderstorm (user wish: call them sometimes, or at least be able to catch them).
+        First log the full eCWeatherAdmin catalogue (names + blend factors + mode) per world and over time;
+        check whether rain/storm states exist outside the game start, where precipitation/lightning come from
+        (weather state vs separate effect/script, e.g. a Sunny_Full-like state per weather), and whether
+        mode 2 + weight 1 on a rain state is enough. Then a 'next weather state' key / timed random weather.
+        Also check why Sunny_Full looks overcast (other states' weights, time of day, sky/fog params).
       NUMPAD1 set F10 hour, NUMPAD2 cycle 06/12/18/00, NUMPAD6 next day, NUMPAD3 Sunny_Full / restore.
       Exports + retail clock/weather field stores verified by check-world-debug.py; 39 control checks.
       Check by hand: hour/day change visible, weather toggle and restore, disabling debug restores weather,
