@@ -10,7 +10,11 @@ small proxy `version.dll`; no game files or saves are changed, uninstalling = de
 | **No Limits** | Strength and dexterity go past the game's maximum of 200 (1000 by default, configurable), and their teachers train them that far instead of their personal limit. Learning point costs unchanged. |
 | **Fast Start** | The game window appears in ~10 s instead of ~32 s (buffered `.pak` reads, skips the DxDiag video card probe). |
 | **Window** | Borderless window over the whole monitor, hides the double Windows cursor, instant Alt+Tab. |
+| **Quick Lockpick** | Right mouse button on a locked chest or door opens it at once, no minigame. The game's own rules decide (lockpick skill, lockpick or key, key-only locks); a lockpick may break. |
 | **Menu** | `F10` in-game settings for all mods (RU / EN), styled with the game's own parchment, cursor and fonts, plus the status icons. Its own zip; the installer adds it with the first mod. |
+
+Only these are in [Releases](../../releases). Everything else in this repository is work in progress or
+developer tooling, see [Repository layout](#repository-layout).
 
 ## Install
 
@@ -38,14 +42,48 @@ Visual Studio 2022 Build Tools (MSVC x64). `build.bat` builds everything into `b
 `build.bat deploy` also copies it into `..\bin` (the repo is meant to live in `Risen\risen-mods`; close the game first).
 `powershell -File tools\package.ps1` makes `dist\Risen<Mod>-<version>.zip`.
 
-Layout: `loader/` (proxy `version.dll`, loads `bin\mods\*.dll`), `mods/<name>/` (one DLL each), `installer/`
-(`build\RisenModsInstaller.exe`), `shared/` (log, ini, keys, D3D9 hook, input capture, menu API, game art reader,
-Risen style), `third_party/imgui`, `tools/` (PE export / disassembly helpers used for reverse engineering),
-`notes/` (findings).
+The Rust tools build separately with Cargo in `rust/` (`cargo build --release` → `rust\target\release\risen.exe`).
 
 The mods call functions exported by the game's own DLLs (`Engine.dll`, `Game.dll`, `Script.dll`, ...) by their
 mangled names. No game code or assets are in this repository; the menu reads the game's textures and fonts from
 its archives at runtime.
+
+## Repository layout
+
+One repository, three kinds of content. Only the **released mods** reach players: `tools\package.ps1` zips a mod
+only if its folder has a `README.txt`, and the installer only offers what is in a release.
+
+**Released mods and what they need** (C++, `build.bat`)
+
+| Path | What it is |
+|---|---|
+| `loader/` | Proxy `bin\version.dll`: loads `bin\mods\*.dll`, the shared log, crash reports |
+| `mods/autoloot`, `speed`, `no-limits`, `fast-start`, `window`, `quick-lockpick`, `menu` | The mods, one DLL each (`mods/fast-start` → `fast_start.dll`); version = first line of the mod's `README.txt` |
+| `scripts/risenmods/` | `bin\scripts\Script_RisenMods.dll`: our script names for the game's own GUI (the "Mods" tab in the options) |
+| `shared/` | Code linked into every DLL: log, ini, keys, D3D9/ImGui overlay, input capture, F10 menu API, game art reader, Risen style |
+| `installer/` | `RisenModsInstaller.exe` (installs / updates the mods of the latest release) |
+| `third_party/imgui` | Dear ImGui |
+
+**Developer tools** (not in releases)
+
+| Path | What it is |
+|---|---|
+| `mods/world-debug` | In-game developer controls: move/freeze items, free camera, time and weather (has a README, not released yet) |
+| `mods/test-start` | "Test" button next to "New Game": a new game in a small test world, no intro (dev only) |
+| `mods/ui-lab`, `mods/startup-trace` | GUI tree dumps and a startup file-read trace (dev only) |
+| `rust/` | `risen-formats` library + `risen` CLI: game archives (VFS), worlds, layers, templates, string tables, collision, placement on the ground, own models; edits are installed as loose files with backup and undo. The base of a planned own world editor |
+| `tools/` | Reverse engineering helpers (`pe_disasm.py`, `pe_symbol.py`, ...), packaging, deploy scripts, regression checks (`check-*`, `test-*.ps1`) |
+
+**Knowledge and process**
+
+| Path | What it is |
+|---|---|
+| `notes/` | Findings about the game: start with [notes/reference-implementations.md](notes/reference-implementations.md) (how each technique is done here, with the reference code), then the topic notes (GUI, VFS, world editing, geometry, assets, crash diagnostics) |
+| `TODO.md` | The plan by stages, with findings per item |
+| `DEVELOPMENT_LOG.md` | Dated development diary (Russian) |
+| `AGENTS.md`, `.agents/skills/` | Working rules and step-by-step procedures for AI coding agents (deploy/test, crash triage, world edits, RE patches, release, diary) |
+
+Generated and local, not in git: `build/`, `dist/`, `backup/`, `rust/target/`, `notes/exports/`.
 
 ---
 
@@ -56,6 +94,10 @@ its archives at runtime.
 Файлы игры и сохранения не меняются. Проще всего ставить установщиком `RisenModsInstaller.exe` из
 [Releases](../../releases): сам найдёт игру, поставит выбранные моды вместе с меню F10 и будет их обновлять.
 Там же архивы для ручной установки, в каждом README с инструкцией.
+
+В репозитории, кроме выпущенных модов, лежат инструменты разработчика: World Debug, кнопка «Тест», Rust-библиотека
+и CLI для правки мира (основа будущего редактора), заметки по устройству игры и план. В релизы они не входят;
+что где лежит - в разделе [Repository layout](#repository-layout).
 
 **Баги и вылеты:** создайте [issue](../../issues) и приложите `Risen\bin\mods\RisenMods.log` - общий лог всех модов
 (после вылета и перезапуска игры - `RisenMods.prev.log`). Папку с ним открывает кнопка "Папка с логом" внизу окна F10.

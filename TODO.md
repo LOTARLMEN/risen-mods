@@ -1617,7 +1617,13 @@ World::NewGame +0x236810. DLG_MENU_GAME (id 14) button row y=710 (notes/ui-recon
       test_start.dll 11:35:13, world_debug.dll 11:35:15, Script_RisenMods.dll 11:35:15
 - [ ] Check by hand: vanilla New Game after a test start -> island with dialog + intro; Load/Save clicks don't
       start a game; Test from the in-game Esc menu
-- [ ] After a test start: optional teleport, 12:00 + clear weather, World Debug on (ask user)
+- [x] After a test start: World Debug on + [Debug] TargetHour + clear weather (user agreed 2026-10-17; USER
+      CONFIRMED 11:46, log "test start: debugging on, 12:00, clear weather on"). test_start calls world_debug's
+      export RisenDebugTestStart at the skipped intro (= loading done); World Debug applies it on the first tick
+      with a hero and a world clock (writes Enabled=1 if it was off). Teleport not needed so far
+- [ ] Test start: the hero/camera look down after loading (user 2026-10-17), should look ahead. Check PC_Hero /
+      PC_Camera rotation in Testlevel_Plane_Intern_01 (`risen entities Testlevel_Plane_Intern_01 --props`) vs the
+      island's start; fix via the CLI (world edit with backup) or set the camera pitch after the test start
 - [ ] AutoTest=1: auto-press at DLG_MENU_MAIN; mode B: load a prepared test save
 
 ## Stage 6 — Release

@@ -7,6 +7,8 @@
 //   (Risen.exe hard-codes -worldfile=World; the engine's own string is left alone);
 // - skips the new-game intro video (EndProgress PlayVideo(<lang>_Intro.bik), Game +0x87ac0f);
 // - skips the wake-up scene PS_Gamestart (Rtn_Player asks ExistsGameVariable("Gamestart"), Script_Game +0x1af175).
+// After the skipped intro (= loading done) World Debug, if loaded, gets RisenDebugTestStart: debugging on,
+// [Debug] TargetHour and clear weather once the hero exists.
 // The world name is served once; the skips stay on until the next New Game. All three are IAT hooks with a
 // return-address check, installed on the first arm after the call sites' bytes are verified; no code is patched.
 
@@ -76,6 +78,10 @@ void PlayVideo(void* app, const void* name, bool wait)
 {
     if (g_testRun && reinterpret_cast<uintptr_t>(_ReturnAddress()) == g_introReturn) {
         Log("test start: intro video skipped");
+        // Loading is done: World Debug (if loaded) turns itself on with TargetHour and clear weather.
+        HMODULE debug = GetModuleHandleA("world_debug.dll");
+        if (auto ready = debug ? reinterpret_cast<void (*)()>(GetProcAddress(debug, "RisenDebugTestStart")) : nullptr)
+            ready();
         return;
     }
     g_playVideo(app, name, wait);

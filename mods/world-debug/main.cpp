@@ -26,6 +26,8 @@ bool g_hasSelection=false,g_ready=false;
 std::atomic<bool> g_ownsCamera{false};
 char g_name[128]{},g_feedback[180]="Select a loose item: NUMPAD7";
 bool g_enabled=false;
+// Set by test_start.dll after a test start: enable debugging, TargetHour and clear weather once the hero exists.
+std::atomic<bool> g_testStart{false};
 int g_select=VK_NUMPAD7,g_physics=VK_NUMPAD5,g_lift=VK_NUMPAD9,g_camera=VK_NUMPAD0;
 int g_camSlower=VK_OEM_MINUS,g_camFaster=VK_OEM_PLUS;
 int g_timeKey=VK_NUMPAD1,g_cycleKey=VK_NUMPAD2,g_dayKey=VK_NUMPAD6,g_weatherKey=VK_NUMPAD3;
@@ -392,6 +394,7 @@ void Command(int action) {
         Log("lift target: %.3f %.3f %.3f",p.x,p.y,p.z);
     }
 }
+void ConfigLoad();
 void Tick() {
     if(!ApiInit())return;
     static bool checkedModules=false;
@@ -400,6 +403,12 @@ void Tick() {
         if(scene&&camera){checkedModules=true;Log("modules: scene and camera found by exported vtables");}
     }
     Entity player;
+    if(g_testStart&&Player(player)&&WorldClock()) {
+        g_testStart=false;
+        if(!g_enabled){IniWriteString("Debug","Enabled","1");ConfigLoad();}
+        LightingCommand(SetHour);if(!g_weatherOwned)LightingCommand(ClearWeather);
+        Log("test start: debugging on, %02d:%02d, clear weather %s",static_cast<int>(g_targetHour),static_cast<int>(g_targetHour*60.f+.5f)%60,g_weatherOwned?"on":"FAILED");
+    }
     if(!g_enabled||!Player(player)){ReturnCamera();if(!g_enabled||!player.e)RestoreWeather();if(!player.e)g_hasSelection=false;return;}
     if(g_weatherOwned){void* weather=Module(a.weatherVtable);if(!weather||a.weatherMode(weather)!=2){g_weatherOwned=false;g_weatherCount=0;}}
     if(g_ownsCamera){void* camera=Module(a.cameraVtable);if(!camera||!a.cameraActive(camera))g_ownsCamera=false;}
@@ -510,6 +519,8 @@ DWORD WINAPI Worker(void*) {
     return 0;
 }
 }
+// Called by test_start.dll (game thread) when a test start finished loading.
+extern "C" __declspec(dllexport) void RisenDebugTestStart(){g_testStart=true;}
 BOOL WINAPI DllMain(HINSTANCE instance,DWORD reason,LPVOID) {
     if(reason==DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(instance);ModInit(instance,"world_debug");Log("Risen World Debug 0.2.0");
